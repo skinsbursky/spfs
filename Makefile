@@ -4,8 +4,8 @@ LD = ld
 PROGRAM = fuse_stub
 CLIENT = fuse_client
 
-CFLAGS = -c -O2 -Wall -Werror -ggdb
-BUILDFLAGS = `pkg-config fuse --cflags --libs` $(CFLAGS)
+CFLAGS = -O2 -Wall -Werror -ggdb
+BUILDFLAGS = `pkg-config fuse --cflags --libs` $(CFLAGS) -c
 
 LIBS = -lfuse -lulockmgr -lpthread
 
