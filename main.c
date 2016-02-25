@@ -413,6 +413,6 @@ int main(int argc, char *argv[])
 		pr_info("See %s\n", log_file);
 		return kill_child_and_collect(pid);
 	}
-	pr_info("Fuse master started successfully\n");
+	pr_info("Fuse master started successfully with pid %d\n", pid);
 	return 0;
 }

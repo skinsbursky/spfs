@@ -98,6 +98,7 @@ static int proxy_opendir(const char *path, struct fuse_file_info *fi)
 	d->offset = 0;
 	d->entry = NULL;
 
+	pr_debug("%s: opened %s as fd %d\n", __func__, path, dirfd(d->dp));
 	fi->fh = (unsigned long) d;
 	return 0;
 }
@@ -145,6 +146,9 @@ static int proxy_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 static int proxy_releasedir(const char *path, struct fuse_file_info *fi)
 {
 	struct proxy_dirp *d = get_dirp(fi);
+
+	pr_debug("%s: closed %s as fd %d\n", __func__, path, dirfd(d->dp));
+
 	(void) path;
 	closedir(d->dp);
 	free(d);
@@ -319,6 +323,7 @@ static int proxy_open(const char *path, struct fuse_file_info *fi)
 		return -errno;
 
 	fi->fh = fd;
+	pr_debug("%s: opened %s as fd %d\n", __func__, path, fd);
 	return 0;
 }
 
@@ -414,6 +419,8 @@ static int proxy_flush(const char *path, struct fuse_file_info *fi)
 
 static int proxy_release(const char *path, struct fuse_file_info *fi)
 {
+	pr_debug("%s: closed %s as fd %d\n", __func__, path, fi->fh);
+
 	(void) path;
 	close(fi->fh);
 

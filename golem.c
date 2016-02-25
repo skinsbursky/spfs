@@ -34,12 +34,8 @@ const struct dentry_info_s *find_dentry_info(struct context_data_s *ctx, const c
 		else
 			len = strlen(dentry);
 
-		pr_debug("%s: dentry %s, len %d\n", __func__, dentry, len);
-
 		list_for_each_entry(child, &parent->children, siblings) {
-			pr_debug("%s: %s - %s\n", __func__, parent->name, child->name);
 			if (!strncmp(child->name, dentry, len)) {
-				pr_debug("%s: match\n", __func__);
 				parent = child;
 				found = 1;
 				break;
@@ -51,16 +47,10 @@ const struct dentry_info_s *find_dentry_info(struct context_data_s *ctx, const c
 		}
 		if (!slash)
 			break;
-		pr_debug("%s: slash: %p\n", __func__, slash);
 
 	}
 	pthread_mutex_unlock(&ctx->root_lock);
-	if (parent)
-		pr_debug("%s: return \"%s\"\n", __func__, parent->name);
-	else
-		pr_debug("%s: return NULL\n", __func__);
 	return parent;
-
 }
 
 static int golem_getattr(const char *path, struct stat *stbuf)
@@ -68,11 +58,13 @@ static int golem_getattr(const char *path, struct stat *stbuf)
 	struct context_data_s *ctx = get_context();
 	const struct dentry_info_s *info;
 
-	pr_debug("%s: searching for dentry\n", __func__);
+	pr_debug("%s: searching dentry for path %s\n", __func__, path);
 
 	info = find_dentry_info(ctx, path);
-	if (!info)
+	if (!info) {
+		pr_debug("%s: dentry for path %s wasn't found\n", __func__, path);
 		return -ENOENT;
+	}
 
 	pr_debug("%s: return stat for path %s\n", __func__, path);
 
