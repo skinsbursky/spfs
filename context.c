@@ -107,8 +107,7 @@ int set_work_mode(struct context_data_s *ctx, int mode)
 
 }
 
-static int setup_context(struct context_data_s *ctx,
-			 const char *root, const char *proxy_dir,
+static int setup_context(struct context_data_s *ctx, const char *proxy_dir,
 			 int mode)
 {
 	int err = -ENOMEM;
@@ -169,28 +168,28 @@ static int setup_log(struct context_data_s *ctx, const char *log_file, int verbo
 	return 0;
 }
 
-int context_init(const char *root, const char *proxy_dir,
-		  int mode, const char *log_file, const char *socket_path, int verbosity)
+int context_init(const char *proxy_dir, int mode, const char *log_file,
+		 const char *socket_path, int verbosity)
 {
 	struct context_data_s *ctx = get_context();
 	int err;
 
-	pr_debug("fuse: creating context (root: %s)\n", root);
-	pr_debug("%s: root        : %s\n", __func__, root);
-	pr_debug("%s: proxy_dir   : %s\n", __func__, proxy_dir);
-	pr_debug("%s: mode        : %d\n", __func__, mode);
-	pr_debug("%s: log         : %s\n", __func__, log_file);
-	pr_debug("%s: socket path : %s\n", __func__, socket_path);
-	pr_debug("%s: verbosity   : +%d\n", __func__, verbosity);
+	pr_debug("fuse: opening log %s\n", log_file);
 
 	err = setup_log(ctx, log_file, verbosity);
 	if (err) {
 		pr_crit("Failed to open log: %d\n", err);
 		return err;
 	}
-	pr_debug("fuse: opened log\n");
 
-	err = setup_context(ctx, root, proxy_dir, mode);
+	pr_debug("fuse: creating context\n");
+	pr_debug("%s: proxy_dir   : %s\n", __func__, proxy_dir);
+	pr_debug("%s: mode        : %d\n", __func__, mode);
+	pr_debug("%s: log         : %s\n", __func__, log_file);
+	pr_debug("%s: socket path : %s\n", __func__, socket_path);
+	pr_debug("%s: verbosity   : +%d\n", __func__, verbosity);
+
+	err = setup_context(ctx, proxy_dir, mode);
 	if (err) {
 		pr_crit("Failed to setup context: %d\n", err);
 		return err;
@@ -201,12 +200,6 @@ int context_init(const char *root, const char *proxy_dir,
 		pr_err("failed to create socket interface: %d\n", err);
 		return err;
 	}
-
-	if (chroot(root)) {
-		pr_crit("Failed to chroot into %s: %d\n", root, -errno);
-		return err;
-	}
-	pr_debug("fuse: chrooted to %s\n", root);
 
 	if(stat(ctx->proxy_dir, &ctx->root.stat) < 0) {
 		pr_crit("%s: failed to stat %s\n", __func__, ctx->proxy_dir);

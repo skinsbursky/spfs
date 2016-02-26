@@ -38,9 +38,8 @@ struct context_data_s {
 	pthread_t		sock_pthread;
 };
 
-int context_init(const char *root, const char *proxy_dir,
-		 int mode, const char *log_file, const char *socket_path,
-		 int verbosity);
+int context_init(const char *proxy_dir, int mode, const char *log_file,
+		 const char *socket_path, int verbosity);
 
 void context_fini(void);
 

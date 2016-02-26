@@ -81,7 +81,7 @@ int save_fd(int fd)
 		int new_fd;
 
 		pr_info("Duplicating decriptor %d to region above standart "
-			"descriptors\n");
+			"descriptors\n", fd);
 		/* We need to move log fd away from first 3 descriptors,
 		 * because they will be closed. */
 		new_fd = fcntl(fd, F_DUPFD, STDERR_FILENO + 1);

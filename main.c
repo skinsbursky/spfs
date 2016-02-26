@@ -30,7 +30,6 @@ static void help(int argc, char **argv, int help_level)
 	printf("usage: %s mountpoint [options]\n", argv[0]);
 	printf("\n");
 	printf("general options:\n");
-	printf("\t-r   --root            path to chroot to\n");
 	printf("\t-m   --proxy_dir       work mode\n");
 	printf("\t-p   --proxy_dir       path for proxy mode\n");
 	printf("\t-l   --log             log file\n");
@@ -48,12 +47,10 @@ static void help(int argc, char **argv, int help_level)
 }
 
 int parse_options(int *orig_argc, char ***orig_argv,
-		  char **root, char **proxy_dir, int *mode, char **log,
-		  char **socket_path,
+		  char **proxy_dir, int *mode, char **log, char **socket_path,
 		  int *verbosity)
 {
 	static struct option opts[] = {
-		{"root",	required_argument,	0, 'r'},
 		{"proxy_dir",	required_argument,	0, 'p'},
 		{"mode",	required_argument,	0, 'm'},
 		{"log",		required_argument,	0, 'l'},
@@ -82,7 +79,7 @@ int parse_options(int *orig_argc, char ***orig_argv,
 	while (1) {
 		char c;
 
-		c = getopt_long(argc, argv, "r:p:l:m:s:vh", opts, &oind);
+		c = getopt_long(argc, argv, "p:l:m:s:vh", opts, &oind);
 		if (c == -1)
 			break;
 
@@ -96,10 +93,6 @@ int parse_options(int *orig_argc, char ***orig_argv,
 		}
 
 		switch (c) {
-			case 'r':
-				*root = optarg;
-				nind += 2;
-				break;
 			case 'p':
 				*proxy_dir = optarg;
 				nind += 2;
@@ -141,10 +134,6 @@ int parse_options(int *orig_argc, char ***orig_argv,
 		exit(0);
 	}
 
-	if (!*root) {
-		pr_crit("Root for fuse daemon must be specified\n");
-		return -EINVAL;
-	}
 	if (!*proxy_dir) {
 		pr_crit("Proxy directory must be specified\n");
 		return -EINVAL;
@@ -242,17 +231,16 @@ static int report_to_parent(int pipe, int res)
 	return 0;
 }
 
-static int mount_fuse(const char *root, const char *proxy_dir,
-		      int mode, const char *log_file, const char *socket_path,
-		      int argc, char *argv[],
-		      int pipe, int verbosity)
+static int mount_fuse(const char *proxy_dir, int mode, const char *log_file,
+		      const char *socket_path, int pipe, int verbosity,
+		      int argc, char *argv[])
 {
 	int err;
 	struct fuse *fuse;
 	char *mountpoint;
 	int multithreaded;
 
-	err = context_init(root, proxy_dir, mode, log_file, socket_path, verbosity);
+	err = context_init(proxy_dir, mode, log_file, socket_path, verbosity);
 	if (err) {
 		pr_crit("Failed to create gateway ctx\n");
 		goto err;
@@ -366,14 +354,14 @@ static int wait_child_report(int pipe)
 int main(int argc, char *argv[])
 {
 	int err;
-	char *root = NULL, *proxy_dir = NULL;
+	char *proxy_dir = NULL;
 	char *log_file = "/var/log/fuse_spfs.log";
 	char *socket_path = "/var/run/fuse_control.sock";
 	int mode = FUSE_STUB_MODE, pid, pipes[2];
 	int verbosity = 0;
 
-	if (parse_options(&argc, &argv, &root, &proxy_dir,
-			  &mode, &log_file, &socket_path, &verbosity))
+	if (parse_options(&argc, &argv, &proxy_dir, &mode, &log_file,
+			  &socket_path, &verbosity))
 		return -1;
 
 	/* This is the control pipe, used to inform parent, that child
@@ -402,7 +390,9 @@ int main(int argc, char *argv[])
 			return -1;
 		case 0:
 			close(pipes[0]);
-			return mount_fuse(root, proxy_dir, mode, log_file, socket_path, argc, argv, pipes[1], verbosity);
+			return mount_fuse(proxy_dir, mode, log_file,
+					  socket_path, pipes[1], verbosity,
+					  argc, argv);
 	}
 
 	close(pipes[1]);
@@ -414,5 +404,11 @@ int main(int argc, char *argv[])
 		return kill_child_and_collect(pid);
 	}
 	pr_info("Fuse master started successfully with pid %d\n", pid);
+	pr_debug("%s: proxy_dir   : %s\n", __func__, proxy_dir);
+	pr_debug("%s: mode        : %d\n", __func__, mode);
+	pr_debug("%s: log         : %s\n", __func__, log_file);
+	pr_debug("%s: socket path : %s\n", __func__, socket_path);
+	pr_debug("%s: verbosity   : +%d\n", __func__, verbosity);
+
 	return 0;
 }
