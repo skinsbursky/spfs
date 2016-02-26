@@ -57,10 +57,8 @@ static int context_add_dentry(struct context_data_s *ctx, struct dentry_package_
 		*ptr = '\0';
 
 	ptr = dp->path;
-	if (*ptr++ != '/') {
-		pr_err("%s: path must begin with '/': \"%s\"\n", __func__, ptr);
-		return -EINVAL;
-	}
+	if (*ptr == '/')
+		ptr++;
 
 	if (pthread_mutex_lock(&ctx->root_lock)) {
 		pr_err("%s: failed to lock root\n", __func__);
