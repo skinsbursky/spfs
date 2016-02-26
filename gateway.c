@@ -78,7 +78,17 @@ static char *gateway_fix_path(const char *path)
 	return xsprintf("%s%s", ctx->proxy_dir, path);
 }
 
-static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
+static const struct fuse_operations *gateway_fh_operations(unsigned long fh)
+{
+	struct gateway_fh_s *gw_fh = (struct gateway_fh_s *)fh;
+
+	return get_operations(gw_fh->mode);
+}
+
+static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)__attribute__((always_inline));
+
+inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
+
 {
 	int err = 0;
 
@@ -106,12 +116,10 @@ static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 	return err;
 }
 
-#define GATEWAY_METHOD(__name, __path, ...)					\
+#define GATEWAY_METHOD(___ops, __name, __path, ...)				\
 ({										\
 	int ___err = -ENOSYS;							\
-	const struct fuse_operations *___ops = get_operations();		\
 										\
-	pr_debug("%s: %s\n", __func__, __path);					\
 	if (___ops->__name) {							\
 		char *___fpath;							\
 										\
@@ -121,15 +129,21 @@ static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 			___err = ___ops->__name(___fpath, ##__VA_ARGS__);	\
 		free(___fpath);							\
 	}									\
+	if (___err < 0)								\
+		pr_err("gateway: %s(\"%s\") = %d (%s)\n", #__name, __path,	\
+						___err, strerror(-___err));	\
+	else									\
+		pr_info("gateway: %s(\"%s\") = %d\n", #__name, __path, ___err);\
 	___err;									\
 })
 
 #define GATEWAY_METHOD_FH(__func, __path, __fi, ...)				\
 ({										\
+	const struct fuse_operations *__ops = gateway_fh_operations(__fi->fh);	\
 	uint64_t __gw_fh = gateway_pop_context(__fi);				\
 	int __err;								\
 										\
-	__err = GATEWAY_METHOD(__func, __path, ##__VA_ARGS__);			\
+	__err = GATEWAY_METHOD(__ops, __func, __path, ##__VA_ARGS__);		\
 										\
 	gateway_push_context(__fi, __gw_fh);					\
 	__err;									\
@@ -138,8 +152,10 @@ static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 #define GATEWAY_METHOD_RESTARTABLE(_func, _path, ...)				\
 ({										\
 	int _err;								\
+										\
 	do {									\
-		_err = GATEWAY_METHOD(_func, _path, ##__VA_ARGS__);		\
+		_err = GATEWAY_METHOD(ctx_operations(), _func,			\
+				      _path, ##__VA_ARGS__);			\
 	} while(_err == -ERESTARTSYS);						\
 	_err;									\
 })
@@ -228,12 +244,12 @@ static int gateway_rmdir(const char *path)
 
 static int gateway_symlink(const char *to, const char *from)
 {
-	return GATEWAY_POINT_RESTARTABLE(link, to, from);
+	return GATEWAY_POINT_RESTARTABLE(symlink, to, from);
 }
 
 static int gateway_rename(const char *from, const char *to)
 {
-	return GATEWAY_POINT_RESTARTABLE(link, from, to);
+	return GATEWAY_POINT_RESTARTABLE(rename, from, to);
 }
 
 static int gateway_link(const char *from, const char *to)
@@ -344,8 +360,8 @@ static int gateway_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 static int gateway_releasedir(const char *path, struct fuse_file_info *fi)
 {
-	return GATEWAY_METHOD_FI_RESTARTABLE(releasedir, path, fi,
-					     fi);
+	return GATEWAY_METHOD_FH(releasedir, path, fi,
+				 fi);
 }
 
 #if 0

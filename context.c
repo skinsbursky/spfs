@@ -37,12 +37,12 @@ struct context_data_s *get_context(void)
 	return &fs_context;
 }
 
-const struct fuse_operations *get_operations(void)
+const struct fuse_operations *get_operations(int mode)
 {
 	const struct context_data_s *ctx = get_context();
 	const struct fuse_operations *ops;
 
-	switch (ctx->mode) {
+	switch (mode) {
 		case FUSE_PROXY_MODE:
 			ops = ctx->operations[FUSE_PROXY_MODE];
 			break;
@@ -53,11 +53,16 @@ const struct fuse_operations *get_operations(void)
 			ops = ctx->operations[FUSE_GOLEM_MODE];
 			break;
 		default:
-			pr_crit("%s: unsupported mode: %d\n", __func__, ctx->mode);
+			pr_crit("%s: unsupported mode: %d\n", __func__, mode);
 			ops = ctx->operations[FUSE_STUB_MODE];
 			break;
 	}
 	return ops;
+}
+
+const struct fuse_operations *ctx_operations(void)
+{
+	return get_operations(get_context()->mode);
 }
 
 int wait_mode_change(int current_mode)

@@ -49,6 +49,7 @@ struct context_data_s *get_context(void);
 int set_work_mode(struct context_data_s *ctx, int mode);
 int wait_mode_change(int current_mode);
 
-const struct fuse_operations *get_operations(void);
+const struct fuse_operations *get_operations(int mode);
+const struct fuse_operations *ctx_operations(void);
 
 #endif
