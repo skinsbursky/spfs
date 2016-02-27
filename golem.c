@@ -74,57 +74,57 @@ static int golem_getattr(const char *path, struct stat *stbuf)
 
 static int golem_readlink(const char *path, char *buf, size_t size)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_mknod(const char *path, mode_t mode, dev_t rdev)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_mkdir(const char *path, mode_t mode)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_unlink(const char *path)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_rmdir(const char *path)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_symlink(const char *to, const char *from)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_rename(const char *from, const char *to)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_link(const char *from, const char *to)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_chmod(const char *path, mode_t mode)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_chown(const char *path, uid_t uid, gid_t gid)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_truncate(const char *path, off_t size)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_open(const char *path, struct fuse_file_info *fi)
@@ -152,17 +152,17 @@ static int golem_read(const char *path, char *buf, size_t size, off_t offset,
 static int golem_write(const char *path, const char *buf, size_t size,
 		off_t offset, struct fuse_file_info *fi)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_statfs(const char *path, struct statvfs *stbuf)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_flush(const char *path, struct fuse_file_info *fi)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_release(const char *path, struct fuse_file_info *fi)
@@ -174,13 +174,13 @@ static int golem_release(const char *path, struct fuse_file_info *fi)
 static int golem_fsync(const char *path, int isdatasync,
 		struct fuse_file_info *fi)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_setxattr(const char *path, const char *name, const char *value,
 			    size_t size, int flags)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_getxattr(const char *path, const char *name, char *value,
@@ -191,12 +191,12 @@ static int golem_getxattr(const char *path, const char *name, char *value,
 
 static int golem_listxattr(const char *path, char *list, size_t size)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_removexattr(const char *path, const char *name)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_opendir(const char *path, struct fuse_file_info *fi)
@@ -247,7 +247,7 @@ static int golem_releasedir(const char *path, struct fuse_file_info *fi)
 static int golem_fsyncdir(const char *path, int isdatasync,
 			    struct fuse_file_info *fi)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static void *golem_init(struct fuse_conn_info *conn)
@@ -277,71 +277,71 @@ static int golem_access(const char *path, int mask)
 static int golem_create(const char *path, mode_t mode,
 		struct fuse_file_info *fi)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_ftruncate(const char *path, off_t offset,
 		struct fuse_file_info *fi)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_fgetattr(const char *path, struct stat *stbuf,
 			    struct fuse_file_info *fi)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_lock(const char *path, struct fuse_file_info *fi, int cmd,
 			struct flock *lock)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_utimens(const char *path, const struct timespec tv[2])
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 #if 0
 static int golem_bmap(const char *path, size_t blocksize, uint64_t *idx)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_ioctl(const char *path, int cmd, void *arg,
 			 struct fuse_file_info *fi, unsigned int flags,
 			 void *ctx)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_poll(const char *path, struct fuse_file_info *fi,
 			struct fuse_pollhandle *ph, unsigned *reventsp)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 #endif
 static int golem_write_buf(const char *path, struct fuse_bufvec *buf,
 			     off_t off, struct fuse_file_info *fi)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_read_buf(const char *path, struct fuse_bufvec **bufp,
 			    size_t size, off_t off, struct fuse_file_info *fi)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_flock(const char *path, struct fuse_file_info *fi, int op)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 static int golem_fallocate(const char *path, int mode, off_t offset,
 			     off_t lenght, struct fuse_file_info *fi)
 {
-	return wait_mode_change(FUSE_GOLEM_MODE);
+	return -ENOSYS;
 }
 
 struct fuse_operations golem_operations = {
