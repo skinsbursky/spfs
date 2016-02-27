@@ -131,10 +131,11 @@ inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 		free(___fpath);							\
 	}									\
 	if (___err < 0)								\
-		pr_err("gateway: %s(\"%s\") = %d (%s)\n", #__name, __path,	\
-						___err, strerror(-___err));	\
+		pr_err("gateway: %s(\"%s\") = %d (%s)\n",			\
+				#__name, __path, ___err, strerror(-___err));	\
 	else									\
-		pr_info("gateway: %s(\"%s\") = %d\n", #__name, __path, ___err);\
+		pr_info("gateway: %s(\"%s\") = %d\n",				\
+				#__name, __path, ___err);			\
 	___err;									\
 })
 

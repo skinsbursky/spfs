@@ -3,44 +3,53 @@
 
 #include <sys/syslog.h>
 #include <errno.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <syscall.h>
+
+static inline pid_t gettid(void)
+{
+	return syscall(SYS_gettid);
+
+}
 
 #define pr_emerg(fmt, ...)			\
 	print_on_level(LOG_EMERG,		\
-			"EMERG : "fmt, ##__VA_ARGS__)
+			"EMERG : %d: "fmt, gettid(), ##__VA_ARGS__)
 
 #define pr_alert(fmt, ...)			\
 	print_on_level(LOG_ALERT,		\
-			"ALERT : "fmt, ##__VA_ARGS__)
+			"ALERT : %d: "fmt, gettid(), ##__VA_ARGS__)
 
 #define pr_crit(fmt, ...)			\
 	print_on_level(LOG_CRIT,		\
-			"CRIT  : "fmt, ##__VA_ARGS__)
+			"CRIT  : %d: "fmt, gettid(), ##__VA_ARGS__)
 
 #define pr_err(fmt, ...)			\
 	print_on_level(LOG_ERR,			\
-			"ERR   : "fmt, ##__VA_ARGS__)
+			"ERROR : %d: "fmt, gettid(), ##__VA_ARGS__)
 
 #define pr_warn(fmt, ...)			\
 	print_on_level(LOG_WARNING,		\
-			"WARN  : "fmt, ##__VA_ARGS__)
+			"WARN  : %d: "fmt, gettid(), ##__VA_ARGS__)
 
 #define pr_notice(fmt, ...)			\
 	print_on_level(LOG_NOTICE,		\
-			"NOTICE: "fmt, ##__VA_ARGS__)
+			"NOTICE: %d: "fmt, gettid(), ##__VA_ARGS__)
 
 #define pr_info(fmt, ...)			\
 	print_on_level(LOG_INFO,		\
-			"INFO  : "fmt, ##__VA_ARGS__)
+			"INFO  : %d: "fmt, gettid(), ##__VA_ARGS__)
 
 #define pr_debug(fmt, ...)			\
 	print_on_level(LOG_DEBUG,		\
-			"DEBUG : "fmt, ##__VA_ARGS__)
+			"DEBUG : %d: "fmt, gettid(), ##__VA_ARGS__)
 
 #define pr_perror(fmt, ...)			\
 ({						\
 	int _errno = errno;			\
         print_on_level(LOG_ERR,			\
-                       "ERR: "fmt": %d\n",	\
+                       "ERROR : %d: "fmt": %d\n", gettid(),	\
 		       ##__VA_ARGS__, errno);	\
 	errno = _errno;				\
 })
