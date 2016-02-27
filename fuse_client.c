@@ -18,13 +18,21 @@
 static int send_data(int sock, void *ctx, size_t len)
 {
 	ssize_t bytes;
+	int err;
 
 	bytes = send(sock, ctx, len, MSG_EOR);
 	if (bytes < 0) {
-		printf("failed to send package %d\n", -errno);
+		printf("failed to send package: %d\n", -errno);
 		return -1;
 	}
-	return 0;
+
+	bytes = recv(sock, &err, sizeof(err), 0);
+	if (bytes < 0) {
+		printf("failed to receive reply: %d", -errno);
+		return -1;
+	}
+
+	return err;
 }
 
 static int send_path(int sock, const char *path_to_send, const char *path_to_stat)
