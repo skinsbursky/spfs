@@ -85,41 +85,56 @@ static const struct fuse_operations *gateway_fh_operations(unsigned long fh)
 	return get_operations(gw_fh->mode);
 }
 
-static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)__attribute__((always_inline));
-
-inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
-
+inline static int gateway_stale_fh(struct fuse_file_info *fi)
 {
-	int err = 0;
+	return gateway_fh_mode(fi->fh) != get_context()->mode;
+}
 
-	if (gateway_fh_mode(fi->fh) != get_context()->mode) {
-		int (*open)(const char *path, struct fuse_file_info *fi);
-		int (*release)(const char *path, struct fuse_file_info *fi);
+inline static int gateway_open_fh(const char *path, struct fuse_file_info *fi)
+{
+	int err;
+	int (*open)(const char *path, struct fuse_file_info *fi);
 
-		open = (fi->flags & O_DIRECTORY) ? gateway_opendir : gateway_open;
-		release = (fi->flags & O_DIRECTORY) ? gateway_releasedir : gateway_release;
+	open = (fi->flags & O_DIRECTORY) ? gateway_opendir : gateway_open;
 
-		/* File handle is stale. Need to reopen. */
-		pr_info("%s: reopening file handle for %s (mode: %d -> %d)\n",
-				__func__, path, gateway_fh_mode(fi->fh),
-				get_context()->mode);
+	pr_info("%s: reopening file handle for %s (mode: %d -> %d)\n",
+			__func__, path, gateway_fh_mode(fi->fh),
+			get_context()->mode);
 
-		err = release(path, fi);
-		if (err)
-			pr_err("%s: failed to release fd for %s\n", __func__, path);
+	err = open(path, fi);
+	if (err)
+		pr_err("%s: failed to reopen file handler for %s\n",
+				__func__, path);
+	return err;
+}
 
-		err = open(path, fi);
-		if (err)
-			pr_err("%s: failed to reopen file handler for %s\n",
-					__func__, path);
-	}
+inline static int gateway_close_fh(const char *path, struct fuse_file_info *fi)
+{
+	int err;
+	int (*release)(const char *path, struct fuse_file_info *fi);
+
+	release = (fi->flags & O_DIRECTORY) ? gateway_releasedir : gateway_release;
+
+	pr_info("%s: releasing temporary file handle for %s (mode: %d -> %d)\n",
+			__func__, path, gateway_fh_mode(fi->fh),
+			get_context()->mode);
+
+	err = release(path, fi);
+	if (err)
+		pr_err("%s: failed to release temporary file handler for %s\n",
+				__func__, path);
 	return err;
 }
 
 /* TODO: gateway_fix_path() should be called with fh mode */
+/* TODO: Some mess still here. OPen of temporary fh can stuck as well
+ * Need to re-think all this macros-style... */
+
 #define GATEWAY_METHOD(___ops, __name, __path, ...)				\
 ({										\
 	int ___err = -ENOSYS;							\
+										\
+	pr_info("gateway: %s(\"%s\") = ...\n", #__name, __path);		\
 										\
 	if (___ops->__name) {							\
 		char *___fpath;							\
@@ -131,11 +146,9 @@ inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 		free(___fpath);							\
 	}									\
 	if (___err < 0)								\
-		pr_err("gateway: %s(\"%s\") = %d (%s)\n",			\
-				#__name, __path, ___err, strerror(-___err));	\
+		pr_err("= %d (%s)\n", ___err, strerror(-___err));		\
 	else									\
-		pr_info("gateway: %s(\"%s\") = %d\n",				\
-				#__name, __path, ___err);			\
+		pr_info("= %d\n", ___err);					\
 	___err;									\
 })
 
@@ -162,24 +175,27 @@ inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 	_err;									\
 })
 
+/* Unfortunatelly, libfuse copies fi instead of using the one, returned from
+ * open() call...
+ * Because of this, we can't reopen the file only once on more change.
+ * We have to do it each time and then close (otherwise we quickly run out of
+ * file descriptors */
 #define GATEWAY_METHOD_FI_RESTARTABLE(_func, _path, _fi, ...)			\
 ({										\
-	int _err;								\
+	int _err = 0;								\
 										\
-	_err = gateway_reopen_fh(_path, _fi);					\
-	if (_err == 0) {							\
-		do {								\
+	do {									\
+		int _stale_fh = gateway_stale_fh(_fi);				\
+										\
+		if (_stale_fh)							\
+			_err = gateway_open_fh(_path, _fi);			\
+										\
+		if (!_err)							\
 			_err = GATEWAY_METHOD_FH(_func, _path, _fi,		\
 						 ##__VA_ARGS__);		\
-			if (_err == -ERESTARTSYS) {				\
-				int __err;					\
-										\
-				__err = gateway_reopen_fh(_path, _fi);		\
-				if (__err)					\
-					_err = __err;				\
-			}							\
-		} while(_err == -ERESTARTSYS);					\
-	}									\
+		if (_stale_fh)							\
+			gateway_close_fh(_path, _fi);				\
+	} while (_err == -ERESTARTSYS);						\
 	_err;									\
 })
 
