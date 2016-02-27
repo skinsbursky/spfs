@@ -171,6 +171,7 @@ static void *sock_routine(void *ptr)
 
 		while (1) {
 			ssize_t bytes;
+			int err;
 
 			bytes = recv(sock, page, sizeof(page), 0);
 			if (bytes < 0) {
@@ -188,7 +189,22 @@ static void *sock_routine(void *ptr)
 
 			pr_debug("%s: !!!received %ld bytes\n", __func__, bytes);
 
-			execute_cmd(ctx, page);
+			err = execute_cmd(ctx, page);
+
+			bytes = send(sock, &err, sizeof(&err), MSG_NOSIGNAL | MSG_DONTWAIT | MSG_EOR);
+			if (bytes < 0) {
+				pr_perror("%s: write failed", __func__, bytes);
+				if (errno == EINTR) {
+					pr_debug("%s: exit\n", __func__);
+					return NULL;
+				}
+				break;
+			}
+			if (bytes == 0) {
+				pr_debug("%s: peer was closed\n", __func__);
+				break;
+			}
+
 		}
 		close(sock);
 	}

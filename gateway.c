@@ -116,6 +116,7 @@ inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 	return err;
 }
 
+/* TODO: gateway_fix_path() should be called with fh mode */
 #define GATEWAY_METHOD(___ops, __name, __path, ...)				\
 ({										\
 	int ___err = -ENOSYS;							\
