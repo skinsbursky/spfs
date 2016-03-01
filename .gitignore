@@ -1,0 +1,5 @@
+*.o
+*.d
+*~
+fuse_client
+fuse_stub
