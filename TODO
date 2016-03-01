@@ -1,0 +1,6 @@
+TODO list:
+1) script to mount NFS and change FUSE to proxy mode.
+2) Makefile "install" goal.
+3) Locks support.
+4) Automake.
+5) RPM
