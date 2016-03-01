@@ -94,6 +94,8 @@ int set_work_mode(struct context_data_s *ctx, int mode)
 	switch (mode) {
 		case FUSE_STUB_MODE:
 		case FUSE_PROXY_MODE:
+			/* TODO: hold underlying fs to make sure, that it won't
+			 * be removed from underneath of us ? */
 		case FUSE_GOLEM_MODE:
 			break;
 		default:
