@@ -12,6 +12,7 @@
 
 struct gateway_fh_s {
 	unsigned mode;
+	const struct fuse_operations *ops;
 	uint64_t fh;
 };
 
@@ -21,42 +22,37 @@ static int gateway_open(const char *path, struct fuse_file_info *fi);
 static int gateway_opendir(const char *path, struct fuse_file_info *fi);
 static int gateway_releasedir(const char *path, struct fuse_file_info *fi);
 
-static uint64_t gateway_fh_data(uint64_t gw_fh)
-{
-	return ((struct gateway_fh_s *)gw_fh)->fh;
-}
-
 static unsigned gateway_fh_mode(uint64_t gw_fh)
 {
 	return ((struct gateway_fh_s *)gw_fh)->mode;
 }
 
-static uint64_t gateway_pop_context(struct fuse_file_info *fi)
+static struct gateway_fh_s *gateway_pop_context(struct fuse_file_info *fi)
 {
-	uint64_t gw_fh = fi->fh;
+	struct gateway_fh_s *gw_fh = (struct gateway_fh_s *)fi->fh;
 
-	fi->fh = gateway_fh_data(fi->fh);
+	fi->fh = gw_fh->fh;
 
 	return gw_fh;
 }
 
-static void gateway_push_context(struct fuse_file_info *fi, uint64_t gw_fh)
+static void gateway_push_context(struct fuse_file_info *fi, struct gateway_fh_s *gw_fh)
 {
-	fi->fh = gw_fh;
+	fi->fh = (uint64_t)gw_fh;
 }
 
-static void gateway_set_fh(uint64_t gw_fh, struct fuse_file_info *fi)
+static void gateway_set_fh(struct gateway_fh_s *gw_fh, struct fuse_file_info *fi)
 {
-	((struct gateway_fh_s *)gw_fh)->fh = fi->fh;
-	fi->fh = gw_fh;
+	gw_fh->fh = fi->fh;
+	fi->fh = (uint64_t)gw_fh;
 }
 
-static void gateway_release_fh(uint64_t gw_fh)
+static void gateway_release_fh(struct gateway_fh_s *gw_fh)
 {
-	free((struct gateway_fh_s *)gw_fh);
+	free(gw_fh);
 }
 
-static int gateway_create_fh(uint64_t *gw_fh)
+static int gateway_create_fh(struct gateway_fh_s **gw_fh)
 {
 	struct gateway_fh_s *fh;
 
@@ -64,25 +60,19 @@ static int gateway_create_fh(uint64_t *gw_fh)
 	if (!fh)
 		return -ENOMEM;
 
-	fh->mode = get_context()->mode;
-	*gw_fh = (uint64_t)fh;
+	fh->mode = ctx_mode();
+	fh->ops = get_operations(fh->mode);
+	*gw_fh = fh;
 	return 0;
 }
 
-static char *gateway_fix_path(const char *path)
+static char *gateway_full_path(const char *path, int mode)
 {
 	const struct context_data_s *ctx = get_context();
 
-	if (ctx->mode != FUSE_PROXY_MODE)
+	if (mode != FUSE_PROXY_MODE)
 		return strdup(path);
 	return xsprintf("%s%s", ctx->proxy_dir, path);
-}
-
-static const struct fuse_operations *gateway_fh_operations(unsigned long fh)
-{
-	struct gateway_fh_s *gw_fh = (struct gateway_fh_s *)fh;
-
-	return get_operations(gw_fh->mode);
 }
 
 inline static int gateway_stale_fh(struct fuse_file_info *fi)
@@ -97,11 +87,13 @@ inline static int gateway_open_fh(const char *path, struct fuse_file_info *fi)
 
 	open = (fi->flags & O_DIRECTORY) ? gateway_opendir : gateway_open;
 
-	pr_info("%s: reopening file handle for %s (mode: %d -> %d)\n",
-			__func__, path, gateway_fh_mode(fi->fh),
-			get_context()->mode);
+	do {
+		pr_info("%s: reopening file handle for %s (mode: %d -> %d)\n",
+				__func__, path, gateway_fh_mode(fi->fh),
+				ctx_mode());
 
-	err = open(path, fi);
+		err = open(path, fi);
+	} while (err == -ERESTARTSYS);
 	if (err)
 		pr_err("%s: failed to reopen file handler for %s\n",
 				__func__, path);
@@ -126,23 +118,21 @@ inline static int gateway_close_fh(const char *path, struct fuse_file_info *fi)
 	return err;
 }
 
-/* TODO: gateway_fix_path() should be called with fh mode */
-/* TODO: Some mess still here. OPen of temporary fh can stuck as well
- * Need to re-think all this macros-style... */
-
-#define GATEWAY_METHOD(___ops, __name, __path, ...)				\
+/* This macro is used for _any_operation, which means that context was set
+ * already */
+#define GATEWAY_METHOD(__func, __path, __fh, ...)				\
 ({										\
 	int ___err = -ENOSYS;							\
 										\
-	pr_info("gateway: %s(\"%s\") = ...\n", #__name, __path);		\
+	pr_info("gateway: %s(\"%s\") = ...\n", #__func, __path);		\
 										\
-	if (___ops->__name) {							\
+	if (__fh->ops->__func) {						\
 		char *___fpath;							\
 										\
 		___err = -ENOMEM;						\
-		___fpath = gateway_fix_path(__path);				\
+		___fpath = gateway_full_path(__path, __fh->mode);		\
 		if (___fpath)							\
-			___err = ___ops->__name(___fpath, ##__VA_ARGS__);	\
+			___err = __fh->ops->__func(___fpath, ##__VA_ARGS__);	\
 		free(___fpath);							\
 	}									\
 	if (___err < 0)								\
@@ -152,34 +142,31 @@ inline static int gateway_close_fh(const char *path, struct fuse_file_info *fi)
 	___err;									\
 })
 
-#define GATEWAY_METHOD_FH(__func, __path, __fi, ...)				\
+/* This macro below is used for release() and releasedir(), because in this
+ * case only original fh matters.
+ * It's also used for any fi-related operation as a sub-macro. */
+#define GATEWAY_METHOD_FI(__func, __path, __fi, ...)				\
 ({										\
-	const struct fuse_operations *__ops = gateway_fh_operations(__fi->fh);	\
-	uint64_t __gw_fh = gateway_pop_context(__fi);				\
+	struct gateway_fh_s *__gw_fh = gateway_pop_context(__fi);		\
 	int __err;								\
 										\
-	__err = GATEWAY_METHOD(__ops, __func, __path, ##__VA_ARGS__);		\
+	__err = GATEWAY_METHOD(__func, __path, __gw_fh, ##__VA_ARGS__);		\
 										\
 	gateway_push_context(__fi, __gw_fh);					\
 	__err;									\
 })
 
-#define GATEWAY_METHOD_RESTARTABLE(_func, _path, ...)				\
-({										\
-	int _err;								\
-										\
-	do {									\
-		_err = GATEWAY_METHOD(ctx_operations(), _func,			\
-				      _path, ##__VA_ARGS__);			\
-	} while(_err == -ERESTARTSYS);						\
-	_err;									\
-})
-
-/* Unfortunatelly, libfuse copies fi instead of using the one, returned from
+/* This macro is used for all fi-related calls except:
+ * open(), opendir(), create(),
+ * and
+ * release() and releasedir().
+ * Unfortunatelly, libfuse copies fi instead of using the one, returned from
  * open() call...
- * Because of this, we can't reopen the file only once on more change.
- * We have to do it each time and then close (otherwise we quickly run out of
- * file descriptors */
+ * Because of this, we can't reopen the file only once on mode change.
+ * We have to open a correct file and close it instead on each time and the
+ * fi-related callback is called.
+ * Note: we have to _close_ the file each time, because otherwise we quickly
+ * run out of file descriptors */
 #define GATEWAY_METHOD_FI_RESTARTABLE(_func, _path, _fi, ...)			\
 ({										\
 	int _err = 0;								\
@@ -191,7 +178,7 @@ inline static int gateway_close_fh(const char *path, struct fuse_file_info *fi)
 			_err = gateway_open_fh(_path, _fi);			\
 										\
 		if (!_err)							\
-			_err = GATEWAY_METHOD_FH(_func, _path, _fi,		\
+			_err = GATEWAY_METHOD_FI(_func, _path, _fi,		\
 						 ##__VA_ARGS__);		\
 		if (_stale_fh)							\
 			gateway_close_fh(_path, _fi);				\
@@ -199,34 +186,62 @@ inline static int gateway_close_fh(const char *path, struct fuse_file_info *fi)
 	_err;									\
 })
 
-#define GATEWAY_OPEN_RESTARTABLE(_func, _path, _fi, ...)			\
+/* This macro is used for any operation without _active_ fh (including
+ * open(), opendir(), release(), releasedir() and create()).
+ * Temporary fh is created on stack to fit macro calling convention */
+#define GATEWAY_METHOD_FH_RESTARTABLE(_func, _path, _gw_fh, ...)		\
 ({										\
 	int _err;								\
-	uint64_t _gw_fh;							\
 										\
-	_err = gateway_create_fh(&_gw_fh);					\
-	if (_err == 0) {							\
-		_err = GATEWAY_METHOD_RESTARTABLE(_func, _path,			\
-						  ##__VA_ARGS__);		\
-		if (_err)							\
-			gateway_release_fh(_gw_fh);				\
-		else								\
-			gateway_set_fh(_gw_fh, _fi);				\
-	} else									\
-		pr_err("%s: failed to create gateway context for %s\n",		\
-			__func__, _path);					\
+	do {									\
+		_gw_fh->mode = ctx_mode();					\
+		_gw_fh->ops = get_operations(_gw_fh->mode);			\
+		_err = GATEWAY_METHOD(_func, _path, _gw_fh, ##__VA_ARGS__);	\
+	} while(_err == -ERESTARTSYS);						\
 	_err;									\
 })
 
-#define GATEWAY_POINT_RESTARTABLE(_func, _f, _s)				\
+/* This macro is used for any operation without fh.
+ * Temporary fh is created on stack to fit macro calling convention */
+#define GATEWAY_METHOD_RESTARTABLE(_func, _path, ...)				\
 ({										\
-	char *_ss;								\
+	struct gateway_fh_s __on_stack_fh, *__gw_fh = &__on_stack_fh;		\
+										\
+	GATEWAY_METHOD_FH_RESTARTABLE(_func, _path, __gw_fh, ##__VA_ARGS__);	\
+})
+
+
+/* This macro is called for open(), opendir(), and create() callbacks */
+#define GATEWAY_OPEN_RESTARTABLE(_func, _path, _fi, ...)			\
+({										\
+	int _err;								\
+	struct gateway_fh_s *_gw_fh;						\
+										\
+	_err = gateway_create_fh(&_gw_fh);					\
+	if (_err == 0)								\
+		_err = GATEWAY_METHOD_FH_RESTARTABLE(_func, _path, _gw_fh,	\
+						     ##__VA_ARGS__);		\
+	else									\
+		pr_err("%s: failed to create gateway context for %s\n",		\
+			__func__, _path);					\
+	if (_err)								\
+		gateway_release_fh(_gw_fh);					\
+	else									\
+		gateway_set_fh(_gw_fh, _fi);					\
+	_err;									\
+})
+
+/* This macro is called for link(), symlink() and rename(), where there are two
+ * paths to fix in case of PROXY mode. */
+#define GATEWAY_LINK_RESTARTABLE(_func, _f, _s)					\
+({										\
+	char *_fs;								\
 	int _err = -ENOMEM;							\
 										\
-	_ss = gateway_fix_path(_s);						\
-	if (_ss)								\
-		_err = GATEWAY_METHOD_RESTARTABLE(_func, _f, _ss);		\
-	free(_ss);								\
+	_fs = gateway_full_path(_s, get_context()->mode);			\
+	if (_fs)								\
+		_err = GATEWAY_METHOD_RESTARTABLE(_func, _f, _fs);		\
+	free(_fs);								\
 	_err;									\
 })
 
@@ -262,17 +277,17 @@ static int gateway_rmdir(const char *path)
 
 static int gateway_symlink(const char *to, const char *from)
 {
-	return GATEWAY_POINT_RESTARTABLE(symlink, to, from);
+	return GATEWAY_LINK_RESTARTABLE(symlink, to, from);
 }
 
 static int gateway_rename(const char *from, const char *to)
 {
-	return GATEWAY_POINT_RESTARTABLE(rename, from, to);
+	return GATEWAY_LINK_RESTARTABLE(rename, from, to);
 }
 
 static int gateway_link(const char *from, const char *to)
 {
-	return GATEWAY_POINT_RESTARTABLE(link, from, to);
+	return GATEWAY_LINK_RESTARTABLE(link, from, to);
 }
 
 static int gateway_chmod(const char *path, mode_t mode)
@@ -346,7 +361,7 @@ static int gateway_removexattr(const char *path, const char *name)
 
 static int gateway_release(const char *path, struct fuse_file_info *fi)
 {
-	return GATEWAY_METHOD_FH(release, path, fi,
+	return GATEWAY_METHOD_FI(release, path, fi,
 				 fi);
 }
 
@@ -378,7 +393,7 @@ static int gateway_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 static int gateway_releasedir(const char *path, struct fuse_file_info *fi)
 {
-	return GATEWAY_METHOD_FH(releasedir, path, fi,
+	return GATEWAY_METHOD_FI(releasedir, path, fi,
 				 fi);
 }
 

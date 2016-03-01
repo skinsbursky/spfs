@@ -60,9 +60,9 @@ const struct fuse_operations *get_operations(int mode)
 	return ops;
 }
 
-const struct fuse_operations *ctx_operations(void)
+int ctx_mode(void)
 {
-	return get_operations(get_context()->mode);
+	return get_context()->mode;
 }
 
 int wait_mode_change(int current_mode)

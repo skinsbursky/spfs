@@ -44,11 +44,11 @@ int context_init(const char *proxy_dir, int mode, const char *log_file,
 void context_fini(void);
 
 struct context_data_s *get_context(void);
+const struct fuse_operations *get_operations(int mode);
 
 int set_work_mode(struct context_data_s *ctx, int mode);
 int wait_mode_change(int current_mode);
 
-const struct fuse_operations *get_operations(int mode);
-const struct fuse_operations *ctx_operations(void);
+int ctx_mode(void);
 
 #endif
