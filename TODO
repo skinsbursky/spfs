@@ -1,4 +1,5 @@
 TODO list:
+0) Replace "Golem mode" with Proxy on actual fs (tmpfs is, probably, the best?)
 1) script to mount NFS and change FUSE to proxy mode.
 2) Makefile "install" goal.
 3) Locks support.
