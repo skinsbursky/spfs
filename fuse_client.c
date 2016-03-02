@@ -171,6 +171,12 @@ static int execude_path_cmd(int argc, char **argv)
 		return 1;
 	}
 
+	if (!socket_path) {
+		printf("Socket path wasn't provided\n");
+		help(argv[0]);
+		return 1;
+	}
+
 	sock = socket_create(socket_path);
 	if (sock < 0)
 		return 1;
