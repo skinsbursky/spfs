@@ -1,5 +1,7 @@
 #include "config.h"
 
+#define _GNU_SOURCE
+
 #include <unistd.h>
 #include <fuse.h>
 #include <stdio.h>
@@ -92,11 +94,20 @@ int set_work_mode(struct context_data_s *ctx, int mode)
 	}
 
 	switch (mode) {
-		case FUSE_STUB_MODE:
 		case FUSE_PROXY_MODE:
-			/* TODO: hold underlying fs to make sure, that it won't
-			 * be removed from underneath of us ? */
+			/* Take a reference to underlying fs to make sure, that
+			 * it won't be removed from underneath of us. */
+			ctx->root_fd = open(ctx->proxy_dir, O_PATH);
+			if (ctx->root_fd == -1) {
+				pr_perror("Failed to open %s", ctx->proxy_dir);
+				return -errno;
+			}
+			break;
 		case FUSE_GOLEM_MODE:
+		case FUSE_STUB_MODE:
+			/* Release proxy directory reference */
+			if (ctx->mode == FUSE_PROXY_MODE)
+				close(ctx->root_fd);
 			break;
 		default:
 			pr_err("%s: unsupported mode: %d\n", mode);
