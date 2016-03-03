@@ -21,6 +21,7 @@ enum {
 struct dentry_info_s {
 	char   *name;
 	struct stat	 stat;
+	struct dentry_info_s *parent;
 	struct list_head children;
 	struct list_head siblings;
 };

@@ -1,6 +1,7 @@
 #include "config.h"
 
 #include <unistd.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <sys/socket.h>
 
@@ -11,100 +12,98 @@
 
 #define UNIX_SEQPACKET
 
-static int context_add_one_dentry(struct context_data_s *ctx,
-				  struct dentry_info_s *parent,
-				  const char *dentry, size_t len,
-				  struct stat *stat)
+static struct dentry_info_s *add_dentry_info(struct dentry_info_s *parent,
+					     const char *dentry)
 {
 	struct dentry_info_s *child;
 
-	list_for_each_entry(child, &parent->children, siblings) {
-		if (!strcmp(child->name, dentry)) {
-			pr_debug("%s: dentry \"%s\" already exists\n", __func__, child->name);
-			return 0;
-		}
+	if ((parent->stat.st_mode & S_IFMT) != S_IFDIR) {
+		pr_err("%s: can't add dentry \"%s\" to parent \"%s\": not a directory\n", __func__, dentry, parent->name);
+		return NULL;
 	}
 
 	child = malloc(sizeof(*child));
 	if (!child)
-		return -ENOMEM;
-	child->name = malloc(len + 1);
-	if (!child->name)
-		return -ENOMEM;
-	memset(child->name, 0, len + 1);
+		return NULL;
+	child->name = strdup(dentry);
+	if (!child->name) {
+		free(child);
+		return NULL;
+	}
 
-	if (!stat)
-		stat = &parent->stat;
-
-	memcpy(&child->stat, stat, sizeof(*stat));
 	INIT_LIST_HEAD(&child->children);
 	INIT_LIST_HEAD(&child->siblings);
-	strncpy(child->name, dentry, len);
 	list_add_tail(&child->siblings, &parent->children);
+	child->parent = parent;
+
+	memcpy(&child->stat, &parent->stat, sizeof(child->stat));
 
 	pr_info("%s: added dentry \"%s\" to parent \"%s\"\n", __func__, child->name, parent->name);
-	return 0;
+	return child;
 }
 
-static int context_add_dentry(struct context_data_s *ctx, struct dentry_package_s *dp)
+static struct dentry_info_s *find_child_info(struct dentry_info_s *parent,
+					     const char *dentry)
 {
-	char *ptr = dp->path;
-	struct dentry_info_s *parent = &ctx->root;
-	int ret = -EINVAL;
-	const char *dentry = NULL;
-	ptr = &ptr[strlen(ptr)];
-	while (*--ptr == '/')
-		*ptr = '\0';
+	struct dentry_info_s *child;
 
-	ptr = dp->path;
-	if (*ptr == '/')
-		ptr++;
+	list_for_each_entry(child, &parent->children, siblings) {
+		if (!strcmp(child->name, dentry))
+			return child;
+	}
+	return NULL;
+}
 
-	if (pthread_mutex_lock(&ctx->root_lock)) {
-		pr_err("%s: failed to lock root\n", __func__);
-		return -EINVAL;
+static int context_add_path(struct context_data_s *ctx, const struct dentry_package_s *dp)
+{
+	char *path, *dentry;
+	struct dentry_info_s *cur_info = &ctx->root, *child_info = NULL;
+	int err = -ENOMEM;
+
+	path = strdup(dp->path);
+	if (!path) {
+		pr_err("Failed to duplicate path\n");
+		return -ENOMEM;
 	}
 
-repeat:
-	while (1) {
-		struct dentry_info_s *child;
-		int found = 0;
+	while ((dentry = strsep(&path, "/")) != NULL) {
+		pr_debug("%s: traversing dentry: \"%s\"\n", __func__, dentry);
 
-		dentry = ptr;
-		ptr = strchr(ptr, '/');
-		if (!ptr)
-			break;
-
-		list_for_each_entry(child, &parent->children, siblings) {
-			if (!strncmp(child->name, dentry, ptr - dentry)) {
-				parent = child;
-				ptr++;
-				found = 1;
-				break;
-			}
+		if (strlen(dentry) == 0) {
+			pr_debug("%s: dentry is empty, skipping\n", __func__);
+			continue;
 		}
-		if (!found)
-			break;
+		if (!strcmp(dentry, ".")) {
+			pr_debug("%s: dentry is \".\", skipping\n", __func__);
+			continue;
+		}
+		if (!strcmp(dentry, "..")) {
+			pr_debug("%s: dentry is \"..\", rollback to parent\n", __func__);
+			cur_info = cur_info->parent;
+			continue;
+		}
+
+		child_info = find_child_info(cur_info, dentry);
+		if (!child_info)
+			child_info = add_dentry_info(cur_info, dentry);
+		if (!child_info)
+			goto err;
+		cur_info = child_info;
+	}
+	if (!child_info) {
+		err = -EINVAL;
+		pr_err("%s: path is empty: \"%s\"\n", __func__, dp->path);
+		goto err;
 	}
 
-	pr_debug("%s: found parent \"%s\" for path \"%s\" (dentry: \"%s\")\n", __func__, parent->name, dp->path, dentry);
-
-	if (strchr(dentry, '/')) {
-		pr_debug("%s: tree is incomplete for path: \"%s\"\n", __func__, dp->path);
-		if (context_add_one_dentry(ctx, parent, dentry, ptr - dentry, NULL))
-			goto unlock;
-		goto repeat;
-	}
-
-	if ((parent->stat.st_mode & S_IFMT) != S_IFDIR) {
-		pr_err("%s: path \"%s\" is wrong: dentry \"%s\" is not a directory\n", __func__, dp->path, parent->name);
-		goto unlock;
-	}
-
-	ret = context_add_one_dentry(ctx, parent, dentry, strlen(dentry), &dp->stat);
-unlock:
-	pthread_mutex_unlock(&ctx->root_lock);
-	return ret;
+	if (list_empty(&child_info->children))
+		memcpy(&child_info->stat, &dp->stat, sizeof(child_info->stat));
+	pr_info("%s: \"%s\" size: %ld\n", __func__, dp->path, child_info->stat.st_size);
+	pr_info("%s: \"%s\" mode: 0%o\n", __func__, dp->path, child_info->stat.st_mode);
+	err = 0;
+err:
+	free(path);
+	return err;
 }
 
 static int execute_cmd(struct context_data_s *ctx, void *cmd)
@@ -125,7 +124,7 @@ static int execute_cmd(struct context_data_s *ctx, void *cmd)
 
 			pr_debug("%s: dp->stat.st_dev   : %ld\n", __func__, dp->stat.st_dev);
 			pr_debug("%s: dp->stat.st_ino   : %ld\n", __func__, dp->stat.st_ino);
-			pr_debug("%s: dp->stat.st_mode  : %o\n", __func__, dp->stat.st_mode);
+			pr_debug("%s: dp->stat.st_mode  : 0%o\n", __func__, dp->stat.st_mode);
 			pr_debug("%s: dp->stat.st_nlink : %ld\n", __func__, dp->stat.st_nlink);
 			pr_debug("%s: dp->stat.st_uid   : %d\n", __func__, dp->stat.st_uid);
 			pr_debug("%s: dp->stat.st_gid   : %d\n", __func__, dp->stat.st_gid);
@@ -133,7 +132,7 @@ static int execute_cmd(struct context_data_s *ctx, void *cmd)
 			pr_debug("%s: dp->stat.st_blocks: %ld\n", __func__, dp->stat.st_blocks);
 			pr_debug("%s: dp->path          : \"%s\"\n", __func__, dp->path);
 
-			err = context_add_dentry(ctx, dp);
+			err = context_add_path(ctx, dp);
 			if (err < 0)
 				pr_err("%s: failed to add path \"%s\"\n", __func__, dp->path);
 			return err;

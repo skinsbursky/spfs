@@ -150,6 +150,7 @@ static int setup_context(struct context_data_s *ctx, const char *proxy_dir,
 
 	INIT_LIST_HEAD(&ctx->root.children);
 	INIT_LIST_HEAD(&ctx->root.siblings);
+	ctx->root.parent = &ctx->root;
 
 	return 0;
 }
