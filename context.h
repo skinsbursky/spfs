@@ -42,6 +42,7 @@ struct context_data_s {
 
 int context_init(const char *proxy_dir, int mode, const char *log_file,
 		 const char *socket_path, int verbosity);
+int context_store_mnt_stat(const char *mountpoint);
 
 void context_fini(void);
 

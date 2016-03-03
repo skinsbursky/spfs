@@ -193,6 +193,10 @@ static struct fuse *setup_fuse(int argc, char *argv[],
 	if (res == -1)
 		return NULL;
 
+	res = context_store_mnt_stat(*mountpoint);
+	if (res)
+		return NULL;
+
 	ch = fuse_mount(*mountpoint, &args);
 	if (!ch) {
 		fuse_opt_free_args(&args);

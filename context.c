@@ -181,6 +181,19 @@ static int setup_log(struct context_data_s *ctx, const char *log_file, int verbo
 	return 0;
 }
 
+int context_store_mnt_stat(const char *mountpoint)
+{
+	struct context_data_s *ctx = get_context();
+	int err;
+
+	err = stat(mountpoint, &get_context()->root.stat);
+	if (err < 0) {
+		pr_crit("%s: failed to stat %s\n", __func__, ctx->proxy_dir);
+		return err;
+	}
+	return 0;
+}
+
 int context_init(const char *proxy_dir, int mode, const char *log_file,
 		 const char *socket_path, int verbosity)
 {
@@ -211,11 +224,6 @@ int context_init(const char *proxy_dir, int mode, const char *log_file,
 	err = create_socket_interface(ctx, socket_path);
 	if (err) {
 		pr_err("failed to create socket interface: %d\n", err);
-		return err;
-	}
-
-	if(stat(ctx->proxy_dir, &ctx->root.stat) < 0) {
-		pr_crit("%s: failed to stat %s\n", __func__, ctx->proxy_dir);
 		return err;
 	}
 

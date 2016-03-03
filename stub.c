@@ -8,6 +8,14 @@
 
 static int stub_getattr(const char *path, struct stat *stbuf)
 {
+	if (!strcmp(path, "/")) {
+		/* This is a very specific situation.
+		 * In some cases (say "ls -l /") stat will be called on fuse
+		 * root. It doens't make sense to put the caller to sleep.
+		 * Let's return some directory stat instead. */
+		*stbuf = get_context()->root.stat;
+		return 0;
+	}
 	return wait_mode_change(FUSE_STUB_MODE);
 }
 
