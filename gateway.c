@@ -12,6 +12,7 @@
 
 struct gateway_fh_s {
 	unsigned mode;
+	unsigned open_flags;
 	uint64_t fh;
 };
 
@@ -51,7 +52,7 @@ static void gateway_release_fh(struct gateway_fh_s *gw_fh)
 	free(gw_fh);
 }
 
-static int gateway_create_fh(struct gateway_fh_s **gw_fh)
+static int gateway_create_fh(struct gateway_fh_s **gw_fh, unsigned open_flags)
 {
 	struct gateway_fh_s *fh;
 
@@ -60,6 +61,8 @@ static int gateway_create_fh(struct gateway_fh_s **gw_fh)
 		return -ENOMEM;
 
 	fh->mode = ctx_mode();
+	fh->open_flags = open_flags;
+
 	*gw_fh = fh;
 	return 0;
 }
@@ -215,7 +218,7 @@ inline static int gateway_close_fh(const char *path, struct fuse_file_info *fi)
 	int _err;								\
 	struct gateway_fh_s *_gw_fh;						\
 										\
-	_err = gateway_create_fh(&_gw_fh);					\
+	_err = gateway_create_fh(&_gw_fh, _fi->flags);				\
 	if (_err == 0)								\
 		_err = GATEWAY_METHOD_FH_RESTARTABLE(_func, _path, _gw_fh,	\
 						     ##__VA_ARGS__);		\
