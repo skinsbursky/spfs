@@ -12,7 +12,6 @@
 
 struct gateway_fh_s {
 	unsigned mode;
-	const struct fuse_operations *ops;
 	uint64_t fh;
 };
 
@@ -61,7 +60,6 @@ static int gateway_create_fh(struct gateway_fh_s **gw_fh)
 		return -ENOMEM;
 
 	fh->mode = ctx_mode();
-	fh->ops = get_operations(fh->mode);
 	*gw_fh = fh;
 	return 0;
 }
@@ -123,16 +121,17 @@ inline static int gateway_close_fh(const char *path, struct fuse_file_info *fi)
 #define GATEWAY_METHOD(__func, __path, __fh, ...)				\
 ({										\
 	int ___err = -ENOSYS;							\
+	const struct fuse_operations *___ops = get_operations(__fh->mode);	\
 										\
 	pr_info("gateway: %s(\"%s\") = ...\n", #__func, __path);		\
 										\
-	if (__fh->ops->__func) {						\
+	if (___ops->__func) {							\
 		char *___fpath;							\
 										\
 		___err = -ENOMEM;						\
 		___fpath = gateway_full_path(__path, __fh->mode);		\
 		if (___fpath)							\
-			___err = __fh->ops->__func(___fpath, ##__VA_ARGS__);	\
+			___err = ___ops->__func(___fpath, ##__VA_ARGS__);	\
 		free(___fpath);							\
 	}									\
 	if (___err < 0)								\
@@ -195,7 +194,6 @@ inline static int gateway_close_fh(const char *path, struct fuse_file_info *fi)
 										\
 	do {									\
 		_gw_fh->mode = ctx_mode();					\
-		_gw_fh->ops = get_operations(_gw_fh->mode);			\
 		_err = GATEWAY_METHOD(_func, _path, _gw_fh, ##__VA_ARGS__);	\
 	} while(_err == -ERESTARTSYS);						\
 	_err;									\
