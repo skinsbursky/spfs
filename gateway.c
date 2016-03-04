@@ -81,44 +81,54 @@ inline static int gateway_stale_fh(struct fuse_file_info *fi)
 	return gateway_fh_mode(fi->fh) != get_context()->mode;
 }
 
-inline static int gateway_open_fh(const char *path, struct fuse_file_info *fi)
+inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 {
+	struct gateway_fh_s *cur_fh = (struct gateway_fh_s *)fi->fh;
+	struct gateway_fh_s *new_fh, tmp_fh;
+	struct fuse_file_info tmp_fi = {
+		/* This file info will be used to open and We care only about
+		 * open flags here */
+		.flags = cur_fh->open_flags,
+	};
+	int (*open)(const char *path, struct fuse_file_info *fi) =
+		(fi->flags & O_DIRECTORY) ? gateway_opendir : gateway_open;
+	int (*release)(const char *path, struct fuse_file_info *fi) =
+		(fi->flags & O_DIRECTORY) ? gateway_releasedir : gateway_release;
 	int err;
-	int (*open)(const char *path, struct fuse_file_info *fi);
 
-	open = (fi->flags & O_DIRECTORY) ? gateway_opendir : gateway_open;
+	pr_info("%s: reopening file handle for %s (mode: %d -> %d)\n",
+			__func__, path, gateway_fh_mode(fi->fh), ctx_mode());
 
-	do {
-		pr_info("%s: reopening file handle for %s (mode: %d -> %d)\n",
-				__func__, path, gateway_fh_mode(fi->fh),
-				ctx_mode());
-
-		err = open(path, fi);
-	} while (err == -ERESTARTSYS);
-	if (err)
-		pr_err("%s: failed to reopen file handler for %s\n",
+	/* Open new fh by using temporary fi */
+	err = open(path, &tmp_fi);
+	if (err) {
+		pr_err("%s: failed to open new file handler for %s\n",
 				__func__, path);
+		return err;
+	}
+	new_fh = (struct gateway_fh_s *)tmp_fi.fh;
+
+	/* Here we swap contents of new fh and cur fh.
+	 * The reason for this is that cur fh pointer is stored in libfuse
+	 * internals, so we can't simply replace the pointer itself (original
+	 * one will be returned to us on next call).
+	 * And we also want to:
+	 * 1) close current file descriptor (cur_fh->fh)
+	 * 2) and release memory, used by new_fh.
+	 */
+	tmp_fh = *new_fh;
+	*new_fh = *cur_fh;
+	*cur_fh = tmp_fh;
+
+	/* Releasing new fh with contents of _original_ one */
+	err = release(path, &tmp_fi);
+	if (err) {
+		pr_err("%s: failed to release old file handler for %s\n",
+				__func__, path);
+		return err;
+	}
 	return err;
 }
-
-inline static int gateway_close_fh(const char *path, struct fuse_file_info *fi)
-{
-	int err;
-	int (*release)(const char *path, struct fuse_file_info *fi);
-
-	release = (fi->flags & O_DIRECTORY) ? gateway_releasedir : gateway_release;
-
-	pr_info("%s: releasing temporary file handle for %s (mode: %d -> %d)\n",
-			__func__, path, gateway_fh_mode(fi->fh),
-			get_context()->mode);
-
-	err = release(path, fi);
-	if (err)
-		pr_err("%s: failed to release temporary file handler for %s\n",
-				__func__, path);
-	return err;
-}
-
 /* This macro is used for _any_operation, which means that context was set
  * already */
 #define GATEWAY_METHOD(__func, __path, __fh, ...)				\
@@ -172,16 +182,12 @@ inline static int gateway_close_fh(const char *path, struct fuse_file_info *fi)
 	int _err = 0;								\
 										\
 	do {									\
-		int _stale_fh = gateway_stale_fh(_fi);				\
-										\
-		if (_stale_fh)							\
-			_err = gateway_open_fh(_path, _fi);			\
+		if (gateway_stale_fh(_fi))					\
+			_err = gateway_reopen_fh(_path, _fi);			\
 										\
 		if (!_err)							\
 			_err = GATEWAY_METHOD_FI(_func, _path, _fi,		\
 						 ##__VA_ARGS__);		\
-		if (_stale_fh)							\
-			gateway_close_fh(_path, _fi);				\
 	} while (_err == -ERESTARTSYS);						\
 	_err;									\
 })
