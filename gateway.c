@@ -144,9 +144,7 @@ inline static int gateway_close_fh(const char *path, struct fuse_file_info *fi)
 	___err;									\
 })
 
-/* This macro below is used for release() and releasedir(), because in this
- * case only original fh matters.
- * It's also used for any fi-related operation as a sub-macro. */
+/* This macro below is used for any fi-related operation as a sub-macro. */
 #define GATEWAY_METHOD_FI(__func, __path, __fi, ...)				\
 ({										\
 	struct gateway_fh_s *__gw_fh = gateway_pop_context(__fi);		\
@@ -243,6 +241,19 @@ inline static int gateway_close_fh(const char *path, struct fuse_file_info *fi)
 	if (_fs)								\
 		_err = GATEWAY_METHOD_RESTARTABLE(_func, _f, _fs);		\
 	free(_fs);								\
+	_err;									\
+})
+
+/* This macro below is used for release() and releasedir(), because in this
+ * case only original fh matters.
+ */
+#define GATEWAY_RELEASE(_func, _path, _fi, ...)					\
+({										\
+	int _err;								\
+										\
+	_err = GATEWAY_METHOD_FI(_func, _path, _fi, ##__VA_ARGS__);		\
+	if (!_err)								\
+		gateway_release_fh((struct gateway_fh_s *)_fi->fh);		\
 	_err;									\
 })
 
@@ -362,8 +373,8 @@ static int gateway_removexattr(const char *path, const char *name)
 
 static int gateway_release(const char *path, struct fuse_file_info *fi)
 {
-	return GATEWAY_METHOD_FI(release, path, fi,
-				 fi);
+	return GATEWAY_RELEASE(release, path, fi,
+			       fi);
 }
 
 static int gateway_open(const char *path, struct fuse_file_info *fi)
@@ -394,8 +405,8 @@ static int gateway_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 static int gateway_releasedir(const char *path, struct fuse_file_info *fi)
 {
-	return GATEWAY_METHOD_FI(releasedir, path, fi,
-				 fi);
+	return GATEWAY_RELEASE(releasedir, path, fi,
+			       fi);
 }
 
 #if 0
