@@ -229,8 +229,10 @@ err_free:
 
 static int report_to_parent(int pipe, int res)
 {
-	if (write(pipe, &res, sizeof(res)) < 0)
-		return errno;
+	if (write(pipe, &res, sizeof(res)) < 0) {
+		pr_perror("failed to write to fd %d\n", pipe);
+		return -errno;
+	}
 	close(pipe);
 	return 0;
 }
@@ -250,14 +252,23 @@ static int mount_fuse(const char *proxy_dir, int mode, const char *log_file,
 		goto err;
 	}
 
+	if (access("/dev/fuse", R_OK | W_OK)) {
+		pr_crit("/dev/fuse is not accessible");
+		goto err;
+	}
+
 	fuse = setup_fuse(argc, argv,
 			  &gateway_operations, sizeof(gateway_operations),
 			  &mountpoint, &multithreaded, NULL);
-	if (fuse == NULL)
+	if (fuse == NULL) {
+		pr_crit("failed to setup fuse\n");
 		goto destroy_ctx;
+	}
 
-	if (report_to_parent(pipe, 0) < 0)
+	if (report_to_parent(pipe, 0) < 0) {
+		pr_crit("failed to send report to parent\n");
 		goto teardown;
+	}
 
 	if (multithreaded)
 		err = fuse_loop_mt(fuse);
@@ -403,7 +414,7 @@ int main(int argc, char *argv[])
 
 	err = wait_child_report(pipes[0]);
 	if (err) {
-		pr_info("Child failed to initialize: %d\n", err);
+		pr_crit("Child failed to initialize: %d\n", err);
 		pr_info("See %s\n", log_file);
 		return kill_child_and_collect(pid);
 	}
