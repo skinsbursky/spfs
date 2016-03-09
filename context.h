@@ -32,7 +32,7 @@ struct context_data_s {
 
 	struct dentry_info_s	root;
 	pthread_mutex_t		root_lock;
-	int			root_fd;
+	int			proxy_root_fd;
 
 	int			packet_socket;
 	struct sockaddr_un	sock_addr;
