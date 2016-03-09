@@ -101,8 +101,8 @@ int set_work_mode(struct context_data_s *ctx, int mode, const char *path)
 			}
 			/* Take a reference to underlying fs to make sure, that
 			 * it won't be removed from underneath of us. */
-			ctx->proxy_root_fd = open(ctx->wm->proxy_dir, O_PATH);
-			if (ctx->proxy_root_fd == -1) {
+			ctx->wm->proxy_root_fd = open(ctx->wm->proxy_dir, O_PATH);
+			if (ctx->wm->proxy_root_fd == -1) {
 				free(ctx->wm->proxy_dir);
 				pr_perror("Failed to open %s", ctx->wm->proxy_dir);
 				return -errno;
@@ -112,7 +112,7 @@ int set_work_mode(struct context_data_s *ctx, int mode, const char *path)
 		case FUSE_STUB_MODE:
 			/* Release proxy directory reference */
 			if (ctx->wm->mode == FUSE_PROXY_MODE)
-				close(ctx->proxy_root_fd);
+				close(ctx->wm->proxy_root_fd);
 			break;
 		default:
 			pr_err("%s: unsupported mode: %d\n", mode);
