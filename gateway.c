@@ -73,7 +73,7 @@ static char *gateway_full_path(const char *path, int mode)
 
 	if (mode != FUSE_PROXY_MODE)
 		return strdup(path);
-	return xsprintf("%s%s", ctx->proxy_dir, path);
+	return xsprintf("%s%s", ctx->wm->proxy_dir, path);
 }
 
 inline static int gateway_stale_fh(struct fuse_file_info *fi)

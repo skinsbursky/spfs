@@ -94,17 +94,17 @@ int set_work_mode(struct context_data_s *ctx, int mode, const char *path)
 
 	switch (mode) {
 		case FUSE_PROXY_MODE:
-			ctx->proxy_dir = strdup(path);
+			ctx->wm->proxy_dir = strdup(path);
 			if (!ctx) {
 				pr_err("%s: failed to duplicate string\n", __func__);
 				return -ENOMEM;
 			}
 			/* Take a reference to underlying fs to make sure, that
 			 * it won't be removed from underneath of us. */
-			ctx->proxy_root_fd = open(ctx->proxy_dir, O_PATH);
+			ctx->proxy_root_fd = open(ctx->wm->proxy_dir, O_PATH);
 			if (ctx->proxy_root_fd == -1) {
-				free(ctx->proxy_dir);
-				pr_perror("Failed to open %s", ctx->proxy_dir);
+				free(ctx->wm->proxy_dir);
+				pr_perror("Failed to open %s", ctx->wm->proxy_dir);
 				return -errno;
 			}
 			break;
@@ -188,7 +188,7 @@ int context_store_mnt_stat(const char *mountpoint)
 
 	err = stat(mountpoint, &get_context()->root.stat);
 	if (err < 0) {
-		pr_crit("%s: failed to stat %s\n", __func__, ctx->proxy_dir);
+		pr_crit("%s: failed to stat %s\n", __func__, ctx->wm->proxy_dir);
 		return err;
 	}
 	return 0;

@@ -22,10 +22,10 @@ struct dentry_info_s {
 
 struct work_mode_s {
 	int			mode;
+	char                    *proxy_dir;
 };
 
 struct context_data_s {
-	char                    *proxy_dir;
 	struct work_mode_s	*wm;
 	FILE			*log;
 	struct fuse_operations	*operations[FUSE_MAX_MODE];
