@@ -4,6 +4,13 @@
 #include <sys/stat.h>
 #include <string.h>
 
+enum {
+	FUSE_PROXY_MODE,
+	FUSE_STUB_MODE,
+	FUSE_GOLEM_MODE,
+	FUSE_MAX_MODE,
+};
+
 struct external_cmd {
 	unsigned int	cmd;
 	unsigned long	pad;
@@ -11,12 +18,13 @@ struct external_cmd {
 };
 
 struct cmd_package_s {
-	int	mode;
+	int		mode;
+	char		path[0];
 };
 
 struct dentry_package_s {
-	struct stat stat;
-	char path[0];
+	struct stat	stat;
+	char		path[0];
 };
 
 enum {
@@ -30,9 +38,9 @@ static inline size_t path_packet_size(const char *path)
 	return sizeof(struct external_cmd) + sizeof(struct dentry_package_s) + strlen(path) + 1;
 }
 
-static inline size_t mode_packet_size(int mode)
+static inline size_t mode_packet_size(const char *path)
 {
-	return sizeof(struct external_cmd) + sizeof(struct cmd_package_s) + 1;
+	return sizeof(struct external_cmd) + sizeof(struct cmd_package_s) + strlen(path) + 1;
 }
 
 static inline void fill_path_packet(struct external_cmd *package,
@@ -46,13 +54,15 @@ static inline void fill_path_packet(struct external_cmd *package,
 	strcpy(dp->path, path);
 }
 
-static inline void fill_mode_packet(struct external_cmd *package, unsigned mode)
+static inline void fill_mode_packet(struct external_cmd *package, unsigned mode,
+			const char *path)
 {
 	struct cmd_package_s *cp = (struct cmd_package_s *)&package->ctx;
 
 	package->cmd = FUSE_CMD_SET_MODE;
 
 	cp->mode = mode;
+	strcpy(cp->path, path);
 }
 
 #endif

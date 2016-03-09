@@ -7,16 +7,10 @@
 
 #include <pthread.h>
 
+#include "interface.h"
 #include "list.h"
 
 #define ERESTARTSYS		512
-
-enum {
-	FUSE_PROXY_MODE,
-	FUSE_STUB_MODE,
-	FUSE_GOLEM_MODE,
-	FUSE_MAX_MODE,
-};
 
 struct dentry_info_s {
 	char   *name;
@@ -27,7 +21,7 @@ struct dentry_info_s {
 };
 
 struct context_data_s {
-	const char		*proxy_dir;
+	char			*proxy_dir;
 	FILE			*log;
 	int			mode;
 	struct fuse_operations	*operations[FUSE_MAX_MODE];
@@ -50,7 +44,7 @@ void context_fini(void);
 struct context_data_s *get_context(void);
 const struct fuse_operations *get_operations(int mode);
 
-int set_work_mode(struct context_data_s *ctx, int mode);
+int set_work_mode(struct context_data_s *ctx, int mode, const char *path);
 int wait_mode_change(int current_mode);
 
 int ctx_mode(void);

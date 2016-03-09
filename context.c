@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <fuse.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <limits.h>
 #include <linux/futex.h>
 #include <syscall.h>
@@ -85,7 +86,7 @@ static int wake_mode_waiters(void)
 	return syscall(SYS_futex, &ctx->mode, FUTEX_WAKE, INT_MAX, NULL, NULL, 0);
 }
 
-int set_work_mode(struct context_data_s *ctx, int mode)
+int set_work_mode(struct context_data_s *ctx, int mode, const char *path)
 {
 	pr_info("%s: changing work mode from %d to %d\n", __func__, ctx->mode, mode);
 	if (mode == ctx->mode) {
@@ -95,10 +96,16 @@ int set_work_mode(struct context_data_s *ctx, int mode)
 
 	switch (mode) {
 		case FUSE_PROXY_MODE:
+			ctx->proxy_dir = strdup(path);
+			if (!ctx) {
+				pr_err("%s: failed to duplicate string\n", __func__);
+				return -ENOMEM;
+			}
 			/* Take a reference to underlying fs to make sure, that
 			 * it won't be removed from underneath of us. */
 			ctx->root_fd = open(ctx->proxy_dir, O_PATH);
 			if (ctx->root_fd == -1) {
+				free(ctx->proxy_dir);
 				pr_perror("Failed to open %s", ctx->proxy_dir);
 				return -errno;
 			}
@@ -125,19 +132,13 @@ static int setup_context(struct context_data_s *ctx, const char *proxy_dir,
 {
 	int err = -ENOMEM;
 
-	ctx->proxy_dir = strdup(proxy_dir);
-	if (!ctx) {
-		pr_err("%s: failed to duplicate string\n", __func__);
-		return -ENOMEM;
-	}
-
 	ctx->root.name = strdup("/");
 	if (!ctx->root.name) {
 		pr_err("%s: failed to duplicate string\n", __func__);
 		return -ENOMEM;
 	}
 
-	err = set_work_mode(ctx, mode);
+	err = set_work_mode(ctx, mode, proxy_dir);
 	if (err) {
 		pr_err("Set work mode %d failed\n", mode);
 		return err;
