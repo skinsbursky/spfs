@@ -60,20 +60,20 @@ static int send_path(int sock, const char *path_to_send, const char *path_to_sta
 	return send_data(sock, package, len);
 }
 
-static int send_mode(int sock, int mode)
+static int send_mode(int sock, int mode, const char *path_to_send)
 {
 	size_t len;
 	struct external_cmd *package;
 
-	printf("changind mode to %d\n", mode);
-	len = mode_packet_size(mode);
+	printf("changind mode to %d (path: %s)\n", mode, path_to_send ? : "none");
+	len = mode_packet_size(path_to_send);
 
 	package = malloc(len);
 	if (!package) {
 		printf("failed to allocate package\n");
 		return -ENOMEM;
 	}
-	fill_mode_packet(package, mode);
+	fill_mode_packet(package, mode, path_to_send);
 
 	return send_data(sock, package, len);
 }
@@ -92,6 +92,7 @@ static void help(char *program)
 	printf("\n");
 	printf("Mode options:\n");
 	printf("\t--mode            mode number (0: Proxy, 1: Stub, 2: Golem)\n");
+	printf("\t--path_to_send    proxy directory path to send to FUSE\n");
 	printf("\n");
 	printf("Path options:\n");
 	printf("\t--path_to_send    file path to send to FUSE\n");
@@ -208,11 +209,13 @@ static int execude_mode_cmd(int argc, char **argv)
 {
 	char *mode = NULL;
 	char *socket_path = NULL;
+	char *path_to_send = NULL;
 	static struct option opts[] = {
-		{"mode",	required_argument,	0,	1 },
-		{"socket_path",	required_argument,	0,	2 },
-		{"help",	no_argument,		0,	'h'},
-		{0,		0,			0,	0 }
+		{"mode",		required_argument,	0,	1 },
+		{"path_to_send",	required_argument,	0,	2 },
+		{"socket_path",		required_argument,	0,	3 },
+		{"help",		no_argument,		0,	'h'},
+		{0,			0,			0,	0 }
 	};
 	int sock;
 	long m;
@@ -229,6 +232,9 @@ static int execude_mode_cmd(int argc, char **argv)
 				mode = optarg;
 				break;
 			case 2:
+				path_to_send = optarg;
+				break;
+			case 3:
 				socket_path = optarg;
 				break;
 			case 'h':
@@ -259,16 +265,26 @@ static int execude_mode_cmd(int argc, char **argv)
 		return 1;
 	}
 
+	if ((m == FUSE_PROXY_MODE) && !path_to_send) {
+		printf("Directory path wasn't provided for Proxy mode\n");
+		help(argv[0]);
+		return 1;
+	}
+
 	sock = socket_create(socket_path);
 	if (sock < 0)
 		return 1;
 
-	return send_mode(sock, m);
+	return send_mode(sock, m, path_to_send);
 }
 
 
 int main(int argc, char **argv)
 {
+	if (argc < 2) {
+		help(argv[0]);
+		return 1;
+	}
 	if (!strcmp(argv[1], "mode"))
 		return execude_mode_cmd(argc, argv);
 	else if (!strcmp(argv[1], "path"))
