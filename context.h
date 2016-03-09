@@ -28,6 +28,8 @@ struct work_mode_s {
 
 struct context_data_s {
 	struct work_mode_s	*wm;
+	pthread_mutex_t		wm_lock;
+
 	FILE			*log;
 	struct fuse_operations	*operations[FUSE_MAX_MODE];
 
@@ -46,11 +48,15 @@ int context_store_mnt_stat(const char *mountpoint);
 void context_fini(void);
 
 struct context_data_s *get_context(void);
-const struct fuse_operations *get_operations(int mode);
+const struct fuse_operations *get_operations(struct work_mode_s *wm);
 
+int change_work_mode(struct context_data_s *ctx, int mode, const char *path);
 int set_work_mode(struct context_data_s *ctx, int mode, const char *path);
 int wait_mode_change(int current_mode);
 
-int ctx_mode(void);
+const struct work_mode_s *ctx_work_mode(void);
+int copy_work_mode(struct work_mode_s **wm);
+void destroy_work_mode(struct work_mode_s *wm);
+int stale_work_mode(int mode, const char *proxy_dir);
 
 #endif

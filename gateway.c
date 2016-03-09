@@ -11,7 +11,7 @@
 #include "log.h"
 
 struct gateway_fh_s {
-	unsigned mode;
+	struct work_mode_s *wm;
 	unsigned open_flags;
 	uint64_t fh;
 };
@@ -22,9 +22,9 @@ static int gateway_open(const char *path, struct fuse_file_info *fi);
 static int gateway_opendir(const char *path, struct fuse_file_info *fi);
 static int gateway_releasedir(const char *path, struct fuse_file_info *fi);
 
-static unsigned gateway_fh_mode(uint64_t gw_fh)
+static struct work_mode_s *gateway_fh_mode(uint64_t gw_fh)
 {
-	return ((struct gateway_fh_s *)gw_fh)->mode;
+	return ((struct gateway_fh_s *)gw_fh)->wm;
 }
 
 static struct gateway_fh_s *gateway_pop_context(struct fuse_file_info *fi)
@@ -49,6 +49,7 @@ static void gateway_set_fh(struct gateway_fh_s *gw_fh, struct fuse_file_info *fi
 
 static void gateway_release_fh(struct gateway_fh_s *gw_fh)
 {
+	destroy_work_mode(gw_fh->wm);
 	free(gw_fh);
 }
 
@@ -60,25 +61,26 @@ static int gateway_create_fh(struct gateway_fh_s **gw_fh, unsigned open_flags)
 	if (!fh)
 		return -ENOMEM;
 
-	fh->mode = ctx_mode();
 	fh->open_flags = open_flags;
+	fh->wm = NULL;
+	fh->fh = 0;
 
 	*gw_fh = fh;
 	return 0;
 }
 
-static char *gateway_full_path(const char *path, int mode)
+static char *gateway_full_path(const char *path, const struct work_mode_s *wm)
 {
-	const struct context_data_s *ctx = get_context();
-
-	if (mode != FUSE_PROXY_MODE)
+	if (wm->mode != FUSE_PROXY_MODE)
 		return strdup(path);
-	return xsprintf("%s%s", ctx->wm->proxy_dir, path);
+	return xsprintf("%s%s", wm->proxy_dir, path);
 }
 
 inline static int gateway_stale_fh(struct fuse_file_info *fi)
 {
-	return gateway_fh_mode(fi->fh) != ctx_mode();
+	struct work_mode_s *wm = gateway_fh_mode(fi->fh);
+
+	return stale_work_mode(wm->mode, wm->proxy_dir);
 }
 
 inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
@@ -96,8 +98,12 @@ inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 		(fi->flags & O_DIRECTORY) ? gateway_releasedir : gateway_release;
 	int err;
 
-	pr_info("%s: reopening file handle for %s (mode: %d -> %d)\n",
-			__func__, path, gateway_fh_mode(fi->fh), ctx_mode());
+	pr_info("%s: reopening file handle for %s (mode: %d -> %d, proxy_dir: %s -> %s)\n",
+			__func__, path,
+			gateway_fh_mode(fi->fh)->mode,
+			ctx_work_mode()->mode,
+			gateway_fh_mode(fi->fh)->proxy_dir ? : 0,
+			ctx_work_mode()->proxy_dir ? : 0);
 
 	/* Open new fh by using temporary fi */
 	err = open(path, &tmp_fi);
@@ -134,7 +140,7 @@ inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 #define GATEWAY_METHOD(__func, __path, __fh, ...)				\
 ({										\
 	int ___err = -ENOSYS;							\
-	const struct fuse_operations *___ops = get_operations(__fh->mode);	\
+	const struct fuse_operations *___ops = get_operations(__fh->wm);	\
 										\
 	pr_info("gateway: %s(\"%s\") = ...\n", #__func, __path);		\
 										\
@@ -142,7 +148,7 @@ inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 		char *___fpath;							\
 										\
 		___err = -ENOMEM;						\
-		___fpath = gateway_full_path(__path, __fh->mode);		\
+		___fpath = gateway_full_path(__path, __fh->wm);			\
 		if (___fpath)							\
 			___err = ___ops->__func(___fpath, ##__VA_ARGS__);	\
 		free(___fpath);							\
@@ -200,8 +206,11 @@ inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 	int _err;								\
 										\
 	do {									\
-		_gw_fh->mode = ctx_mode();					\
-		_err = GATEWAY_METHOD(_func, _path, _gw_fh, ##__VA_ARGS__);	\
+		destroy_work_mode(_gw_fh->wm);					\
+		_err = copy_work_mode(&_gw_fh->wm);				\
+		if (!_err)							\
+			_err = GATEWAY_METHOD(_func, _path, _gw_fh,		\
+					      ##__VA_ARGS__);			\
 	} while(_err == -ERESTARTSYS);						\
 	_err;									\
 })
@@ -210,9 +219,16 @@ inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
  * Temporary fh is created on stack to fit macro calling convention */
 #define GATEWAY_METHOD_RESTARTABLE(_func, _path, ...)				\
 ({										\
-	struct gateway_fh_s __on_stack_fh, *__gw_fh = &__on_stack_fh;		\
+	struct gateway_fh_s __on_stack_fh = {					\
+		.wm = NULL,							\
+	}, *__gw_fh = &__on_stack_fh;						\
+	int __err;								\
 										\
-	GATEWAY_METHOD_FH_RESTARTABLE(_func, _path, __gw_fh, ##__VA_ARGS__);	\
+	__err = GATEWAY_METHOD_FH_RESTARTABLE(_func, _path, __gw_fh,		\
+					      ##__VA_ARGS__);			\
+										\
+	destroy_work_mode(__gw_fh->wm);						\
+	__err;									\
 })
 
 
@@ -220,7 +236,7 @@ inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 #define GATEWAY_OPEN_RESTARTABLE(_func, _path, _fi, ...)			\
 ({										\
 	int _err;								\
-	struct gateway_fh_s *_gw_fh;						\
+	struct gateway_fh_s *_gw_fh = NULL;					\
 										\
 	_err = gateway_create_fh(&_gw_fh, _fi->flags);				\
 	if (_err == 0)								\
@@ -243,7 +259,7 @@ inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 	char *_fs;								\
 	int _err = -ENOMEM;							\
 										\
-	_fs = gateway_full_path(_s, ctx_mode());				\
+	_fs = gateway_full_path(_s, ctx_work_mode());				\
 	if (_fs)								\
 		_err = GATEWAY_METHOD_RESTARTABLE(_func, _f, _fs);		\
 	free(_fs);								\

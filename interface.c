@@ -118,7 +118,7 @@ static int execute_cmd(struct context_data_s *ctx, void *cmd)
 	switch (order->cmd) {
 		case FUSE_CMD_SET_MODE:
 			mp = (struct cmd_package_s *)order->ctx;
-			return set_work_mode(ctx, mp->mode, mp->path);
+			return change_work_mode(ctx, mp->mode, mp->path);
 		case FUSE_CMD_INSTALL_PATH:
 			dp = (struct dentry_package_s *)order->ctx;
 

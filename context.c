@@ -30,7 +30,14 @@ struct context_data_s fs_context = {
 		[FUSE_GOLEM_MODE]	= &golem_operations,
 	},
 	.root_lock		= PTHREAD_MUTEX_INITIALIZER,
+	.wm_lock		= PTHREAD_MUTEX_INITIALIZER,
 	.packet_socket		= -1,
+};
+
+const char *work_modes[] = {
+	[FUSE_PROXY_MODE]	= "Proxy",
+	[FUSE_STUB_MODE]	= "Stub",
+	[FUSE_GOLEM_MODE]	= "Golem",
 };
 
 struct context_data_s *get_context(void)
@@ -38,12 +45,12 @@ struct context_data_s *get_context(void)
 	return &fs_context;
 }
 
-const struct fuse_operations *get_operations(int mode)
+const struct fuse_operations *get_operations(struct work_mode_s *wm)
 {
 	const struct context_data_s *ctx = get_context();
 	const struct fuse_operations *ops;
 
-	switch (mode) {
+	switch (wm->mode) {
 		case FUSE_PROXY_MODE:
 			ops = ctx->operations[FUSE_PROXY_MODE];
 			break;
@@ -54,16 +61,16 @@ const struct fuse_operations *get_operations(int mode)
 			ops = ctx->operations[FUSE_GOLEM_MODE];
 			break;
 		default:
-			pr_crit("%s: unsupported mode: %d\n", __func__, mode);
+			pr_crit("%s: unsupported mode: %d\n", __func__, wm->mode);
 			ops = ctx->operations[FUSE_STUB_MODE];
 			break;
 	}
 	return ops;
 }
 
-int ctx_mode(void)
+const struct work_mode_s *ctx_work_mode(void)
 {
-	return get_context()->wm->mode;
+	return get_context()->wm;
 }
 
 int wait_mode_change(int current_mode)
@@ -84,46 +91,146 @@ static int wake_mode_waiters(void)
 	return syscall(SYS_futex, &ctx->wm->mode, FUTEX_WAKE, INT_MAX, NULL, NULL, 0);
 }
 
+static int create_work_mode(int mode, const char *path, struct work_mode_s **wm)
+{
+	struct work_mode_s *new;
+	int err = -ENOMEM;
+
+	new = malloc(sizeof(*new));
+	if (!new) {
+		pr_err("%s: failed to allocate work mode structure\n", __func__);
+		return -ENOMEM;
+	}
+
+	new->mode = mode;
+	new->proxy_root_fd = -1;
+	new->proxy_dir = NULL;
+
+	if (path ) {
+		new->proxy_dir = strdup(path);
+		if (!new->proxy_dir) {
+			pr_err("%s: failed to allocate proxy_dir for work mode structure\n", __func__);
+			goto free_new;
+		}
+		/* Take a reference to underlying fs to make sure, that
+		 * it won't be removed from underneath of us. */
+		new->proxy_root_fd = open(new->proxy_dir, O_PATH);
+		if (new->proxy_root_fd == -1) {
+			pr_perror("Failed to open %s", new->proxy_dir);
+			err = -errno;
+			goto free_proxy_dir;
+		}
+	}
+	*wm = new;
+	return 0;
+
+free_proxy_dir:
+	free(new->proxy_dir);
+free_new:
+	free(new);
+	return err;
+}
+
+int copy_work_mode(struct work_mode_s **wm)
+{
+	struct context_data_s *ctx = get_context();
+	const struct work_mode_s *ctx_wm;
+	struct work_mode_s *copy;
+	int err;
+
+	copy = malloc(sizeof(*copy));
+	if (!copy)
+		return -ENOMEM;
+
+	err = pthread_mutex_lock(&ctx->wm_lock);
+	if (err) {
+		pr_err("%s: failed to lock wm: %d\n", __func__, err);
+		return -err;
+	}
+
+	ctx_wm = ctx->wm;
+
+	copy->proxy_dir = strdup(ctx_wm->proxy_dir);
+	if (!copy->proxy_dir)
+		goto free_copy;
+	copy->mode = ctx_wm->mode;
+	copy->proxy_root_fd = -1;
+
+        pthread_mutex_unlock(&ctx->wm_lock);
+
+	*wm = copy;
+	return 0;
+
+free_copy:
+        pthread_mutex_unlock(&ctx->wm_lock);
+	free(copy);
+	return -ENOMEM;
+}
+
+void destroy_work_mode(struct work_mode_s *wm)
+{
+	if (!wm)
+		return;
+	if (wm->proxy_root_fd != -1)
+		close(wm->proxy_root_fd);
+	if (wm->proxy_dir)
+		free(wm->proxy_dir);
+	free(wm);
+}
+
+int stale_work_mode(int mode, const char *proxy_dir)
+{
+	struct context_data_s *ctx = get_context();
+
+	if (mode != ctx->wm->mode)
+		return 1;
+
+	return !!strcmp(proxy_dir, ctx->wm->proxy_dir);
+}
+
 int set_work_mode(struct context_data_s *ctx, int mode, const char *path)
 {
-	pr_info("%s: changing work mode from %d to %d\n", __func__, ctx->wm->mode, mode);
-	if (mode == ctx->wm->mode) {
-		pr_info("%s: the mode is already %d\n", __func__, ctx->wm->mode);
-		return 0;
-	}
+	struct work_mode_s *cur_wm = get_context()->wm;
+	struct work_mode_s *new_wm = NULL;
+	int err;
 
 	switch (mode) {
 		case FUSE_PROXY_MODE:
-			ctx->wm->proxy_dir = strdup(path);
-			if (!ctx) {
-				pr_err("%s: failed to duplicate string\n", __func__);
-				return -ENOMEM;
-			}
-			/* Take a reference to underlying fs to make sure, that
-			 * it won't be removed from underneath of us. */
-			ctx->wm->proxy_root_fd = open(ctx->wm->proxy_dir, O_PATH);
-			if (ctx->wm->proxy_root_fd == -1) {
-				free(ctx->wm->proxy_dir);
-				pr_perror("Failed to open %s", ctx->wm->proxy_dir);
-				return -errno;
-			}
-			break;
 		case FUSE_GOLEM_MODE:
 		case FUSE_STUB_MODE:
-			/* Release proxy directory reference */
-			if (ctx->wm->mode == FUSE_PROXY_MODE)
-				close(ctx->wm->proxy_root_fd);
+			err = create_work_mode(mode, path, &new_wm);
+			if (err)
+				return err;
+
+			err = pthread_mutex_lock(&ctx->wm_lock);
+			if (err) {
+				pr_err("%s: failed to lock wm: %d\n", __func__, err);
+				free(new_wm);
+				return -err;
+			}
+			get_context()->wm = new_wm;
+		        pthread_mutex_unlock(&ctx->wm_lock);
+
+			destroy_work_mode(cur_wm);
 			break;
 		default:
 			pr_err("%s: unsupported mode: %d\n", mode);
 			return -EINVAL;
 	}
-
-	ctx->wm->mode = mode;
 	wake_mode_waiters();
 	return 0;
-
 }
+
+int change_work_mode(struct context_data_s *ctx, int mode, const char *path)
+{
+	pr_info("%s: changing work mode from %d to %d (path: %s)\n", __func__, ctx->wm->mode, mode, path);
+	if (!stale_work_mode(mode, path)) {
+		pr_info("%s: the mode is already %d\n", __func__, ctx->wm->mode);
+		return 0;
+	}
+	return set_work_mode(ctx, mode, path);
+}
+
 
 static int setup_context(struct context_data_s *ctx, const char *proxy_dir,
 			 int mode)
@@ -140,11 +247,6 @@ static int setup_context(struct context_data_s *ctx, const char *proxy_dir,
 	if (err) {
 		pr_err("Set work mode %d failed\n", mode);
 		return err;
-	}
-
-	if (pthread_mutex_init(&ctx->root_lock, NULL)) {
-		pr_perror("%s: failed to init mode switch", __func__);
-		return -errno;
 	}
 
 	INIT_LIST_HEAD(&ctx->root.children);
@@ -209,8 +311,6 @@ int context_init(const char *proxy_dir, int mode, const char *log_file,
 	}
 
 	pr_debug("fuse: creating context\n");
-	pr_debug("%s: proxy_dir   : %s\n", __func__, proxy_dir);
-	pr_debug("%s: mode        : %d\n", __func__, mode);
 	pr_debug("%s: log         : %s\n", __func__, log_file);
 	pr_debug("%s: socket path : %s\n", __func__, socket_path);
 	pr_debug("%s: verbosity   : +%d\n", __func__, verbosity);
@@ -220,6 +320,9 @@ int context_init(const char *proxy_dir, int mode, const char *log_file,
 		pr_crit("Failed to setup context: %d\n", err);
 		return err;
 	}
+
+	pr_debug("%s: proxy_dir   : %s\n", __func__, ctx->wm->proxy_dir);
+	pr_debug("%s: mode        : %s\n", __func__, work_modes[ctx->wm->mode]);
 
 	err = create_socket_interface(ctx, socket_path);
 	if (err) {
