@@ -30,7 +30,7 @@ static void help(int argc, char **argv, int help_level)
 	printf("usage: %s mountpoint [options]\n", argv[0]);
 	printf("\n");
 	printf("general options:\n");
-	printf("\t-m   --proxy_dir       work mode\n");
+	printf("\t-m   --mode            work mode\n");
 	printf("\t-p   --proxy_dir       path for proxy mode\n");
 	printf("\t-l   --log             log file\n");
 	printf("\t-s   --socket_path     control socket bind path\n");
