@@ -134,7 +134,7 @@ int parse_options(int *orig_argc, char ***orig_argv,
 		exit(0);
 	}
 
-	if (!*proxy_dir) {
+	if ((*mode == FUSE_PROXY_MODE) && (!*proxy_dir)) {
 		pr_crit("Proxy directory must be specified\n");
 		return -EINVAL;
 	}
@@ -419,7 +419,8 @@ int main(int argc, char *argv[])
 		return kill_child_and_collect(pid);
 	}
 	pr_info("Fuse master started successfully with pid %d\n", pid);
-	pr_debug("%s: proxy_dir   : %s\n", __func__, proxy_dir);
+	if (proxy_dir)
+		pr_debug("%s: proxy_dir   : %s\n", __func__, proxy_dir);
 	pr_debug("%s: mode        : %d\n", __func__, mode);
 	pr_debug("%s: log         : %s\n", __func__, log_file);
 	pr_debug("%s: socket path : %s\n", __func__, socket_path);
