@@ -24,8 +24,6 @@ extern int create_socket_interface(struct context_data_s *ctx, const char *socke
 extern int start_socket_thread(struct context_data_s *ctx);
 
 struct context_data_s fs_context = {
-	.proxy_dir		= NULL,
-	.mode			= FUSE_STUB_MODE,
 	.operations		= {
 		[FUSE_PROXY_MODE]	= &proxy_operations,
 		[FUSE_STUB_MODE]	= &stub_operations,
@@ -65,14 +63,14 @@ const struct fuse_operations *get_operations(int mode)
 
 int ctx_mode(void)
 {
-	return get_context()->mode;
+	return get_context()->wm->mode;
 }
 
 int wait_mode_change(int current_mode)
 {
 	int err;
 
-	err = syscall(SYS_futex, &get_context()->mode, FUTEX_WAIT,
+	err = syscall(SYS_futex, &get_context()->wm->mode, FUTEX_WAIT,
 		      current_mode, NULL, NULL, 0);
 	if (err)
 		return err;
@@ -83,14 +81,14 @@ static int wake_mode_waiters(void)
 {
 	struct context_data_s *ctx = get_context();
 
-	return syscall(SYS_futex, &ctx->mode, FUTEX_WAKE, INT_MAX, NULL, NULL, 0);
+	return syscall(SYS_futex, &ctx->wm->mode, FUTEX_WAKE, INT_MAX, NULL, NULL, 0);
 }
 
 int set_work_mode(struct context_data_s *ctx, int mode, const char *path)
 {
-	pr_info("%s: changing work mode from %d to %d\n", __func__, ctx->mode, mode);
-	if (mode == ctx->mode) {
-		pr_info("%s: the mode is already %d\n", __func__, ctx->mode);
+	pr_info("%s: changing work mode from %d to %d\n", __func__, ctx->wm->mode, mode);
+	if (mode == ctx->wm->mode) {
+		pr_info("%s: the mode is already %d\n", __func__, ctx->wm->mode);
 		return 0;
 	}
 
@@ -113,7 +111,7 @@ int set_work_mode(struct context_data_s *ctx, int mode, const char *path)
 		case FUSE_GOLEM_MODE:
 		case FUSE_STUB_MODE:
 			/* Release proxy directory reference */
-			if (ctx->mode == FUSE_PROXY_MODE)
+			if (ctx->wm->mode == FUSE_PROXY_MODE)
 				close(ctx->root_fd);
 			break;
 		default:
@@ -121,7 +119,7 @@ int set_work_mode(struct context_data_s *ctx, int mode, const char *path)
 			return -EINVAL;
 	}
 
-	ctx->mode = mode;
+	ctx->wm->mode = mode;
 	wake_mode_waiters();
 	return 0;
 

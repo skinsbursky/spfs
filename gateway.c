@@ -78,7 +78,7 @@ static char *gateway_full_path(const char *path, int mode)
 
 inline static int gateway_stale_fh(struct fuse_file_info *fi)
 {
-	return gateway_fh_mode(fi->fh) != get_context()->mode;
+	return gateway_fh_mode(fi->fh) != ctx_mode();
 }
 
 inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
@@ -243,7 +243,7 @@ inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 	char *_fs;								\
 	int _err = -ENOMEM;							\
 										\
-	_fs = gateway_full_path(_s, get_context()->mode);			\
+	_fs = gateway_full_path(_s, ctx_mode());				\
 	if (_fs)								\
 		_err = GATEWAY_METHOD_RESTARTABLE(_func, _f, _fs);		\
 	free(_fs);								\
