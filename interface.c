@@ -152,9 +152,7 @@ static void *sock_routine(void *ptr)
 	while(1) {
 		int sock;
 #ifdef UNIX_SEQPACKET
-		socklen_t len = sizeof(ctx->sock_addr);
-
-		sock = accept(ctx->packet_socket, (struct sockaddr *)&ctx->sock_addr, &len);
+		sock = accept(ctx->packet_socket, NULL, NULL);
 		if (sock < 0) {
 			pr_perror("%s: accept failed", __func__);
 			if (errno == EINTR) {
