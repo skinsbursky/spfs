@@ -280,6 +280,6 @@ int create_socket_interface(struct context_data_s *ctx, const char *socket_path)
 
 err:
 	err = -errno;
-	close(ctx->packet_socket);
+	close(sock);
 	return err;
 }
