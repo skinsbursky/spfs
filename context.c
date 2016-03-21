@@ -150,9 +150,11 @@ int copy_work_mode(struct work_mode_s **wm)
 
 	ctx_wm = ctx->wm;
 
-	copy->proxy_dir = strdup(ctx_wm->proxy_dir);
-	if (!copy->proxy_dir)
-		goto free_copy;
+	if (ctx_wm->proxy_dir) {
+		copy->proxy_dir = strdup(ctx_wm->proxy_dir);
+		if (!copy->proxy_dir)
+			goto free_copy;
+	}
 	copy->mode = ctx_wm->mode;
 	copy->proxy_root_fd = -1;
 
