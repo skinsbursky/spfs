@@ -290,6 +290,11 @@ int context_store_mnt_stat(const char *mountpoint)
 	struct context_data_s *ctx = get_context();
 	int err;
 
+	if (!mountpoint) {
+		pr_crit("%s: mountpoint wasn't specified\n", __func__);
+		return -EINVAL;
+	}
+
 	err = stat(mountpoint, &get_context()->root.stat);
 	if (err < 0) {
 		pr_crit("%s: failed to stat %s\n", __func__, ctx->wm->proxy_dir);
