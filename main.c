@@ -349,7 +349,7 @@ static int kill_child_and_collect(int pid)
 		pr_info("Child exited with the following reason: %d\n", WEXITSTATUS(status));
 	else
 		pr_info("Child was killed by signal %d\n", WTERMSIG(status));
-	return 0;
+	return -1;
 }
 
 static int wait_child_report(int pipe)
