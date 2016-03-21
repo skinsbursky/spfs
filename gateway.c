@@ -1,4 +1,4 @@
-#include "config.h"
+#include "spfs_config.h"
 
 #define FUSE_USE_VERSION 26
 

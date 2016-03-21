@@ -1,6 +1,0 @@
-#define HAVE_CONFIG_H		1
-#define HAVE_SETXATTR		1
-#define HAVE_UTIMENSAT		1
-#define HAVE_POSIX_FALLOCATE	1
-#define HAVE_SETXATTR		1
-#define HAVE_UTIMENSAT		1

@@ -1,6 +1,4 @@
-#include "config.h"
-
-#define _GNU_SOURCE
+#include "spfs_config.h"
 
 #include <unistd.h>
 #include <fuse.h>

@@ -12,6 +12,9 @@ AC_CONFIG_FILES([
 		 Makefile
 ])
 
+AC_CHECK_FUNCS([fork setxattr fdatasync utimensat])
+AC_CHECK_FUNCS([posix_fallocate fstatat openat readlinkat])
+
 AC_CHECK_LIB(
 	     [fuse],
 	     [fuse_mount],

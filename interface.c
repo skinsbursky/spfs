@@ -1,4 +1,4 @@
-#include "config.h"
+#include "spfs_config.h"
 
 #include <unistd.h>
 #include <stdlib.h>
