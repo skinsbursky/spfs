@@ -304,7 +304,7 @@ static void *sock_routine(void *ptr)
 {
         struct context_data_s *ctx = ptr;
 
-	(void) socket_loop(ctx->packet_socket, ctx, spfs_conn_handler);
+	(void) reliable_socket_loop(ctx->packet_socket, ctx, spfs_execute_cmd);
 
 	return NULL;
 }

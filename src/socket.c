@@ -10,6 +10,63 @@
 #include "include/log.h"
 #include "include/socket.h"
 
+static int reliable_conn_handler(int sock, void *data,
+				 int (*packet_handler)(void *data, void *packet, size_t psize))
+{
+	char page[4096];
+	ssize_t bytes;
+	int err;
+
+	bytes = recv(sock, page, sizeof(page), 0);
+	if (bytes < 0) {
+		pr_perror("%s: read failed", __func__, bytes);
+		return -errno;
+	}
+	if (bytes == 0) {
+		pr_debug("%s: peer was closed\n", __func__);
+		return -ECONNABORTED;
+	}
+
+	pr_debug("received %ld bytes\n", __func__, bytes);
+
+	err = packet_handler(data, page, bytes);
+
+	bytes = send(sock, &err, sizeof(&err), MSG_NOSIGNAL | MSG_DONTWAIT | MSG_EOR);
+	if (bytes < 0) {
+		pr_perror("%s: write failed", __func__, bytes);
+		return -errno;
+	}
+
+	if (bytes == 0) {
+		pr_debug("%s: peer was closed\n", __func__);
+		return -ECONNABORTED;
+	}
+
+	return 0;
+}
+
+int reliable_socket_loop(int psock, void *data,
+			 int (*packet_handler)(void *data, void *packet, size_t psize))
+{
+	pr_info("%s: socket loop started\n", __func__);
+
+	while(1) {
+		int sock;
+
+		sock = accept(psock, NULL, NULL);
+		if (sock < 0) {
+			pr_perror("%s: accept failed", __func__);
+			break;
+		}
+
+		pr_debug("%s: accepted new socket\n", __func__);
+		(void) reliable_conn_handler(sock, data, packet_handler);
+
+		close(sock);
+	}
+	return 0;
+}
+
 int socket_loop(int psock, void *data, int (*handler)(int sock, void *data))
 {
 	pr_info("%s: socket loop started\n", __func__);

@@ -26,7 +26,7 @@ char *namespaces;
 char *cgroups;
 char *mountpoint;
 
-static int spfs_manager_conn_handler(int sock, void *data)
+static int spfs_manager_packet_handler(void *data, void *packet, size_t psize)
 {
 	pr_err("Interface is not ready yet\n");
 	return -ENOENT;
@@ -403,5 +403,5 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	return socket_loop(sock, NULL, spfs_manager_conn_handler);
+	return reliable_socket_loop(sock, NULL, spfs_manager_packet_handler);
 }

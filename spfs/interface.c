@@ -104,14 +104,15 @@ err:
 	return err;
 }
 
-static int execute_cmd(struct context_data_s *ctx, void *cmd)
+int spfs_execute_cmd(void *data, void *package, size_t psize)
 {
+	struct context_data_s *ctx = data;
 	struct external_cmd *order;
 	struct dentry_package_s *dp;
 	struct cmd_package_s *mp;
 	int err;
 
-	order = (struct external_cmd *)cmd;
+	order = (struct external_cmd *)package;
 	pr_debug("%s: cmd: %d\n", __func__, order->cmd);
 	switch (order->cmd) {
 		case FUSE_CMD_SET_MODE:
@@ -138,40 +139,5 @@ static int execute_cmd(struct context_data_s *ctx, void *cmd)
 			pr_err("%s: unknown cmd: %d\n", __func__, order->cmd);
 			return -1;
 	}
-	return 0;
-}
-
-int spfs_conn_handler(int sock, void *data)
-{
-	char page[4096];
-	struct context_data_s *ctx = data;
-	ssize_t bytes;
-	int err;
-
-	bytes = recv(sock, page, sizeof(page), 0);
-	if (bytes < 0) {
-		pr_perror("%s: read failed", __func__, bytes);
-		return -errno;
-	}
-	if (bytes == 0) {
-		pr_debug("%s: peer was closed\n", __func__);
-		return -ECONNABORTED;
-	}
-
-	pr_debug("received %ld bytes\n", __func__, bytes);
-
-	err = execute_cmd(ctx, page);
-
-	bytes = send(sock, &err, sizeof(&err), MSG_NOSIGNAL | MSG_DONTWAIT | MSG_EOR);
-	if (bytes < 0) {
-		pr_perror("%s: write failed", __func__, bytes);
-		return -errno;
-	}
-
-	if (bytes == 0) {
-		pr_debug("%s: peer was closed\n", __func__);
-		return -ECONNABORTED;
-	}
-
 	return 0;
 }
