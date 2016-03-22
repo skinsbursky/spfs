@@ -1,5 +1,5 @@
 ## Process this file with automake to produce Makefile.in
-CLEANFILES = `find . -name *~`
+CLEANFILES = `find . -name "*~"`
 
 AM_CFLAGS = -Wall -ggdb -D_GNU_SOURCE -iquote include/
 AM_MAKEFLAGS = --no-print-directory
