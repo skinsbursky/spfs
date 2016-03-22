@@ -25,8 +25,8 @@
 #endif
 #include <sys/file.h> /* flock(2) */
 
-#include "util.h"
-#include "log.h"
+#include "include/util.h"
+#include "include/log.h"
 
 static int proxy_getattr(const char *path, struct stat *stbuf)
 {

@@ -4,7 +4,7 @@
 
 #include <fuse.h>
 
-#include "context.h"
+#include "include/context.h"
 
 static int stub_getattr(const char *path, struct stat *stbuf)
 {

@@ -8,9 +8,9 @@
 #include <linux/futex.h>
 #include <syscall.h>
 
-#include "util.h"
-#include "context.h"
-#include "log.h"
+#include "include/util.h"
+#include "include/context.h"
+#include "include/log.h"
 
 #define UNIX_SEQPACKET
 

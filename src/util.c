@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "log.h"
+#include "include/log.h"
 
 /*
  * This function reallocates passed str pointer.

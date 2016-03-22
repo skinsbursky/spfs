@@ -6,9 +6,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "util.h"
-#include "context.h"
-#include "log.h"
+#include "include/util.h"
+#include "include/context.h"
+#include "include/log.h"
 
 struct gateway_fh_s {
 	struct work_mode_s *wm;

@@ -12,8 +12,8 @@
 #include <stdio.h>
 
 
-#include "interface.h"
-#include "util.h"
+#include "include/interface.h"
+#include "include/util.h"
 
 static int send_data(int sock, void *ctx, size_t len)
 {

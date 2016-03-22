@@ -8,8 +8,8 @@
 #include <poll.h>
 #include <sys/wait.h>
 
-#include "context.h"
-#include "log.h"
+#include "include/context.h"
+#include "include/log.h"
 
 extern struct fuse_operations gateway_operations;
 

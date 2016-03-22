@@ -4,8 +4,8 @@
 
 #include <fuse.h>
 
-#include "context.h"
-#include "log.h"
+#include "include/context.h"
+#include "include/log.h"
 
 const struct dentry_info_s *find_dentry_info(struct context_data_s *ctx, const char *path)
 {

@@ -1,10 +1,10 @@
 AC_INIT([spfs], [0.01], [skinsbursky@virtuozzo.org])
-AM_INIT_AUTOMAKE
-AM_PROG_CC_C_O
 
 m4_ifdef([AM_SILENT_RULES],
 	 [AM_SILENT_RULES([yes])],
 	 [AC_SUBST([AM_DEFAULT_VERBOSITY], [1])])
+
+AM_INIT_AUTOMAKE([subdir-objects])
 
 AC_GNU_SOURCE
 AC_CONFIG_HEADERS([spfs_config.h])

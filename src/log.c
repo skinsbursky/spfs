@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#include "log.h"
+#include "include/log.h"
 
 static int log_level = LOG_DEBUG;
 FILE *stream;
