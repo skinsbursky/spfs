@@ -5,7 +5,7 @@ AM_CFLAGS = -Wall -ggdb -D_GNU_SOURCE -iquote include/
 AM_MAKEFLAGS = --no-print-directory
 
 #sbin_PROGRAMS = spfs spfs_client
-sbin_PROGRAMS = bin/spfs bin/spfs-client
+sbin_PROGRAMS = bin/spfs bin/spfs-client bin/spfs-manager
 
 bin_spfs_SOURCES =	spfs/main.c		\
 			spfs/gateway.c		\
@@ -31,6 +31,17 @@ bin_spfs_client_CFLAGS =
 bin_spfs_client_LDADD =
 bin_spfs_client_LDFLAGS =
 bin_spfs_client_DEPENDENCIES =
+
+bin_spfs_manager_SOURCES = manager/main.c	\
+			   			\
+			   src/util.c		\
+			   src/socket.c		\
+			   src/log.c
+
+bin_spfs_manager_CFLAGS =
+bin_spfs_manager_LDADD =
+bin_spfs_manager_LDFLAGS =
+bin_spfs_manager_DEPENDENCIES =
 
 tags: ctags
 
