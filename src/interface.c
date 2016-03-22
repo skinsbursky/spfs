@@ -10,8 +10,6 @@
 #include "include/log.h"
 #include "include/interface.h"
 
-#define UNIX_SEQPACKET
-
 static struct dentry_info_s *add_dentry_info(struct dentry_info_s *parent,
 					     const char *dentry)
 {
@@ -151,7 +149,6 @@ static void *sock_routine(void *ptr)
 	pr_info("%s: pthread started\n", __func__);
 	while(1) {
 		int sock;
-#ifdef UNIX_SEQPACKET
 		sock = accept(ctx->packet_socket, NULL, NULL);
 		if (sock < 0) {
 			pr_perror("%s: accept failed", __func__);
@@ -161,9 +158,6 @@ static void *sock_routine(void *ptr)
 			}
 			continue;
 		}
-#else
-		sock = ctx->packet_socket;
-#endif
 		pr_debug("%s: accepted new socket\n", __func__);
 
 		while (1) {
@@ -227,11 +221,7 @@ int create_socket_interface(struct context_data_s *ctx, const char *socket_path)
 	int err, sock;
 
 	pr_debug("fuse: creating socket: %s\n", socket_path);
-#ifdef UNIX_SEQPACKET
 	sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
-#else
-	sock = socket(AF_UNIX, SOCK_DGRAM, 0);
-#endif
 	if (sock < 0) {
 		pr_perror("%s: failed to create packet socket", __func__);
 		return -errno;
@@ -263,13 +253,11 @@ int create_socket_interface(struct context_data_s *ctx, const char *socket_path)
 		goto err;
 	}
 
-#ifdef UNIX_SEQPACKET
 	if (listen(sock, 20) == -1) {
 		pr_perror("%s: failed to listen to socket %s", __func__,
 				ctx->sock_addr.sun_path);
 		goto err;
 	}
-#endif
 
 	ctx->packet_socket = sock;
 
