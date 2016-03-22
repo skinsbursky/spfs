@@ -92,10 +92,10 @@ static void help(char *program)
 	printf("\n");
 	printf("Mode options:\n");
 	printf("\t--mode            mode number (0: Proxy, 1: Stub, 2: Golem)\n");
-	printf("\t--path_to_send    proxy directory path to send to FUSE\n");
+	printf("\t--path_to_send    proxy directory path to send to spfs\n");
 	printf("\n");
 	printf("Path options:\n");
-	printf("\t--path_to_send    file path to send to FUSE\n");
+	printf("\t--path_to_send    file path to send to spfs\n");
 	printf("\t--path_to_stat    file path to stat\n");
 }
 
@@ -265,7 +265,7 @@ static int execude_mode_cmd(int argc, char **argv)
 		return 1;
 	}
 
-	if ((m == FUSE_PROXY_MODE) && !path_to_send) {
+	if ((m == SPFS_PROXY_MODE) && !path_to_send) {
 		printf("Directory path wasn't provided for Proxy mode\n");
 		help(argv[0]);
 		return 1;

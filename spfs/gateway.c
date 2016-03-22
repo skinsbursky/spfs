@@ -71,7 +71,7 @@ static int gateway_create_fh(struct gateway_fh_s **gw_fh, unsigned open_flags)
 
 static char *gateway_full_path(const char *path, const struct work_mode_s *wm)
 {
-	if (wm->mode != FUSE_PROXY_MODE)
+	if (wm->mode != SPFS_PROXY_MODE)
 		return strdup(path);
 	return xsprintf("%s%s", wm->proxy_dir, path);
 }

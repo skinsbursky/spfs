@@ -31,7 +31,7 @@ struct context_data_s {
 	pthread_mutex_t		wm_lock;
 
 	FILE			*log;
-	struct fuse_operations	*operations[FUSE_MAX_MODE];
+	struct fuse_operations	*operations[SPFS_MAX_MODE];
 
 	struct dentry_info_s	root;
 	pthread_mutex_t		root_lock;

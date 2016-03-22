@@ -134,7 +134,7 @@ int parse_options(int *orig_argc, char ***orig_argv,
 		exit(0);
 	}
 
-	if ((*mode == FUSE_PROXY_MODE) && (!*proxy_dir)) {
+	if ((*mode == SPFS_PROXY_MODE) && (!*proxy_dir)) {
 		pr_crit("Proxy directory must be specified\n");
 		return -EINVAL;
 	}
@@ -372,7 +372,7 @@ int main(int argc, char *argv[])
 	char *proxy_dir = NULL;
 	char *log_file = "/var/log/fuse_spfs.log";
 	char *socket_path = "/var/run/fuse_control.sock";
-	int mode = FUSE_STUB_MODE, pid, pipes[2];
+	int mode = SPFS_STUB_MODE, pid, pipes[2];
 	int verbosity = 0;
 
 	if (parse_options(&argc, &argv, &proxy_dir, &mode, &log_file,

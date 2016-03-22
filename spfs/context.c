@@ -22,9 +22,9 @@ extern struct fuse_operations golem_operations;
 
 struct context_data_s fs_context = {
 	.operations		= {
-		[FUSE_PROXY_MODE]	= &proxy_operations,
-		[FUSE_STUB_MODE]	= &stub_operations,
-		[FUSE_GOLEM_MODE]	= &golem_operations,
+		[SPFS_PROXY_MODE]	= &proxy_operations,
+		[SPFS_STUB_MODE]	= &stub_operations,
+		[SPFS_GOLEM_MODE]	= &golem_operations,
 	},
 	.root_lock		= PTHREAD_MUTEX_INITIALIZER,
 	.wm_lock		= PTHREAD_MUTEX_INITIALIZER,
@@ -32,9 +32,9 @@ struct context_data_s fs_context = {
 };
 
 const char *work_modes[] = {
-	[FUSE_PROXY_MODE]	= "Proxy",
-	[FUSE_STUB_MODE]	= "Stub",
-	[FUSE_GOLEM_MODE]	= "Golem",
+	[SPFS_PROXY_MODE]	= "Proxy",
+	[SPFS_STUB_MODE]	= "Stub",
+	[SPFS_GOLEM_MODE]	= "Golem",
 };
 
 struct context_data_s *get_context(void)
@@ -48,18 +48,14 @@ const struct fuse_operations *get_operations(struct work_mode_s *wm)
 	const struct fuse_operations *ops;
 
 	switch (wm->mode) {
-		case FUSE_PROXY_MODE:
-			ops = ctx->operations[FUSE_PROXY_MODE];
-			break;
-		case FUSE_STUB_MODE:
-			ops = ctx->operations[FUSE_STUB_MODE];
-			break;
-		case FUSE_GOLEM_MODE:
-			ops = ctx->operations[FUSE_GOLEM_MODE];
+		case SPFS_PROXY_MODE:
+		case SPFS_STUB_MODE:
+		case SPFS_GOLEM_MODE:
+			ops = ctx->operations[wm->mode];
 			break;
 		default:
 			pr_crit("%s: unsupported mode: %d\n", __func__, wm->mode);
-			ops = ctx->operations[FUSE_STUB_MODE];
+			ops = ctx->operations[SPFS_STUB_MODE];
 			break;
 	}
 	return ops;
@@ -194,9 +190,9 @@ int set_work_mode(struct context_data_s *ctx, int mode, const char *path)
 	int err;
 
 	switch (mode) {
-		case FUSE_PROXY_MODE:
-		case FUSE_GOLEM_MODE:
-		case FUSE_STUB_MODE:
+		case SPFS_PROXY_MODE:
+		case SPFS_GOLEM_MODE:
+		case SPFS_STUB_MODE:
 			err = create_work_mode(mode, path, &new_wm);
 			if (err)
 				return err;

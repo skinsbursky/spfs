@@ -115,10 +115,10 @@ int spfs_execute_cmd(void *data, void *package, size_t psize)
 	order = (struct external_cmd *)package;
 	pr_debug("%s: cmd: %d\n", __func__, order->cmd);
 	switch (order->cmd) {
-		case FUSE_CMD_SET_MODE:
+		case SPFS_CMD_SET_MODE:
 			mp = (struct cmd_package_s *)order->ctx;
 			return change_work_mode(ctx, mp->mode, mp->path);
-		case FUSE_CMD_INSTALL_PATH:
+		case SPFS_CMD_INSTALL_PATH:
 			dp = (struct dentry_package_s *)order->ctx;
 
 			pr_debug("%s: dp->stat.st_dev   : %ld\n", __func__, dp->stat.st_dev);

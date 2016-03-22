@@ -5,10 +5,10 @@
 #include <string.h>
 
 enum {
-	FUSE_PROXY_MODE,
-	FUSE_STUB_MODE,
-	FUSE_GOLEM_MODE,
-	FUSE_MAX_MODE,
+	SPFS_PROXY_MODE,
+	SPFS_STUB_MODE,
+	SPFS_GOLEM_MODE,
+	SPFS_MAX_MODE,
 };
 
 struct external_cmd {
@@ -28,9 +28,9 @@ struct dentry_package_s {
 };
 
 enum {
-	FUSE_CMD_SET_MODE,
-	FUSE_CMD_INSTALL_PATH,
-	FUSE_CMD_MAX,
+	SPFS_CMD_SET_MODE,
+	SPFS_CMD_INSTALL_PATH,
+	SPFS_CMD_MAX,
 };
 
 static inline size_t path_packet_size(const char *path)
@@ -48,7 +48,7 @@ static inline void fill_path_packet(struct external_cmd *package,
 {
 	struct dentry_package_s *dp = (struct dentry_package_s *)&package->ctx;
 
-	package->cmd = FUSE_CMD_INSTALL_PATH;
+	package->cmd = SPFS_CMD_INSTALL_PATH;
 
 	memcpy(&dp->stat, stat, sizeof(dp->stat));
 	strcpy(dp->path, path);
@@ -59,7 +59,7 @@ static inline void fill_mode_packet(struct external_cmd *package, unsigned mode,
 {
 	struct cmd_package_s *cp = (struct cmd_package_s *)&package->ctx;
 
-	package->cmd = FUSE_CMD_SET_MODE;
+	package->cmd = SPFS_CMD_SET_MODE;
 
 	cp->mode = mode;
 	strcpy(cp->path, path);
