@@ -1,6 +1,7 @@
 #ifndef __LOG_FUSE_FS_H_
 #define __LOG_FUSE_FS_H_
 
+#include <stdio.h>
 #include <sys/syslog.h>
 #include <errno.h>
 #include <sys/types.h>
