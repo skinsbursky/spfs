@@ -13,10 +13,11 @@ bin_spfs_SOURCES =	spfs/main.c		\
 			spfs/stub.c		\
 			spfs/context.c		\
 			spfs/golem.c		\
+			spfs/interface.c	\
 						\
 			src/util.c		\
 			src/log.c		\
-			src/interface.c
+			src/socket.c
 
 bin_spfs_CFLAGS = `pkg-config fuse --cflags --libs`
 bin_spfs_LDADD =

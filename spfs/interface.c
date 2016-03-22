@@ -141,131 +141,37 @@ static int execute_cmd(struct context_data_s *ctx, void *cmd)
 	return 0;
 }
 
-static void *sock_routine(void *ptr)
+int spfs_conn_handler(int sock, void *data)
 {
-	struct context_data_s *ctx = ptr;
 	char page[4096];
-
-	pr_info("%s: pthread started\n", __func__);
-	while(1) {
-		int sock;
-		sock = accept(ctx->packet_socket, NULL, NULL);
-		if (sock < 0) {
-			pr_perror("%s: accept failed", __func__);
-			if (errno == EINTR) {
-				pr_debug("%s: exit\n", __func__);
-				return NULL;
-			}
-			continue;
-		}
-		pr_debug("%s: accepted new socket\n", __func__);
-
-		while (1) {
-			ssize_t bytes;
-			int err;
-
-			bytes = recv(sock, page, sizeof(page), 0);
-			if (bytes < 0) {
-				pr_perror("%s: read failed", __func__, bytes);
-				if (errno == EINTR) {
-					pr_debug("%s: exit\n", __func__);
-					return NULL;
-				}
-				break;
-			}
-			if (bytes == 0) {
-				pr_debug("%s: peer was closed\n", __func__);
-				break;
-			}
-
-			pr_debug("%s: !!!received %ld bytes\n", __func__, bytes);
-
-			err = execute_cmd(ctx, page);
-
-			bytes = send(sock, &err, sizeof(&err), MSG_NOSIGNAL | MSG_DONTWAIT | MSG_EOR);
-			if (bytes < 0) {
-				pr_perror("%s: write failed", __func__, bytes);
-				if (errno == EINTR) {
-					pr_debug("%s: exit\n", __func__);
-					return NULL;
-				}
-				break;
-			}
-			if (bytes == 0) {
-				pr_debug("%s: peer was closed\n", __func__);
-				break;
-			}
-
-		}
-		close(sock);
-	}
-	return NULL;
-}
-
-int start_socket_thread(struct context_data_s *ctx)
-{
+	struct context_data_s *ctx = data;
+	ssize_t bytes;
 	int err;
 
-	err = pthread_create(&ctx->sock_pthread, NULL, sock_routine, ctx);
-	if (err) {
-		pr_perror("%s: failed to create socket pthread", __func__);
+	bytes = recv(sock, page, sizeof(page), 0);
+	if (bytes < 0) {
+		pr_perror("%s: read failed", __func__, bytes);
+		return -errno;
+	}
+	if (bytes == 0) {
+		pr_debug("%s: peer was closed\n", __func__);
+		return -ECONNABORTED;
+	}
+
+	pr_debug("received %ld bytes\n", __func__, bytes);
+
+	err = execute_cmd(ctx, page);
+
+	bytes = send(sock, &err, sizeof(&err), MSG_NOSIGNAL | MSG_DONTWAIT | MSG_EOR);
+	if (bytes < 0) {
+		pr_perror("%s: write failed", __func__, bytes);
 		return -errno;
 	}
 
-	pr_debug("%s: created pthread with ID %ld\n", __func__, ctx->sock_pthread);
+	if (bytes == 0) {
+		pr_debug("%s: peer was closed\n", __func__);
+		return -ECONNABORTED;
+	}
+
 	return 0;
-}
-
-int create_socket_interface(struct context_data_s *ctx, const char *socket_path)
-{
-	int err, sock;
-
-	pr_debug("fuse: creating socket: %s\n", socket_path);
-	sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
-	if (sock < 0) {
-		pr_perror("%s: failed to create packet socket", __func__);
-		return -errno;
-	}
-	pr_debug("Socket fd: %d\n", sock);
-
-	sock = save_fd(sock);
-	if (sock < 0) {
-		pr_crit("Failed to save sock fd\n");
-		return sock;
-	}
-	pr_debug("Saved socket fd: %d\n", sock);
-
-	if (!access(socket_path, F_OK) && (unlink(socket_path) < 0)) {
-		err = -errno;
-		pr_crit("fuse: failed to unlink %s: %d\n", socket_path, -errno);
-		return err;
-	}
-
-	memset(&ctx->sock_addr, 0, sizeof(struct sockaddr_un));
-	ctx->sock_addr.sun_family = AF_UNIX;
-	strncpy(ctx->sock_addr.sun_path, socket_path,
-			sizeof(ctx->sock_addr.sun_path) - 1);
-
-	err = bind(sock, (struct sockaddr *)&ctx->sock_addr, sizeof(ctx->sock_addr));
-	if (err) {
-		pr_perror("%s: failed to bind socket to %s", __func__,
-				ctx->sock_addr.sun_path);
-		goto err;
-	}
-
-	if (listen(sock, 20) == -1) {
-		pr_perror("%s: failed to listen to socket %s", __func__,
-				ctx->sock_addr.sun_path);
-		goto err;
-	}
-
-	ctx->packet_socket = sock;
-
-	pr_info("%s: Listening to %s\n", __func__, ctx->sock_addr.sun_path);
-	return 0;
-
-err:
-	err = -errno;
-	close(sock);
-	return err;
 }

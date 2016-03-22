@@ -65,4 +65,6 @@ static inline void fill_mode_packet(struct external_cmd *package, unsigned mode,
 	strcpy(cp->path, path);
 }
 
+extern int spfs_conn_handler(int sock, void *data);
+
 #endif

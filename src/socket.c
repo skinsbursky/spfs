@@ -85,7 +85,7 @@ int sock_seqpacket(const char *path, bool move_fd, bool start_listen,
 		*address = addr;
 
 	pr_info("listening to %s\n", addr.sun_path);
-	return 0;
+	return sock;
 
 err:
 	err = -errno;

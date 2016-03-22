@@ -11,15 +11,14 @@
 #include "include/util.h"
 #include "include/context.h"
 #include "include/log.h"
+#include "include/socket.h"
+#include "include/interface.h"
 
 #define UNIX_SEQPACKET
 
 extern struct fuse_operations stub_operations;
 extern struct fuse_operations proxy_operations;
 extern struct fuse_operations golem_operations;
-
-extern int create_socket_interface(struct context_data_s *ctx, const char *socket_path);
-extern int start_socket_thread(struct context_data_s *ctx);
 
 struct context_data_s fs_context = {
 	.operations		= {
@@ -301,6 +300,15 @@ int context_store_mnt_stat(const char *mountpoint)
 	return 0;
 }
 
+static void *sock_routine(void *ptr)
+{
+        struct context_data_s *ctx = ptr;
+
+	(void) socket_loop(ctx->packet_socket, ctx, spfs_conn_handler);
+
+	return NULL;
+}
+
 int context_init(const char *proxy_dir, int mode, const char *log_file,
 		 const char *socket_path, int verbosity)
 {
@@ -329,13 +337,21 @@ int context_init(const char *proxy_dir, int mode, const char *log_file,
 	pr_debug("%s: proxy_dir   : %s\n", __func__, ctx->wm->proxy_dir);
 	pr_debug("%s: mode        : %s\n", __func__, work_modes[ctx->wm->mode]);
 
-	err = create_socket_interface(ctx, socket_path);
-	if (err) {
+	ctx->packet_socket = sock_seqpacket(socket_path, true, true,
+					    &ctx->sock_addr);
+	if (ctx->packet_socket < 0) {
 		pr_err("failed to create socket interface: %d\n", err);
 		return err;
 	}
 
-	return start_socket_thread(ctx);
+	err = pthread_create(&ctx->sock_pthread, NULL, sock_routine, ctx);
+	if (err) {
+		pr_perror("%s: failed to create socket pthread", __func__);
+		return -errno;
+	}
+
+	pr_debug("%s: created pthread with ID %ld\n", __func__, ctx->sock_pthread);
+	return 0;
 }
 
 void context_fini(void)
