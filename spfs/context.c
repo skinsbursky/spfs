@@ -12,7 +12,7 @@
 #include "include/context.h"
 #include "include/log.h"
 #include "include/socket.h"
-#include "include/interface.h"
+#include "include/spfs_interface.h"
 
 #define UNIX_SEQPACKET
 

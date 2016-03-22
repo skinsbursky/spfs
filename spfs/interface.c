@@ -8,7 +8,7 @@
 #include "include/util.h"
 #include "include/context.h"
 #include "include/log.h"
-#include "include/interface.h"
+#include "include/spfs_interface.h"
 
 static struct dentry_info_s *add_dentry_info(struct dentry_info_s *parent,
 					     const char *dentry)

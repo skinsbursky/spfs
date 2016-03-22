@@ -7,7 +7,7 @@
 
 #include <pthread.h>
 
-#include "interface.h"
+#include "include/spfs_interface.h"
 #include "list.h"
 
 #define ERESTARTSYS		512

@@ -11,7 +11,7 @@
 #include <stdbool.h>
 #include <getopt.h>
 
-#include "include/interface.h"
+#include "include/spfs_interface.h"
 #include "include/util.h"
 #include "include/log.h"
 #include "include/socket.h"

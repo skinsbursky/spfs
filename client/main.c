@@ -12,7 +12,7 @@
 #include <stdio.h>
 
 
-#include "include/interface.h"
+#include "include/spfs_interface.h"
 #include "include/util.h"
 
 static int send_data(int sock, void *ctx, size_t len)
