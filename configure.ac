@@ -5,6 +5,7 @@ m4_ifdef([AM_SILENT_RULES],
 	 [AC_SUBST([AM_DEFAULT_VERBOSITY], [1])])
 
 AM_INIT_AUTOMAKE([subdir-objects])
+AM_PROG_CC_C_O
 
 AC_GNU_SOURCE
 AC_CONFIG_HEADERS([spfs_config.h])
