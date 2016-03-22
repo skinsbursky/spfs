@@ -1,5 +1,5 @@
-#ifndef __INTERFACE_FUSE_FS_H_
-#define __INTERFACE_FUSE_FS_H_
+#ifndef __SPFS_INTERFACE_H_
+#define __SPFS_INTERFACE_H_
 
 #include <sys/stat.h>
 #include <string.h>

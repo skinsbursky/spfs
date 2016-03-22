@@ -1,5 +1,5 @@
-#ifndef __UTIL_FUSE_FS_H_
-#define __UTIL_FUSE_FS_H_
+#ifndef __SPFS_UTIL_H_
+#define __SPFS_UTIL_H_
 
 extern char *xstrcat(char *str, const char *fmt, ...);
 extern char *xsprintf(const char *fmt, ...);

@@ -1,5 +1,5 @@
-#ifndef __FUSE_STUB_LIST_H__
-#define __FUSE_STUB_LIST_H__
+#ifndef __SPFS_LIST_H__
+#define __SPFS_LIST_H__
 
 /*
  * Double linked lists.

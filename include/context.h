@@ -1,5 +1,5 @@
-#ifndef __CONTEXT_FUSE_FS_H_
-#define __CONTEXT_FUSE_FS_H_
+#ifndef __SPFS_CONTEXT_H_
+#define __SPFS_CONTEXT_H_
 
 #include <stdio.h>
 #include <sys/un.h>

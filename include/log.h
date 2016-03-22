@@ -1,5 +1,5 @@
-#ifndef __LOG_FUSE_FS_H_
-#define __LOG_FUSE_FS_H_
+#ifndef __SPFS_LOG_H_
+#define __SPFS_LOG_H_
 
 #include <stdio.h>
 #include <sys/syslog.h>
