@@ -35,7 +35,7 @@ static int spfs_manager_conn_handler(int sock, void *data)
 static int mount_spfs(const char *work_dir, char *mountpoint)
 {
 	int pid, status;
-	const char *spfs = "fuse_stub";
+	const char *spfs = FS_NAME;
 	char *proxy_dir;
 	char *socket_path;
 	char *log_path;

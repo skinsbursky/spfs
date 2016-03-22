@@ -37,5 +37,14 @@ AC_CHECK_LIB(
 	     [AC_MSG_ERROR([*** libulockmgr not found.])
 	     ])
 
+FS_NAME=spfs
+AC_DEFINE_UNQUOTED(FS_NAME, "$FS_NAME", [spfs])
+
+CLIENT_NAME=spfs-client
+AC_DEFINE_UNQUOTED(CLIENT_NAME, "$CLIENT_NAME", [spfs])
+
+MANAGER_NAME=spfs-manager
+AC_DEFINE_UNQUOTED(MANAGER_NAME, "$MANAGER_NAME", [spfs])
+
 AC_OUTPUT
 
