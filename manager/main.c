@@ -16,7 +16,7 @@
 #include "include/log.h"
 #include "include/socket.h"
 
-#include "spfs/interface.h"
+#include "spfs/context.h"
 
 #include "context.h"
 #include "interface.h"

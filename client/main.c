@@ -196,12 +196,6 @@ static int execude_mode_cmd(int argc, char **argv)
 		return 1;
 	}
 
-	if ((m == SPFS_PROXY_MODE) && !path_to_send) {
-		printf("Directory path wasn't provided for Proxy mode\n");
-		help(argv[0]);
-		return 1;
-	}
-
 	return send_mode(socket_path, m, path_to_send);
 }
 

@@ -4,13 +4,6 @@
 #include <sys/stat.h>
 #include <string.h>
 
-enum {
-	SPFS_PROXY_MODE,
-	SPFS_STUB_MODE,
-	SPFS_GOLEM_MODE,
-	SPFS_MAX_MODE,
-};
-
 struct external_cmd {
 	unsigned int	cmd;
 	unsigned long	pad;

@@ -8,9 +8,14 @@
 
 #include "include/list.h"
 
-#include "interface.h"
-
 #define ERESTARTSYS		512
+
+enum {
+	SPFS_PROXY_MODE,
+	SPFS_STUB_MODE,
+	SPFS_GOLEM_MODE,
+	SPFS_MAX_MODE,
+};
 
 struct dentry_info_s {
 	char   *name;
