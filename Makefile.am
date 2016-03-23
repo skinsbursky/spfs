@@ -45,10 +45,8 @@ bin_spfs_manager_SOURCES =	manager/main.c			\
 				src/socket.c			\
 				src/log.c			\
 								\
-				include/context.h		\
 				include/log.h			\
 				include/socket.h		\
-				include/spfs_interface.h	\
 				include/util.h
 
 bin_spfs_manager_CFLAGS =
