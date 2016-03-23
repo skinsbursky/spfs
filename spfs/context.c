@@ -333,7 +333,7 @@ int context_init(const char *proxy_dir, int mode, const char *log_file,
 	pr_debug("%s: proxy_dir   : %s\n", __func__, ctx->wm->proxy_dir);
 	pr_debug("%s: mode        : %s\n", __func__, work_modes[ctx->wm->mode]);
 
-	ctx->packet_socket = sock_seqpacket(socket_path, true, true,
+	ctx->packet_socket = seqpacket_sock(socket_path, true, true,
 					    &ctx->sock_addr);
 	if (ctx->packet_socket < 0) {
 		pr_err("failed to create socket interface: %d\n", err);

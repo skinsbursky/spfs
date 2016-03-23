@@ -88,7 +88,7 @@ int socket_loop(int psock, void *data, int (*handler)(int sock, void *data))
 	return 0;
 }
 
-int sock_seqpacket(const char *path, bool move_fd, bool start_listen,
+int seqpacket_sock(const char *path, bool move_fd, bool start_listen,
 		     struct sockaddr_un *address)
 {
 	int err, sock;

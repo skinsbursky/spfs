@@ -164,7 +164,7 @@ static int configure(struct spfs_manager_context_s *ctx)
 	if (err)
 		return err;
 
-	sock = sock_seqpacket(ctx->socket_path, true, true, NULL);
+	sock = seqpacket_sock(ctx->socket_path, true, true, NULL);
 	if (sock < 0)
 		return sock;
 
