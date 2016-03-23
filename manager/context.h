@@ -2,6 +2,7 @@
 #define __SPFS_MANAGER_CONTEXT_H_
 
 #include <stdbool.h>
+#include <stddef.h>
 
 struct spfs_manager_context_s {
 	const char	*progname;

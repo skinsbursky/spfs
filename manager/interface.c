@@ -38,6 +38,8 @@ int spfs_manager_packet_handler(void *data, void *package, size_t psize)
 		case SPFS_CMD_SET_MODE:
 		case SPFS_CMD_INSTALL_PATH:
 			return send_packet_to_spfs(ctx, package, psize);
+		case SPFS_MANAGER_MOUNT_FS:
+			return mount_fs(ctx, order->ctx, psize);
 		default:
 			pr_err("%s: unknown cmd: %d\n", __func__, order->cmd);
 			return -1;
