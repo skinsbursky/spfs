@@ -4,6 +4,7 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <limits.h>
 
 #include "include/log.h"
 
@@ -111,3 +112,26 @@ void execvp_print(const char *file, char *const argv[])
 
 	pr_perror("exec failed");
 }
+
+int xatol(const char *string, long *number)
+{
+	char *endptr;
+	long nr;
+
+	errno = 0;
+	nr = strtol(string, &endptr, 10);
+	if ((errno == ERANGE && (nr == LONG_MAX || nr == LONG_MIN))
+			|| (errno != 0 && nr == 0)) {
+		perror("failed to convert string");
+		return -EINVAL;
+	}
+
+	if ((endptr == string) || (*endptr != '\0')) {
+		printf("String is not a number: '%s'\n", string);
+		return -EINVAL;
+	}
+	*number = nr;
+	return 0;
+}
+
+

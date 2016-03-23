@@ -4,6 +4,8 @@
 extern char *xstrcat(char *str, const char *fmt, ...);
 extern char *xsprintf(const char *fmt, ...);
 
+extern int xatol(const char *string, long *number);
+
 int save_fd(int fd);
 
 void execvp_print(const char *file, char *const argv[]);
