@@ -14,14 +14,15 @@ bin_spfs_SOURCES =		spfs/main.c			\
 				spfs/golem.c			\
 				spfs/interface.c		\
 								\
+				spfs/interface.h		\
+				spfs/context.h			\
+								\
 				src/util.c			\
 				src/log.c			\
 				src/socket.c			\
 								\
-				include/context.h		\
 				include/log.h			\
 				include/socket.h		\
-				include/spfs_interface.h	\
 				include/util.h
 
 bin_spfs_CFLAGS = `pkg-config fuse --cflags --libs`
@@ -31,7 +32,9 @@ bin_spfs_DEPENDENCIES =
 
 
 bin_spfs_client_SOURCES =	client/main.c			\
-				include/spfs_interface.h	\
+								\
+				spfs/interface.h		\
+								\
 				include/util.h
 
 bin_spfs_client_CFLAGS =
@@ -41,6 +44,8 @@ bin_spfs_client_DEPENDENCIES =
 
 bin_spfs_manager_SOURCES =	manager/main.c			\
 				manager/context.c		\
+								\
+				manager/context.h		\
 								\
 				src/util.c			\
 				src/socket.c			\
