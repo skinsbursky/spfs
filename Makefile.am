@@ -40,6 +40,7 @@ bin_spfs_client_LDFLAGS =
 bin_spfs_client_DEPENDENCIES =
 
 bin_spfs_manager_SOURCES =	manager/main.c			\
+				manager/context.c		\
 								\
 				src/util.c			\
 				src/socket.c			\
