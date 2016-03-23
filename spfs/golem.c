@@ -5,7 +5,7 @@
 #include "include/context.h"
 #include "include/log.h"
 
-const struct dentry_info_s *find_dentry_info(struct context_data_s *ctx, const char *path)
+const struct dentry_info_s *find_dentry_info(struct spfs_context_s *ctx, const char *path)
 {
 	const struct dentry_info_s *parent = NULL;
 	const char *dentry, *slash;
@@ -53,7 +53,7 @@ const struct dentry_info_s *find_dentry_info(struct context_data_s *ctx, const c
 
 static int golem_getattr(const char *path, struct stat *stbuf)
 {
-	struct context_data_s *ctx = get_context();
+	struct spfs_context_s *ctx = get_context();
 	const struct dentry_info_s *info;
 
 	pr_debug("%s: searching dentry for path %s\n", __func__, path);
@@ -127,7 +127,7 @@ static int golem_truncate(const char *path, off_t size)
 
 static int golem_open(const char *path, struct fuse_file_info *fi)
 {
-	struct context_data_s *ctx = get_context();
+	struct spfs_context_s *ctx = get_context();
 	const struct dentry_info_s *info;
 
 	info = find_dentry_info(ctx, path);
@@ -199,7 +199,7 @@ static int golem_removexattr(const char *path, const char *name)
 
 static int golem_opendir(const char *path, struct fuse_file_info *fi)
 {
-	struct context_data_s *ctx = get_context();
+	struct spfs_context_s *ctx = get_context();
 	const struct dentry_info_s *info;
 
 	info = find_dentry_info(ctx, path);

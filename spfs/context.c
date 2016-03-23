@@ -20,7 +20,7 @@ extern struct fuse_operations stub_operations;
 extern struct fuse_operations proxy_operations;
 extern struct fuse_operations golem_operations;
 
-struct context_data_s fs_context = {
+struct spfs_context_s fs_context = {
 	.operations		= {
 		[SPFS_PROXY_MODE]	= &proxy_operations,
 		[SPFS_STUB_MODE]	= &stub_operations,
@@ -37,14 +37,14 @@ const char *work_modes[] = {
 	[SPFS_GOLEM_MODE]	= "Golem",
 };
 
-struct context_data_s *get_context(void)
+struct spfs_context_s *get_context(void)
 {
 	return &fs_context;
 }
 
 const struct fuse_operations *get_operations(struct work_mode_s *wm)
 {
-	const struct context_data_s *ctx = get_context();
+	const struct spfs_context_s *ctx = get_context();
 	const struct fuse_operations *ops;
 
 	switch (wm->mode) {
@@ -79,7 +79,7 @@ int wait_mode_change(int current_mode)
 
 static int wake_mode_waiters(void)
 {
-	struct context_data_s *ctx = get_context();
+	struct spfs_context_s *ctx = get_context();
 
 	return syscall(SYS_futex, &ctx->wm->mode, FUTEX_WAKE, INT_MAX, NULL, NULL, 0);
 }
@@ -126,7 +126,7 @@ free_new:
 
 int copy_work_mode(struct work_mode_s **wm)
 {
-	struct context_data_s *ctx = get_context();
+	struct spfs_context_s *ctx = get_context();
 	const struct work_mode_s *ctx_wm;
 	struct work_mode_s *copy;
 	int err;
@@ -175,7 +175,7 @@ void destroy_work_mode(struct work_mode_s *wm)
 
 int stale_work_mode(int mode, const char *proxy_dir)
 {
-	struct context_data_s *ctx = get_context();
+	struct spfs_context_s *ctx = get_context();
 
 	if (mode != ctx->wm->mode)
 		return 1;
@@ -183,7 +183,7 @@ int stale_work_mode(int mode, const char *proxy_dir)
 	return !!strcmp(proxy_dir, ctx->wm->proxy_dir);
 }
 
-int set_work_mode(struct context_data_s *ctx, int mode, const char *path)
+int set_work_mode(struct spfs_context_s *ctx, int mode, const char *path)
 {
 	struct work_mode_s *cur_wm = get_context()->wm;
 	struct work_mode_s *new_wm = NULL;
@@ -216,7 +216,7 @@ int set_work_mode(struct context_data_s *ctx, int mode, const char *path)
 	return 0;
 }
 
-int change_work_mode(struct context_data_s *ctx, int mode, const char *path)
+int change_work_mode(struct spfs_context_s *ctx, int mode, const char *path)
 {
 	pr_info("%s: changing work mode from %d to %d (path: %s)\n", __func__, ctx->wm->mode, mode, path);
 	if (!stale_work_mode(mode, path)) {
@@ -227,7 +227,7 @@ int change_work_mode(struct context_data_s *ctx, int mode, const char *path)
 }
 
 
-static int setup_context(struct context_data_s *ctx, const char *proxy_dir,
+static int setup_context(struct spfs_context_s *ctx, const char *proxy_dir,
 			 int mode)
 {
 	int err = -ENOMEM;
@@ -251,7 +251,7 @@ static int setup_context(struct context_data_s *ctx, const char *proxy_dir,
 	return 0;
 }
 
-static int setup_log(struct context_data_s *ctx, const char *log_file, int verbosity)
+static int setup_log(struct spfs_context_s *ctx, const char *log_file, int verbosity)
 {
 	int fd;
 
@@ -280,7 +280,7 @@ static int setup_log(struct context_data_s *ctx, const char *log_file, int verbo
 
 int context_store_mnt_stat(const char *mountpoint)
 {
-	struct context_data_s *ctx = get_context();
+	struct spfs_context_s *ctx = get_context();
 	int err;
 
 	if (!mountpoint) {
@@ -298,7 +298,7 @@ int context_store_mnt_stat(const char *mountpoint)
 
 static void *sock_routine(void *ptr)
 {
-        struct context_data_s *ctx = ptr;
+        struct spfs_context_s *ctx = ptr;
 
 	(void) reliable_socket_loop(ctx->packet_socket, ctx, spfs_execute_cmd);
 
@@ -308,7 +308,7 @@ static void *sock_routine(void *ptr)
 int context_init(const char *proxy_dir, int mode, const char *log_file,
 		 const char *socket_path, int verbosity)
 {
-	struct context_data_s *ctx = get_context();
+	struct spfs_context_s *ctx = get_context();
 	int err;
 
 	pr_debug("fuse: opening log %s\n", log_file);
@@ -352,7 +352,7 @@ int context_init(const char *proxy_dir, int mode, const char *log_file,
 
 void context_fini(void)
 {
-	struct context_data_s *ctx = get_context();
+	struct spfs_context_s *ctx = get_context();
 	void *res;
 	int err;
 

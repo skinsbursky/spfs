@@ -52,7 +52,7 @@ static struct dentry_info_s *find_child_info(struct dentry_info_s *parent,
 	return NULL;
 }
 
-static int context_add_path(struct context_data_s *ctx, const struct dentry_package_s *dp)
+static int context_add_path(struct spfs_context_s *ctx, const struct dentry_package_s *dp)
 {
 	char *path, *dentry;
 	struct dentry_info_s *cur_info = &ctx->root, *child_info = NULL;
@@ -106,7 +106,7 @@ err:
 
 int spfs_execute_cmd(void *data, void *package, size_t psize)
 {
-	struct context_data_s *ctx = data;
+	struct spfs_context_s *ctx = data;
 	struct external_cmd *order;
 	struct dentry_package_s *dp;
 	struct cmd_package_s *mp;

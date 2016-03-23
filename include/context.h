@@ -26,7 +26,7 @@ struct work_mode_s {
 	int			proxy_root_fd;
 };
 
-struct context_data_s {
+struct spfs_context_s {
 	struct work_mode_s	*wm;
 	pthread_mutex_t		wm_lock;
 
@@ -47,11 +47,11 @@ int context_store_mnt_stat(const char *mountpoint);
 
 void context_fini(void);
 
-struct context_data_s *get_context(void);
+struct spfs_context_s *get_context(void);
 const struct fuse_operations *get_operations(struct work_mode_s *wm);
 
-int change_work_mode(struct context_data_s *ctx, int mode, const char *path);
-int set_work_mode(struct context_data_s *ctx, int mode, const char *path);
+int change_work_mode(struct spfs_context_s *ctx, int mode, const char *path);
+int set_work_mode(struct spfs_context_s *ctx, int mode, const char *path);
 int wait_mode_change(int current_mode);
 
 const struct work_mode_s *ctx_work_mode(void);
