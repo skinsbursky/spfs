@@ -134,7 +134,8 @@ static int configure(struct spfs_manager_context_s *ctx)
 	}
 
 	if (!ctx->socket_path) {
-		ctx->socket_path = xsprintf("/var/run/spfs_manager_sock-%d.sock", getpid());
+		ctx->socket_path = xsprintf("/var/run/%s-%d.sock",
+						ctx->progname, getpid());
 		if (!ctx->socket_path) {
 			pr_err("failed to allocate\n");
 			return -ENOMEM;
@@ -148,7 +149,8 @@ static int configure(struct spfs_manager_context_s *ctx)
 	}
 
 	if (!ctx->log_file) {
-		ctx->log_file = xsprintf("/var/log/spfs_manager_sock-%d.log", getpid());
+		ctx->log_file = xsprintf("/var/log/%s-%d.log", ctx->progname,
+								getpid());
 		if (!ctx->log_file) {
 			pr_err("failed to allocate\n");
 			return -ENOMEM;
@@ -306,9 +308,13 @@ static void cleanup(void)
 			pr_perror("failed ot unlink %s", spfs_manager_context.socket_path);
 }
 
+extern const char *__progname;
+
 struct spfs_manager_context_s *create_context(int argc, char **argv)
 {
 	struct spfs_manager_context_s *ctx = &spfs_manager_context;
+
+	ctx->progname = __progname;
 
 	if (parse_options(argc, argv, &ctx->work_dir, &ctx->log_file,
 			  &ctx->socket_path, &ctx->verbosity, &ctx->daemonize,
