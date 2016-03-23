@@ -98,7 +98,10 @@ int parse_options(int *orig_argc, char ***orig_argv,
 				nind += 2;
 				break;
 			case 'm':
-				*mode = atoi(optarg);
+				if (xatol(optarg, mode)) {
+					pr_err("mode is invalid\n");
+					return -EINVAL;
+				}
 				nind += 2;
 				break;
 			case 'l':
