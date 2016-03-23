@@ -18,16 +18,6 @@
 
 #include "context.h"
 
-char *work_dir;
-char *log_file;
-char *socket_path;
-int verbosity;
-bool daemonize;
-char *process_id;
-char *namespaces;
-char *cgroups;
-char *mountpoint;
-
 static int spfs_manager_packet_handler(void *data, void *packet, size_t psize)
 {
 	pr_err("Interface is not ready yet\n");
@@ -117,7 +107,7 @@ int main(int argc, char *argv[])
 	if (mount_spfs(ctx->work_dir, ctx->mountpoint))
 		return -EINVAL;
 
-	if (daemonize) {
+	if (ctx->daemonize) {
 		if (daemon(0, 0)) {
 			pr_perror("failed to daemonize");
 			return -errno;
