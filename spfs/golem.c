@@ -2,7 +2,7 @@
 
 #include <fuse.h>
 
-#include "include/context.h"
+#include "context.h"
 #include "include/log.h"
 
 const struct dentry_info_s *find_dentry_info(struct spfs_context_s *ctx, const char *path)

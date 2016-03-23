@@ -6,9 +6,9 @@
 #include <sys/socket.h>
 
 #include "include/util.h"
-#include "include/context.h"
+#include "context.h"
 #include "include/log.h"
-#include "include/spfs_interface.h"
+#include "interface.h"
 
 static struct dentry_info_s *add_dentry_info(struct dentry_info_s *parent,
 					     const char *dentry)

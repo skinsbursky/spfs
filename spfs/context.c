@@ -9,10 +9,10 @@
 #include <syscall.h>
 
 #include "include/util.h"
-#include "include/context.h"
+#include "context.h"
 #include "include/log.h"
 #include "include/socket.h"
-#include "include/spfs_interface.h"
+#include "interface.h"
 
 #define UNIX_SEQPACKET
 

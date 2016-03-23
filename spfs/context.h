@@ -4,11 +4,11 @@
 #include <stdio.h>
 #include <sys/un.h>
 #include <sys/stat.h>
-
 #include <pthread.h>
 
-#include "include/spfs_interface.h"
-#include "list.h"
+#include "include/list.h"
+
+#include "interface.h"
 
 #define ERESTARTSYS		512
 
