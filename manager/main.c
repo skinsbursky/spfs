@@ -31,8 +31,6 @@ static int mount_spfs(const char *work_dir, char *mountpoint)
 	char *proxy_dir;
 	char *socket_path;
 	char *log_path;
-	/*TODO Add spfs_mode option? */
-	/* TODO make mode accepf strings like "stub" or "proxy" ? */
 	char *mode = "1";
 
 	log_path = xsprintf("%s/spfs.log", work_dir);
@@ -51,8 +49,6 @@ static int mount_spfs(const char *work_dir, char *mountpoint)
 		pr_perror("failed to create %s", proxy_dir);
 		return -errno;
 	}
-
-	pr_debug("%s: 2\n", __func__);
 
 	pid = fork();
 	switch (pid) {
