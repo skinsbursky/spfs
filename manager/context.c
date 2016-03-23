@@ -115,6 +115,8 @@ static int convert_pid(const char *process_id)
 
 static int setup_log(const char *log_file)
 {
+	setvbuf(stdout, NULL, _IONBF, 0);
+	setvbuf(stderr, NULL, _IONBF, 0);
 	/* TODO: set O_CLOEXEC */
 	return 0;
 }
