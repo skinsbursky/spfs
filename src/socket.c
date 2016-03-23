@@ -10,6 +10,41 @@
 #include "include/log.h"
 #include "include/socket.h"
 
+static int seqpacket_sock_send(int sock, void *packet, size_t psize)
+{
+	ssize_t bytes;
+	int err;
+
+	bytes = send(sock, packet, psize, MSG_EOR);
+	if (bytes < 0) {
+		printf("failed to send packet: %d\n", -errno);
+		return -1;
+	}
+
+	bytes = recv(sock, &err, sizeof(err), 0);
+	if (bytes < 0) {
+		printf("failed to receive reply: %d", -errno);
+		return -1;
+	}
+
+	return err;
+}
+
+int send_packet(const char *socket_path, void *package, size_t psize)
+{
+	int sock, err;
+
+	sock = seqpacket_sock(socket_path, false, false, NULL);
+	if (sock < 0)
+		return sock;
+
+	err = seqpacket_sock_send(sock, package, psize);
+
+	close(sock);
+	return err;
+}
+
+
 static int reliable_conn_handler(int sock, void *data,
 				 int (*packet_handler)(void *data, void *packet, size_t psize))
 {
