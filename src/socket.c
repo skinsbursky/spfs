@@ -124,24 +124,29 @@ int seqpacket_sock(const char *path, bool move_fd, bool start_listen,
 	addr.sun_family = AF_UNIX;
 	strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
 
-	err = bind(sock, (struct sockaddr *)&addr, sizeof(addr));
-	if (err) {
-		pr_perror("failed to bind socket to %s", addr.sun_path);
-		goto err;
-	}
-
 	if (start_listen) {
+		if (bind(sock, (struct sockaddr *)&addr, sizeof(addr))) {
+			pr_perror("failed to bind socket to %s", addr.sun_path);
+			goto err;
+		}
+
 		if (listen(sock, 20) == -1) {
 			pr_perror("failed to start listen to socket %s",
 					addr.sun_path);
 			goto err;
 		}
+		pr_info("listening to %s\n", addr.sun_path);
+	} else {
+		if (connect(sock, (struct sockaddr *)&addr, sizeof(addr))) {
+			printf("failed to connect to socket %s\n", addr.sun_path);
+			return -1;
+		}
+		pr_info("connected to %s\n", addr.sun_path);
 	}
 
 	if (address)
 		*address = addr;
 
-	pr_info("listening to %s\n", addr.sun_path);
 	return sock;
 
 err:
