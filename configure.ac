@@ -37,6 +37,9 @@ AC_CHECK_LIB(
 	     [AC_MSG_ERROR([*** libulockmgr not found.])
 	     ])
 
+FUSE_USE_VERSION=26
+AC_DEFINE_UNQUOTED(FUSE_USE_VERSION, $FUSE_USE_VERSION, [spfs])
+
 FS_NAME=spfs
 AC_DEFINE_UNQUOTED(FS_NAME, "$FS_NAME", [spfs])
 

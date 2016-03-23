@@ -1,5 +1,3 @@
-#define FUSE_USE_VERSION 26
-
 #include "spfs_config.h"
 
 #include <fuse.h>
