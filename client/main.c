@@ -1,14 +1,5 @@
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <stdio.h>
 #include <errno.h>
-#include <stdlib.h>
-#include <unistd.h>
 #include <getopt.h>
-#include <ctype.h>
-#include <limits.h>
 #include <stdio.h>
 
 #include "spfs/interface.h"

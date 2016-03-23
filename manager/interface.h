@@ -8,4 +8,10 @@ enum {
 	SPFS_MANAGER_CMD_MAX,
 };
 
+struct mount_fs_package_s {
+	unsigned long	mountflags;
+	char		filesystemtype[64];
+	char		data[0];
+};
+
 #endif
