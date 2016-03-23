@@ -6,4 +6,6 @@ extern char *xsprintf(const char *fmt, ...);
 
 int save_fd(int fd);
 
+void execvp_print(const char *file, char *const argv[]);
+
 #endif

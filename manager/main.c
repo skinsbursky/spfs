@@ -60,7 +60,7 @@ static int mount_spfs(const char *work_dir, char *mountpoint)
 			pr_perror("failed to fork");
 			return -errno;
 		case 0:
-			execvp(spfs, (char *[]){ "spfs", "-vvvv",
+			execvp_print(spfs, (char *[]){ "spfs", "-vvvv",
 				/* TODO start with STUB mode and feed with proper directory later */
 //				"--proxy_dir", proxy_dir,
 				"--mode", mode,
@@ -68,7 +68,6 @@ static int mount_spfs(const char *work_dir, char *mountpoint)
 				"--log", log_path,
 				mountpoint, NULL });
 
-			pr_perror("exec failed");
 			_exit(EXIT_FAILURE);
 	}
 

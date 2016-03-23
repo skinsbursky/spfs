@@ -95,3 +95,19 @@ int save_fd(int fd)
 	}
 	return fd;
 }
+
+void execvp_print(const char *file, char *const argv[])
+{
+	const char **tmp = (const char **)argv;
+
+	pr_info("Executing %s with options: ", file);
+	while (*tmp) {
+		print_on_level(LOG_INFO, "%s ", *tmp);
+		tmp++;
+	}
+	print_on_level(LOG_INFO, "\n");
+
+	execvp(file, argv);
+
+	pr_perror("exec failed");
+}
