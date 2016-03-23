@@ -18,7 +18,7 @@
 
 #include "context.h"
 
-struct spfs_manager_context_s spfs_manager_context;
+static struct spfs_manager_context_s spfs_manager_context;
 
 static int join_cgroups(char *cgroups)
 {
@@ -123,6 +123,16 @@ static int configure(struct spfs_manager_context_s *ctx)
 {
 	int err, sock;
 
+	if (!ctx->work_dir) {
+		pr_err("work directory wasn't provided\n");
+		return -EINVAL;
+	}
+
+	if (!ctx->mountpoint) {
+		pr_err("mountpoint wasn't provided\n");
+		return -EINVAL;
+	}
+
 	if (!ctx->socket_path) {
 		ctx->socket_path = xsprintf("/var/run/spfs_manager_sock-%d.sock", getpid());
 		if (!ctx->socket_path) {
@@ -134,11 +144,6 @@ static int configure(struct spfs_manager_context_s *ctx)
 
 	if (!access(ctx->socket_path, X_OK)) {
 		pr_perror("socket %s already exists. Stale?", ctx->socket_path);
-		return -EINVAL;
-	}
-
-	if (!ctx->mountpoint) {
-		pr_err("mountpoint wasn't provided\n");
 		return -EINVAL;
 	}
 
