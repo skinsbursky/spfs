@@ -19,12 +19,7 @@
 #include "spfs/interface.h"
 
 #include "context.h"
-
-static int spfs_manager_packet_handler(void *data, void *packet, size_t psize)
-{
-	pr_err("Interface is not ready yet\n");
-	return -ENOENT;
-}
+#include "interface.h"
 
 static int mount_spfs(const char *work_dir, int mode, char *mountpoint)
 {
@@ -116,5 +111,5 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	return reliable_socket_loop(ctx->sock, NULL, spfs_manager_packet_handler);
+	return reliable_socket_loop(ctx->sock, ctx, spfs_manager_packet_handler);
 }
