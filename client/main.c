@@ -11,31 +11,11 @@
 #include <limits.h>
 #include <stdio.h>
 
-
 #include "spfs/interface.h"
 #include "include/util.h"
+#include "include/socket.h"
 
-static int send_data(int sock, void *ctx, size_t len)
-{
-	ssize_t bytes;
-	int err;
-
-	bytes = send(sock, ctx, len, MSG_EOR);
-	if (bytes < 0) {
-		printf("failed to send package: %d\n", -errno);
-		return -1;
-	}
-
-	bytes = recv(sock, &err, sizeof(err), 0);
-	if (bytes < 0) {
-		printf("failed to receive reply: %d", -errno);
-		return -1;
-	}
-
-	return err;
-}
-
-static int send_path(int sock, const char *path_to_send, const char *path_to_stat)
+static int send_path(const char *socket_path, const char *path_to_send, const char *path_to_stat)
 {
 	size_t len;
 	struct external_cmd *package;
@@ -57,10 +37,10 @@ static int send_path(int sock, const char *path_to_send, const char *path_to_sta
 	}
 	fill_path_packet(package, path_to_send, &st);
 
-	return send_data(sock, package, len);
+	return send_packet(socket_path, package, len);
 }
 
-static int send_mode(int sock, int mode, const char *path_to_send)
+static int send_mode(const char *socket_path, int mode, const char *path_to_send)
 {
 	size_t len;
 	struct external_cmd *package;
@@ -75,7 +55,7 @@ static int send_mode(int sock, int mode, const char *path_to_send)
 	}
 	fill_mode_packet(package, mode, path_to_send);
 
-	return send_data(sock, package, len);
+	return send_packet(socket_path, package, len);
 }
 
 static void help(char *program)
@@ -99,28 +79,6 @@ static void help(char *program)
 	printf("\t--path_to_stat    file path to stat\n");
 }
 
-static int socket_create(const char *path)
-{
-	int sock, err;
-	struct sockaddr_un addr;
-
-	sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
-	if (sock < 0) {
-		printf("Failed to create packet socket\n");
-		return -1;
-	}
-	memset(&addr, 0, sizeof(struct sockaddr_un));
-	addr.sun_family = AF_UNIX;
-	strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
-
-	err = connect(sock, (struct sockaddr *)&addr, sizeof(addr));
-	if (err) {
-		printf("failed to connect to socket %s\n", addr.sun_path);
-		return -1;
-	}
-	return sock;
-}
-
 static int execude_path_cmd(int argc, char **argv)
 {
 	char *path_to_send = NULL, *path_to_stat = NULL;
@@ -132,7 +90,6 @@ static int execude_path_cmd(int argc, char **argv)
 		{"help",		no_argument,		0,	'h'},
 		{0,			0,			0,	0 }
 	};
-	int sock;
 
 	while (1) {
 		char c;
@@ -178,31 +135,7 @@ static int execude_path_cmd(int argc, char **argv)
 		return 1;
 	}
 
-	sock = socket_create(socket_path);
-	if (sock < 0)
-		return 1;
-
-	return send_path(sock, path_to_send, path_to_stat);
-}
-
-static int convert_mode(const char *mode)
-{
-	char *endptr;
-	long m;
-
-	errno = 0;
-	m = strtol(mode, &endptr, 10);
-	if ((errno == ERANGE && (m == LONG_MAX || m == LONG_MIN))
-			|| (errno != 0 && m == 0)) {
-		perror("failed to convert mode");
-		return -EINVAL;
-	}
-
-	if ((endptr == mode) || (*endptr != '\0')) {
-		printf("Mode is not a number: '%s'\n", mode);
-		return -EINVAL;
-	}
-	return m;
+	return send_path(socket_path, path_to_send, path_to_stat);
 }
 
 static int execude_mode_cmd(int argc, char **argv)
@@ -217,7 +150,6 @@ static int execude_mode_cmd(int argc, char **argv)
 		{"help",		no_argument,		0,	'h'},
 		{0,			0,			0,	0 }
 	};
-	int sock;
 	long m;
 
 	while (1) {
@@ -259,8 +191,7 @@ static int execude_mode_cmd(int argc, char **argv)
 		return 1;
 	}
 
-	m = convert_mode(mode);
-	if (m < 0) {
+	if (xatol(mode, &m)) {
 		help(argv[0]);
 		return 1;
 	}
@@ -271,11 +202,7 @@ static int execude_mode_cmd(int argc, char **argv)
 		return 1;
 	}
 
-	sock = socket_create(socket_path);
-	if (sock < 0)
-		return 1;
-
-	return send_mode(sock, m, path_to_send);
+	return send_mode(socket_path, m, path_to_send);
 }
 
 
