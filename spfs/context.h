@@ -59,4 +59,6 @@ int copy_work_mode(struct work_mode_s **wm);
 void destroy_work_mode(struct work_mode_s *wm);
 int stale_work_mode(int mode, const char *proxy_dir);
 
+extern int spfs_execute_cmd(void *data, void *package, size_t psize);
+
 #endif

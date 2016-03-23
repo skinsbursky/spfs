@@ -65,6 +65,4 @@ static inline void fill_mode_packet(struct external_cmd *package, unsigned mode,
 	strcpy(cp->path, path);
 }
 
-int spfs_execute_cmd(void *data, void *package, size_t psize);
-
 #endif
