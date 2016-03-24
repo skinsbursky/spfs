@@ -19,12 +19,12 @@ static int send_mode(const char *socket_path, int mode, const char *path_to_send
 	size_t len;
 	struct external_cmd *package;
 
-	printf("changind mode to %d (path: %s)\n", mode, path_to_send ? : "none");
+	pr_debug("changind mode to %d (path: %s)\n", mode, path_to_send ? : "none");
 	len = mode_packet_size(path_to_send);
 
 	package = malloc(len);
 	if (!package) {
-		printf("failed to allocate package\n");
+		pr_err("failed to allocate package\n");
 		return -ENOMEM;
 	}
 	fill_mode_packet(package, mode, path_to_send);
@@ -41,27 +41,31 @@ static int parse_mount_data(struct mount_fs_package_s *p,
 		NULL, NULL, NULL
 	}, **ptr;
 
+	pr_debug("mountdata: %s\n", p->mountdata);
+
 	str = strdup(p->mountdata);
 	if (!str) {
 		pr_err("failed to allocate\n");
 		return -ENOMEM;
 	}
 
-	while ((token = strsep(&str, ",")) != NULL) {
+	while ((token = strsep(&str, ";")) != NULL) {
 		if (nr >= sizeof(tokens)/sizeof(char *)) {
 			pr_err("invalid token: %s (>3)\n", token);
 			goto free_tokens;
 		}
+		pr_debug("token: %s\n", token);
 		tokens[nr] = strdup(token);
 		if (!tokens[nr]) {
 			pr_err("failed to duplicate token\n");
 			goto free_tokens;
 		}
+		nr++;
 	}
 
 	*source = tokens[0];
-	*fstype = fstype[0];
-	*options = options[0];
+	*fstype = tokens[1];
+	*options = tokens[2];
 
 	err = -EINVAL;
 
@@ -71,7 +75,7 @@ static int parse_mount_data(struct mount_fs_package_s *p,
 	}
 
 	if (!*fstype) {
-		pr_err("files system type wasn't provided\n");
+		pr_err("file system type wasn't provided\n");
 		goto free_tokens;
 	}
 
@@ -125,12 +129,13 @@ int mount_fs(struct spfs_manager_context_s *ctx, void *package, size_t psize)
 	err = mount(source, mnt, fstype, p->mountflags, options);
 	if (err) {
 		pr_perror("failed to mount %s", fstype);
-		goto free_mnt;
+		goto rmdir_mnt;
 	}
 
 	err = send_mode(ctx->spfs_socket, SPFS_PROXY_MODE, mnt);
 	if (err) {
-		pr_err("failed to switch spfs to rpoxy mode to %s\n", mnt);
+		pr_err("failed to switch spfs to ppoxy mode to %s: %d\n", mnt,
+				err);
 		goto umount;
 	}
 
@@ -146,5 +151,8 @@ free_mount_data:
 umount:
 	if (umount(mnt))
 		pr_perror("failed to umount %s\n", mnt);
+rmdir_mnt:
+	if (rmdir(mnt))
+		pr_perror("failed to remove %s\n", mnt);
 	goto free_mnt;
 }
