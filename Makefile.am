@@ -1,7 +1,7 @@
 ## Process this file with automake to produce Makefile.in
 CLEANFILES = `find . -name "*~"`
 
-AM_CFLAGS = -Wall -ggdb -D_GNU_SOURCE -iquote include/
+AM_CFLAGS = -Wall -Werror -ggdb -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64
 AM_MAKEFLAGS = --no-print-directory
 
 sbin_PROGRAMS = bin/spfs bin/spfs-client bin/spfs-manager
@@ -25,7 +25,7 @@ bin_spfs_SOURCES =		spfs/main.c			\
 				include/socket.h		\
 				include/util.h
 
-bin_spfs_CFLAGS = `pkg-config fuse --cflags --libs`
+bin_spfs_CFLAGS = `pkg-config fuse --cflags --libs` $(AM_CFLAGS)
 bin_spfs_LDADD =
 bin_spfs_LDFLAGS = @LIBS@
 bin_spfs_DEPENDENCIES =
