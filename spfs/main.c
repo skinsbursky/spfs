@@ -8,8 +8,10 @@
 #include <poll.h>
 #include <sys/wait.h>
 
-#include "context.h"
 #include "include/log.h"
+#include "include/util.h"
+
+#include "context.h"
 
 extern struct fuse_operations gateway_operations;
 
@@ -47,7 +49,7 @@ static void help(int argc, char **argv, int help_level)
 }
 
 int parse_options(int *orig_argc, char ***orig_argv,
-		  char **proxy_dir, int *mode, char **log, char **socket_path,
+		  char **proxy_dir, long *mode, char **log, char **socket_path,
 		  int *verbosity)
 {
 	static struct option opts[] = {
@@ -371,12 +373,12 @@ static int wait_child_report(int pipe)
 
 int main(int argc, char *argv[])
 {
-	int err;
 	char *proxy_dir = NULL;
 	char *log_file = "/var/log/fuse_spfs.log";
 	char *socket_path = "/var/run/fuse_control.sock";
-	int mode = SPFS_STUB_MODE, pid, pipes[2];
-	int verbosity = 0;
+	long mode = SPFS_STUB_MODE;
+	pid_t pid;
+	int err, pipes[2], verbosity = 0;
 
 	if (parse_options(&argc, &argv, &proxy_dir, &mode, &log_file,
 			  &socket_path, &verbosity))
