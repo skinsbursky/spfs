@@ -233,7 +233,7 @@ err_free:
 static int report_to_parent(int pipe, int res)
 {
 	if (write(pipe, &res, sizeof(res)) < 0) {
-		pr_perror("failed to write to fd %d\n", pipe);
+		pr_perror("failed to write to fd %d", pipe);
 		return -errno;
 	}
 	close(pipe);

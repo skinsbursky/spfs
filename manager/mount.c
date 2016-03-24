@@ -150,9 +150,9 @@ free_mount_data:
 	return err;
 umount:
 	if (umount(mnt))
-		pr_perror("failed to umount %s\n", mnt);
+		pr_perror("failed to umount %s", mnt);
 rmdir_mnt:
 	if (rmdir(mnt))
-		pr_perror("failed to remove %s\n", mnt);
+		pr_perror("failed to remove %s", mnt);
 	goto free_mnt;
 }

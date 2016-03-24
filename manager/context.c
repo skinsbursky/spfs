@@ -204,7 +204,7 @@ static int configure(struct spfs_manager_context_s *ctx)
 	}
 #endif
 	if (access(ctx->mountpoint, R_OK | W_OK)) {
-		pr_perror("mountpoint %s is not accessible\n", ctx->mountpoint);
+		pr_perror("mountpoint %s is not accessible for RW", ctx->mountpoint);
 		return -EINVAL;
 	}
 

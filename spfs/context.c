@@ -336,8 +336,8 @@ int context_init(const char *proxy_dir, int mode, const char *log_file,
 	ctx->packet_socket = seqpacket_sock(socket_path, true, true,
 					    &ctx->sock_addr);
 	if (ctx->packet_socket < 0) {
-		pr_err("failed to create socket interface: %d\n", err);
-		return err;
+		pr_err("failed to create socket interface: %d\n", ctx->packet_socket);
+		return ctx->packet_socket;
 	}
 
 	err = pthread_create(&ctx->sock_pthread, NULL, sock_routine, ctx);
