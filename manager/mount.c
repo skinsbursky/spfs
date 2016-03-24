@@ -6,10 +6,31 @@
 
 #include "include/util.h"
 #include "include/log.h"
+#include "include/socket.h"
+
+#include "spfs/context.h"
 
 #include "context.h"
 #include "interface.h"
 #include "mount.h"
+
+static int send_mode(const char *socket_path, int mode, const char *path_to_send)
+{
+	size_t len;
+	struct external_cmd *package;
+
+	printf("changind mode to %d (path: %s)\n", mode, path_to_send ? : "none");
+	len = mode_packet_size(path_to_send);
+
+	package = malloc(len);
+	if (!package) {
+		printf("failed to allocate package\n");
+		return -ENOMEM;
+	}
+	fill_mode_packet(package, mode, path_to_send);
+
+	return send_packet(socket_path, package, len);
+}
 
 int mount_fs(struct spfs_manager_context_s *ctx, void *package, size_t psize)
 {
@@ -34,9 +55,19 @@ int mount_fs(struct spfs_manager_context_s *ctx, void *package, size_t psize)
 		goto free_mnt;
 	}
 
-	/* TODO: signal spfs to switch to this mountpoint */
+	err = send_mode(ctx->spfs_socket, SPFS_PROXY_MODE, mnt);
+	if (err) {
+		pr_err("failed to switch spfs to rpoxy mode to %s\n", mnt);
+		goto umount;
+	}
+
+	/* TODO: replace mount points */
 
 free_mnt:
 	free(mnt);
 	return err;
+umount:
+	if (umount(mnt))
+		pr_perror("failed to umount %s\n", mnt);
+	goto free_mnt;
 }
