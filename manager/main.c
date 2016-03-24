@@ -40,8 +40,8 @@ static int mount_spfs(struct spfs_manager_context_s *ctx, int mode)
 	if (!log_path)
 		return -ENOMEM;
 
-	socket_path = xsprintf("%s/spfs.sock", work_dir);
-	if (!socket_path)
+	ctx->spfs_socket = xsprintf("%s/spfs.sock", work_dir);
+	if (!ctx->spfs_socket)
 		return -ENOMEM;
 
 	proxy_dir = xsprintf("%s/mnt", work_dir);
@@ -63,14 +63,13 @@ static int mount_spfs(struct spfs_manager_context_s *ctx, int mode)
 				/* TODO start with STUB mode and feed with proper directory later */
 //				"--proxy_dir", proxy_dir,
 				"--mode", mode_str,
-				"--socket_path", socket_path,
+				"--socket_path", ctx->spfs_socket,
 				"--log", log_path,
 				mountpoint, NULL });
 
 			_exit(EXIT_FAILURE);
 	}
 
-	free(socket_path);
 	free(log_path);
 	free(proxy_dir);
 	free(mode_str);

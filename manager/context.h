@@ -18,6 +18,8 @@ struct spfs_manager_context_s {
 	char	*mountpoint;
 
 	int	sock;
+
+	char	*spfs_socket;
 };
 
 struct spfs_manager_context_s *create_context(int argc, char **argv);
