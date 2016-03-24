@@ -130,7 +130,7 @@ int seqpacket_sock(const char *path, bool move_fd, bool start_listen,
 	struct sockaddr_un addr;
 
 	pr_debug("creating SOCK_SEQPACKET socket: %s\n", path);
-	sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
+	sock = socket(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0);
 	if (sock < 0) {
 		pr_perror("failed to create socket");
 		return -errno;
