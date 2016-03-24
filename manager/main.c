@@ -28,7 +28,6 @@ static int mount_spfs(struct spfs_manager_context_s *ctx, int mode)
 	int pid, status;
 	const char *spfs = FS_NAME;
 	char *proxy_dir;
-	char *socket_path;
 	char *log_path;
 	char *mode_str;
 
@@ -111,6 +110,10 @@ int main(int argc, char *argv[])
 			return -errno;
 		}
 	}
+
+	/*TODO: fix verbosity */
+	if (setup_log(ctx->log_file, 8))
+		return -1;
 
 	return reliable_socket_loop(ctx->sock, ctx, spfs_manager_packet_handler);
 }
