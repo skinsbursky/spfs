@@ -21,8 +21,10 @@
 #include "context.h"
 #include "interface.h"
 
-static int mount_spfs(const char *work_dir, int mode, char *mountpoint)
+static int mount_spfs(struct spfs_manager_context_s *ctx, int mode)
 {
+	const char *work_dir = ctx->work_dir;
+	char *mountpoint = ctx->mountpoint;
 	int pid, status;
 	const char *spfs = FS_NAME;
 	char *proxy_dir;
@@ -101,7 +103,7 @@ int main(int argc, char *argv[])
 	if (!ctx)
 		return -1;
 
-	if (mount_spfs(ctx->work_dir, SPFS_STUB_MODE, ctx->mountpoint))
+	if (mount_spfs(ctx, SPFS_STUB_MODE))
 		return -EINVAL;
 
 	if (ctx->daemonize) {
