@@ -35,7 +35,6 @@ struct spfs_context_s {
 	struct work_mode_s	*wm;
 	pthread_mutex_t		wm_lock;
 
-	FILE			*log;
 	struct fuse_operations	*operations[SPFS_MAX_MODE];
 
 	struct dentry_info_s	root;

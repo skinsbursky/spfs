@@ -251,33 +251,6 @@ static int setup_context(struct spfs_context_s *ctx, const char *proxy_dir,
 	return 0;
 }
 
-static int setup_log(struct spfs_context_s *ctx, const char *log_file, int verbosity)
-{
-	int fd;
-
-	fd = open(log_file, O_CREAT | O_TRUNC | O_RDWR);
-	if (fd < 0) {
-		pr_perror("%s: failed to open log file", __func__);
-		return -errno;
-	}
-	pr_debug("Log fd: %d\n", fd);
-	fd = save_fd(fd);
-	if (fd < 0) {
-		pr_crit("Failed to save log fd\n");
-		return fd;
-	}
-	pr_debug("Saved log fd: %d\n", fd);
-	ctx->log = fdopen(fd, "w+");
-	if (!ctx->log) {
-		pr_perror("failed to open log stream");
-		close(fd);
-		return -errno;
-	}
-	setvbuf(ctx->log, NULL, _IONBF, 0);
-	init_log(ctx->log, verbosity);
-	return 0;
-}
-
 int context_store_mnt_stat(const char *mountpoint)
 {
 	struct spfs_context_s *ctx = get_context();
@@ -313,7 +286,7 @@ int context_init(const char *proxy_dir, int mode, const char *log_file,
 
 	pr_debug("fuse: opening log %s\n", log_file);
 
-	err = setup_log(ctx, log_file, verbosity);
+	err = setup_log(log_file, verbosity);
 	if (err) {
 		pr_crit("Failed to open log: %d\n", err);
 		return err;

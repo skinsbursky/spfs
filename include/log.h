@@ -58,6 +58,7 @@ static inline pid_t gettid(void)
 int print_on_level_va(unsigned int level, const char *format, va_list args);
 int print_on_level(unsigned int level, const char *format, ...);
 
-void init_log(FILE *log, int level);
+void set_log_level(FILE *log, int level);
+int setup_log(const char *log_file, int verbosity);
 
 #endif

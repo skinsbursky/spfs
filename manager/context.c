@@ -113,14 +113,6 @@ static int convert_pid(const char *process_id)
 	return pid;
 }
 
-static int setup_log(const char *log_file)
-{
-	setvbuf(stdout, NULL, _IONBF, 0);
-	setvbuf(stderr, NULL, _IONBF, 0);
-	/* TODO: set O_CLOEXEC */
-	return 0;
-}
-
 static int configure(struct spfs_manager_context_s *ctx)
 {
 	int err, sock;
@@ -160,7 +152,8 @@ static int configure(struct spfs_manager_context_s *ctx)
 		pr_info("log path wasn't provided: using %s\n", ctx->log_file);
 	}
 
-	err = setup_log(ctx->log_file);
+	/*TODO: fix verbosity */
+	err = setup_log(ctx->log_file, 8);
 	if (err)
 		return err;
 
