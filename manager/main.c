@@ -81,12 +81,12 @@ static int mount_spfs(struct spfs_manager_context_s *ctx, int mode)
 	}
 
 	if (WIFSIGNALED(status)) {
-		pr_err("Spfs with pid %d was killed by %d\n", pid, WTERMSIG(status));
+		pr_err("spfs(%d) was killed by %d\n", pid, WTERMSIG(status));
 		return -ECANCELED;
 	}
 
 	if (WEXITSTATUS(status)) {
-		pr_err("Spfs with pid %d exited with error %d\n", pid, WEXITSTATUS(status));
+		pr_err("spfs(%d) exited with error %d\n", pid, WEXITSTATUS(status));
 		return WEXITSTATUS(status);
 	}
 

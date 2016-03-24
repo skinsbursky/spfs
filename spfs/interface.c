@@ -60,7 +60,7 @@ static int context_add_path(struct spfs_context_s *ctx, const struct dentry_pack
 
 	path = strdup(dp->path);
 	if (!path) {
-		pr_err("Failed to duplicate path\n");
+		pr_err("failed to duplicate path\n");
 		return -ENOMEM;
 	}
 

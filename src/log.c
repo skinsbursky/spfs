@@ -53,13 +53,12 @@ int setup_log(const char *log_file, int verbosity)
 		pr_perror("%s: failed to open log file", __func__);
 		return -errno;
 	}
-	pr_debug("Log fd: %d\n", fd);
 	fd = save_fd(fd);
 	if (fd < 0) {
 		pr_crit("Failed to save log fd\n");
 		return fd;
 	}
-	pr_debug("Saved log fd: %d\n", fd);
+	pr_debug("Log fd: %d\n", fd);
 	log = fdopen(fd, "w+");
 	if (!log) {
 		pr_perror("failed to open log stream");

@@ -62,7 +62,7 @@ static int reliable_conn_handler(int sock, void *data,
 		return -ECONNABORTED;
 	}
 
-	pr_debug("received %ld bytes\n", __func__, bytes);
+	pr_debug("received %ld bytes\n", bytes);
 
 	err = packet_handler(data, page, bytes);
 

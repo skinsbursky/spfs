@@ -109,7 +109,7 @@ static int create_work_mode(int mode, const char *path, struct work_mode_s **wm)
 		 * it won't be removed from underneath of us. */
 		new->proxy_root_fd = open(new->proxy_dir, O_PATH);
 		if (new->proxy_root_fd == -1) {
-			pr_perror("Failed to open %s", new->proxy_dir);
+			pr_perror("failed to open %s", new->proxy_dir);
 			err = -errno;
 			goto free_proxy_dir;
 		}
@@ -288,7 +288,7 @@ int context_init(const char *proxy_dir, int mode, const char *log_file,
 
 	err = setup_log(log_file, verbosity);
 	if (err) {
-		pr_crit("Failed to open log: %d\n", err);
+		pr_crit("failed to open log: %d\n", err);
 		return err;
 	}
 
@@ -299,7 +299,7 @@ int context_init(const char *proxy_dir, int mode, const char *log_file,
 
 	err = setup_context(ctx, proxy_dir, mode);
 	if (err) {
-		pr_crit("Failed to setup context: %d\n", err);
+		pr_crit("failed to setup context: %d\n", err);
 		return err;
 	}
 
@@ -309,7 +309,7 @@ int context_init(const char *proxy_dir, int mode, const char *log_file,
 	ctx->packet_socket = seqpacket_sock(socket_path, true, true,
 					    &ctx->sock_addr);
 	if (ctx->packet_socket < 0) {
-		pr_err("failed to create socket interface: %d\n", ctx->packet_socket);
+		pr_err("failed to create socket interface\n");
 		return ctx->packet_socket;
 	}
 

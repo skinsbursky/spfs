@@ -138,7 +138,7 @@ static int configure(struct spfs_manager_context_s *ctx)
 	}
 
 	if (!access(ctx->socket_path, X_OK)) {
-		pr_perror("socket %s already exists. Stale?", ctx->socket_path);
+		pr_err("socket %s already exists. Stale?", ctx->socket_path);
 		return -EINVAL;
 	}
 

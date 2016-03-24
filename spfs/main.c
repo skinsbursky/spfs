@@ -251,7 +251,7 @@ static int mount_fuse(const char *proxy_dir, int mode, const char *log_file,
 
 	err = context_init(proxy_dir, mode, log_file, socket_path, verbosity);
 	if (err) {
-		pr_crit("Failed to create gateway ctx\n");
+		pr_crit("failed to create gateway ctx\n");
 		goto err;
 	}
 
@@ -362,7 +362,7 @@ static int wait_child_report(int pipe)
 	err = poll_child_status(pipe);
 	if (!err) {
 		if (read(pipe, &err, sizeof(int)) < 0) {
-			pr_perror("Failed to read from control pipe");
+			pr_perror("failed to read from control pipe");
 			err = -errno;
 		}
 	}
@@ -397,14 +397,14 @@ int main(int argc, char *argv[])
 	 * via pipe.
 	 */
 	if (pipe(pipes) < 0) {
-		pr_crit("Failed to create info pipe\n");
+		pr_crit("failed to create info pipe\n");
 		return -1;
 	}
 
 	pid = fork();
 	switch (pid) {
 		case -1:
-			pr_crit("Failed to fork fuse master\n");
+			pr_crit("failed to fork fuse master\n");
 			return -1;
 		case 0:
 			close(pipes[0]);
