@@ -18,6 +18,7 @@ extern struct fuse_operations gateway_operations;
 static void copy_args(char **old, int *old_index, char **new, int *new_index)
 {
 	while (*old_index < optind) {
+		pr_debug("copy fuse option: %s\n", old[*old_index]);
 		new[*new_index] = old[*old_index];
 		*new_index += 1;
 		*old_index += 1;
@@ -124,7 +125,6 @@ int parse_options(int *orig_argc, char ***orig_argv,
 					new_argv[new_argc++] = "-h";
 				break;
 			case '?':
-				pr_debug("copy fuse option \"%s\"\n", argv[optind-1]);
 				copy_args(argv, &nind, new_argv, &new_argc);
 				break;
 			default:
