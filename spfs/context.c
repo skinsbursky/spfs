@@ -273,7 +273,7 @@ static void *sock_routine(void *ptr)
 {
         struct spfs_context_s *ctx = ptr;
 
-	(void) reliable_socket_loop(ctx->packet_socket, ctx, spfs_execute_cmd);
+	(void) reliable_socket_loop(ctx->packet_socket, ctx, false, spfs_execute_cmd);
 
 	return NULL;
 }

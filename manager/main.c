@@ -108,5 +108,5 @@ int main(int argc, char *argv[])
 	if (setup_log(ctx->log_file, 8))
 		return -1;
 
-	return reliable_socket_loop(ctx->sock, ctx, spfs_manager_packet_handler);
+	return reliable_socket_loop(ctx->sock, ctx, true, spfs_manager_packet_handler);
 }

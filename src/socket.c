@@ -80,7 +80,7 @@ static int reliable_conn_handler(int sock, void *data,
 	return 0;
 }
 
-int reliable_socket_loop(int psock, void *data,
+int reliable_socket_loop(int psock, void *data, bool async,
 			 int (*packet_handler)(void *data, void *packet, size_t psize))
 {
 	pr_info("%s: socket loop started\n", __func__);
@@ -95,7 +95,20 @@ int reliable_socket_loop(int psock, void *data,
 		}
 
 		pr_debug("%s: accepted new socket\n", __func__);
-		(void) reliable_conn_handler(sock, data, packet_handler);
+
+		if (async) {
+			int pid;
+
+			pid = fork();
+			switch (pid) {
+				case -1:
+					pr_err("failed to fork\n");
+					break;
+				case 0:
+					_exit(reliable_conn_handler(sock, data, packet_handler));
+			}
+		} else
+			(void) reliable_conn_handler(sock, data, packet_handler);
 
 		close(sock);
 	}

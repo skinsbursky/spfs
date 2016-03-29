@@ -8,7 +8,7 @@ int seqpacket_sock(const char *path, bool save_fd, bool start_listen,
 		   struct sockaddr_un *address);
 int send_packet(const char *socket_path, void *package, size_t psize);
 
-int reliable_socket_loop(int psock, void *data,
+int reliable_socket_loop(int psock, void *data, bool async,
 			 int (*packet_handler)(void *data, void *packet, size_t psize));
 int socket_loop(int psock, void *data, int (*handler)(int sock, void *data));
 
