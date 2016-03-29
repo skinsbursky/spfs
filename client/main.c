@@ -3,6 +3,7 @@
 #include <stdio.h>
 
 #include "spfs/interface.h"
+#include "spfs/context.h"
 #include "manager/interface.h"
 
 #include "include/util.h"
@@ -86,7 +87,7 @@ static void help(char *program)
 	printf("\t-h   --help            print help (for double option will print fuse help)\n");
 	printf("\n");
 	printf("Mode options:\n");
-	printf("\t--mode            mode number (0: Proxy, 1: Stub, 2: Golem)\n");
+	printf("\t--mode            mode string (\"proxy\", \"stub\", or \"golem\")\n");
 	printf("\t--path_to_send    proxy directory path to send to spfs\n");
 	printf("\n");
 	printf("Path options:\n");
@@ -224,6 +225,27 @@ static int execude_path_cmd(int argc, char **argv)
 	return send_path(socket_path, path_to_send, path_to_stat);
 }
 
+static int check_mode(const char *mode, const char *path_to_send)
+{
+	if (!strcmp(mode, "stub"))
+		return SPFS_STUB_MODE;
+	if (!strcmp(mode, "golem"))
+		return SPFS_GOLEM_MODE;
+	if (!strcmp(mode, "proxy")) {
+		if (!path_to_send) {
+			printf("Proxy directory path wasn't provided\n");
+			return -EINVAL;
+		}
+		if (!strlen(path_to_send)) {
+			printf("Proxy directory path is empty\n");
+			return -EINVAL;
+		}
+		return SPFS_PROXY_MODE;
+	}
+	printf("Unknown mode: %s\n", mode);
+	return -EINVAL;
+}
+
 static int execude_mode_cmd(int argc, char **argv)
 {
 	char *mode = NULL;
@@ -276,12 +298,15 @@ static int execude_mode_cmd(int argc, char **argv)
 		help(argv[0]);
 		return 1;
 	}
-
+#if 0
 	if (xatol(mode, &m)) {
+#else
+	m = check_mode(mode, path_to_send);
+	if (m < 0) {
+#endif
 		help(argv[0]);
 		return 1;
 	}
-
 	return send_mode(socket_path, m, path_to_send);
 }
 
