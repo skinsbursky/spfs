@@ -16,6 +16,8 @@
 #include "include/log.h"
 #include "include/socket.h"
 
+#include "spfs/context.h"
+
 #include "context.h"
 
 static struct spfs_manager_context_s spfs_manager_context;
@@ -122,6 +124,11 @@ static int configure(struct spfs_manager_context_s *ctx)
 		return -EINVAL;
 	}
 
+	if (ctx->start_mode) {
+		if (spfs_mode(ctx->start_mode, ctx->proxy_dir) < 0)
+			return -EINVAL;
+	}
+
 	if (!ctx->log_file) {
 		ctx->log_file = xsprintf("/var/log/%s-%d.log", ctx->progname,
 								getpid());
@@ -186,9 +193,11 @@ static void help(const char *program)
 	printf("usage: %s [options] mountpoint\n", program);
 	printf("\n");
 	printf("general options:\n");
-	printf("\t-p   --work_dir        spfs working directory\n");
+	printf("\t-p   --mode            spfs start mode\n");
+	printf("\t     --proxy-dir       path for proxy mode\n");
+	printf("\t-p   --work-dir        spfs working directory\n");
 	printf("\t-l   --log             log file\n");
-	printf("\t-s   --socket_path     interface socket path\n");
+	printf("\t-s   --socket-path     interface socket path\n");
 	printf("\t-d   --daemon          daemonize\n");
 	printf("\t-p   --pid             pid of the process to join\n");
 	printf("\t     --namespaces      list of namespaces to join\n");
@@ -198,19 +207,22 @@ static void help(const char *program)
 	printf("\n");
 }
 
-static int parse_options(int argc, char **argv,
+static int parse_options(int argc, char **argv, char **start_mode,
 			 char **work_dir, char **log, char **socket_path,
 			 int *verbosity, bool *daemonize, char **pid,
-			 char **namespaces, char **cgroups, char **mountpoint)
+			 char **namespaces, char **cgroups, char **proxy_dir,
+			 char **mountpoint)
 {
 	static struct option opts[] = {
-		{"work_dir",	required_argument,      0, 'w'},
+		{"mode",	required_argument,      0, 'm'},
+		{"work-dir",	required_argument,      0, 'w'},
 		{"log",         required_argument,      0, 'l'},
-		{"socket_path",	required_argument,      0, 's'},
+		{"socket-path",	required_argument,      0, 's'},
 		{"daemon",	required_argument,      0, 'd'},
 		{"pid",		required_argument,      0, 'p'},
 		{"namespaces",	required_argument,      0, 1000},
 		{"cgroups",	required_argument,      0, 1001},
+		{"proxy-dir",	required_argument,      0, 1002},
 		{"help",        no_argument,            0, 'h'},
 		{0,             0,                      0,  0 }
 	};
@@ -218,11 +230,14 @@ static int parse_options(int argc, char **argv,
 	while (1) {
 		int c;
 
-		c = getopt_long(argc, argv, "w:l:s:p:vhd", opts, NULL);
+		c = getopt_long(argc, argv, "m:w:l:s:p:vhd", opts, NULL);
 		if (c == -1)
 			break;
 
 		switch (c) {
+			case 'm':
+				*start_mode = optarg;
+				break;
 			case 'w':
 				*work_dir = optarg;
 				break;
@@ -246,6 +261,9 @@ static int parse_options(int argc, char **argv,
 				break;
 			case 1001:
 				*cgroups = optarg;
+				break;
+			case 1002:
+				*proxy_dir = optarg;
 				break;
 			case 'h':
 				help(argv[0]);
@@ -286,10 +304,10 @@ struct spfs_manager_context_s *create_context(int argc, char **argv)
 
 	ctx->progname = __progname;
 
-	if (parse_options(argc, argv, &ctx->work_dir, &ctx->log_file,
+	if (parse_options(argc, argv, &ctx->start_mode, &ctx->work_dir, &ctx->log_file,
 			  &ctx->socket_path, &ctx->verbosity, &ctx->daemonize,
 			  &ctx->process_id, &ctx->namespaces, &ctx->cgroups,
-			  &ctx->mountpoint)) {
+			  &ctx->proxy_dir, &ctx->mountpoint)) {
 		pr_err("failed to parse options\n");
 		return NULL;
 	}

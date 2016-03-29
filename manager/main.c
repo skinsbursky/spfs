@@ -21,7 +21,7 @@
 #include "context.h"
 #include "interface.h"
 
-static int mount_spfs(struct spfs_manager_context_s *ctx, int mode)
+static int mount_spfs(struct spfs_manager_context_s *ctx)
 {
 	const char *work_dir = ctx->work_dir;
 	char *mountpoint = ctx->mountpoint;
@@ -29,11 +29,6 @@ static int mount_spfs(struct spfs_manager_context_s *ctx, int mode)
 	const char *spfs = FS_NAME;
 	char *proxy_dir;
 	char *log_path;
-	char *mode_str;
-
-	mode_str = xsprintf("%d", mode);
-	if (!mode_str)
-		return -ENOMEM;
 
 	log_path = xsprintf("%s/spfs.log", work_dir);
 	if (!log_path)
@@ -59,9 +54,8 @@ static int mount_spfs(struct spfs_manager_context_s *ctx, int mode)
 			return -errno;
 		case 0:
 			execvp_print(spfs, (char *[]){ "spfs", "-vvvv",
-				/* TODO start with STUB mode and feed with proper directory later */
-//				"--proxy_dir", proxy_dir,
-				"--mode", mode_str,
+				"--mode", ctx->start_mode,
+				"--proxy_dir", ctx->proxy_dir,
 				"--socket_path", ctx->spfs_socket,
 				"--log", log_path,
 				mountpoint, NULL });
@@ -71,7 +65,6 @@ static int mount_spfs(struct spfs_manager_context_s *ctx, int mode)
 
 	free(log_path);
 	free(proxy_dir);
-	free(mode_str);
 
 	pid = waitpid(pid, &status, 0);
 	if (pid < 0) {
@@ -101,7 +94,7 @@ int main(int argc, char *argv[])
 	if (!ctx)
 		return -1;
 
-	if (mount_spfs(ctx, SPFS_STUB_MODE))
+	if (mount_spfs(ctx))
 		return -EINVAL;
 
 	if (ctx->daemonize) {

@@ -7,6 +7,7 @@
 struct spfs_manager_context_s {
 	const char	*progname;
 
+	char	*start_mode;
 	char	*work_dir;
 	char	*log_file;
 	char	*socket_path;
@@ -15,7 +16,10 @@ struct spfs_manager_context_s {
 	char	*process_id;
 	char	*namespaces;
 	char	*cgroups;
+	char	*proxy_dir;
 	char	*mountpoint;
+
+	int	mode;
 
 	int	sock;
 
