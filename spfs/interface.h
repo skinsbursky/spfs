@@ -33,7 +33,9 @@ static inline size_t path_packet_size(const char *path)
 
 static inline size_t mode_packet_size(const char *path)
 {
-	return sizeof(struct external_cmd) + sizeof(struct cmd_package_s) + strlen(path) + 1;
+	size_t len = path ? (strlen(path) + 1) : 0;
+
+	return len + sizeof(struct external_cmd) + sizeof(struct cmd_package_s);
 }
 
 static inline void fill_path_packet(struct external_cmd *package,
@@ -55,7 +57,8 @@ static inline void fill_mode_packet(struct external_cmd *package, unsigned mode,
 	package->cmd = SPFS_CMD_SET_MODE;
 
 	cp->mode = mode;
-	strcpy(cp->path, path);
+	if (path)
+		strcpy(cp->path, path);
 }
 
 #endif
