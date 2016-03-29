@@ -60,7 +60,7 @@ static int send_mode(const char *socket_path, int mode, const char *path_to_send
 	size_t len;
 	struct external_cmd *package;
 
-	printf("changind mode to %d (path: %s)\n", mode, path_to_send ? : "none");
+	printf("changing mode to %d (path: %s)\n", mode, path_to_send ? : "none");
 	len = mode_packet_size(path_to_send);
 
 	package = malloc(len);
@@ -78,27 +78,27 @@ static void help(char *program)
 	printf("usage: %s command options\n", program);
 	printf("\n");
 	printf("commands:\n");
-	printf("\tmode            allows to change mode work mode.\n");
-	printf("\tpath            allows to send a path to be used in Golem mode.\n");
-	printf("\tmount           allows to request for mount a filesystem.\n");
+	printf("\tmode                   allows to change mode work mode.\n");
+	printf("\tpath                   allows to send a path to be used in Golem mode.\n");
+	printf("\tmount                  allows to request for mount a filesystem.\n");
 	printf("\n");
 	printf("general options:\n");
 	printf("\t-s   --socket_path     control socket bind path\n");
 	printf("\t-h   --help            print help (for double option will print fuse help)\n");
 	printf("\n");
 	printf("Mode options:\n");
-	printf("\t--mode            mode string (\"proxy\", \"stub\", or \"golem\")\n");
-	printf("\t--path_to_send    proxy directory path to send to spfs\n");
+	printf("\t--mode                 mode string (\"proxy\", \"stub\", or \"golem\")\n");
+	printf("\t--path_to_send         proxy directory path to send to spfs\n");
 	printf("\n");
 	printf("Path options:\n");
-	printf("\t--path_to_send    file path to send to spfs\n");
-	printf("\t--path_to_stat    file path to stat\n");
+	printf("\t--path_to_send         file path to send to spfs\n");
+	printf("\t--path_to_stat         file path to stat\n");
 	printf("\n");
 	printf("Mount options:\n");
-	printf("\t--source          fileystem fype source (default: \"none\"\n");
-	printf("\t--fstype          fileystem fype (string)\n");
-	printf("\t--mountflags      file system mount flags (default: 0)\n");
-	printf("\t--options         file system mount options (default: empty)\n");
+	printf("\t--source               file system fype source (default: \"none\")\n");
+	printf("\t--fstype               file system fype (string)\n");
+	printf("\t--mountflags           file system mount flags (default: 0)\n");
+	printf("\t--options              file system mount options (default: empty)\n");
 }
 
 static int execude_mount_cmd(int argc, char **argv)
