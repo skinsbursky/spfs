@@ -93,26 +93,6 @@ static int join_namespaces(int pid, char *namespaces)
 	return 0;
 }
 
-static int convert_pid(const char *process_id)
-{
-	char *endptr;
-	long pid;
-
-	errno = 0;
-	pid = strtol(process_id, &endptr, 10);
-	if ((errno == ERANGE && (pid == LONG_MAX || pid == LONG_MIN))
-			|| (errno != 0 && pid == 0)) {
-		perror("failed to convert process_id");
-		return -EINVAL;
-	}
-
-	if ((endptr == process_id) || (*endptr != '\0')) {
-		printf("Mode is not a number: '%s'\n", process_id);
-		return -EINVAL;
-	}
-	return pid;
-}
-
 static int configure(struct spfs_manager_context_s *ctx)
 {
 	int err, sock;
@@ -163,10 +143,10 @@ static int configure(struct spfs_manager_context_s *ctx)
 	}
 
 	if (ctx->process_id) {
-		int pid;
+		long pid;
 
-		pid = convert_pid(ctx->process_id);
-		if (pid < 0)
+		err = xatol(ctx->process_id, &pid);
+		if (err < 0)
 			return -EINVAL;
 
 		if (!ctx->namespaces) {
