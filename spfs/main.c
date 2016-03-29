@@ -33,9 +33,9 @@ static void help(int argc, char **argv, int help_level)
 	printf("\n");
 	printf("general options:\n");
 	printf("\t-m   --mode            work mode\n");
-	printf("\t-p   --proxy_dir       path for proxy mode\n");
+	printf("\t-p   --proxy-dir       path for proxy mode\n");
 	printf("\t-l   --log             log file\n");
-	printf("\t-s   --socket_path     control socket bind path\n");
+	printf("\t-s   --socket-path     control socket bind path\n");
 	printf("\t-h   --help            print help (for double option will print fuse help)\n");
 	printf("\t-v                     increase verbosity (can be used multiple times)\n");
 	printf("\n");
@@ -53,10 +53,10 @@ int parse_options(int *orig_argc, char ***orig_argv,
 		  int *verbosity)
 {
 	static struct option opts[] = {
-		{"proxy_dir",	required_argument,	0, 'p'},
+		{"proxy-dir",	required_argument,	0, 'p'},
 		{"mode",	required_argument,	0, 'm'},
 		{"log",		required_argument,	0, 'l'},
-		{"socket_path",	required_argument,	0, 's'},
+		{"socket-path",	required_argument,	0, 's'},
 		{"help",	no_argument,		0, 'h'},
 		{0,		0,			0,  0 }
 	};
