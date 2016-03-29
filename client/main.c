@@ -225,27 +225,6 @@ static int execude_path_cmd(int argc, char **argv)
 	return send_path(socket_path, path_to_send, path_to_stat);
 }
 
-static int check_mode(const char *mode, const char *path_to_send)
-{
-	if (!strcmp(mode, "stub"))
-		return SPFS_STUB_MODE;
-	if (!strcmp(mode, "golem"))
-		return SPFS_GOLEM_MODE;
-	if (!strcmp(mode, "proxy")) {
-		if (!path_to_send) {
-			printf("Proxy directory path wasn't provided\n");
-			return -EINVAL;
-		}
-		if (!strlen(path_to_send)) {
-			printf("Proxy directory path is empty\n");
-			return -EINVAL;
-		}
-		return SPFS_PROXY_MODE;
-	}
-	printf("Unknown mode: %s\n", mode);
-	return -EINVAL;
-}
-
 static int execude_mode_cmd(int argc, char **argv)
 {
 	char *mode = NULL;
@@ -301,7 +280,7 @@ static int execude_mode_cmd(int argc, char **argv)
 #if 0
 	if (xatol(mode, &m)) {
 #else
-	m = check_mode(mode, path_to_send);
+	m = spfs_mode(mode, path_to_send);
 	if (m < 0) {
 #endif
 		help(argv[0]);

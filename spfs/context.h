@@ -5,6 +5,8 @@
 #include <sys/un.h>
 #include <sys/stat.h>
 #include <pthread.h>
+#include <string.h>
+#include <errno.h>
 
 #include "include/list.h"
 
@@ -65,4 +67,24 @@ int stale_work_mode(int mode, const char *proxy_dir);
 
 extern int spfs_execute_cmd(void *data, void *package, size_t psize);
 
+static inline int spfs_mode(const char *mode, const char *path)
+{
+	if (!strcmp(mode, "stub"))
+		return SPFS_STUB_MODE;
+	if (!strcmp(mode, "golem"))
+		return SPFS_GOLEM_MODE;
+	if (!strcmp(mode, "proxy")) {
+		if (!path) {
+			printf("Proxy directory path wasn't provided\n");
+			return -EINVAL;
+		}
+		if (!strlen(path)) {
+			printf("Proxy directory path is empty\n");
+			return -EINVAL;
+		}
+		return SPFS_PROXY_MODE;
+	}
+	printf("Unknown mode: %s\n", mode);
+	return -EINVAL;
+}
 #endif
