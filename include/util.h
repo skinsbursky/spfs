@@ -12,4 +12,6 @@ void execvp_print(const char *file, char *const argv[]);
 
 int create_dir(const char *fmt, ...);
 
+int close_inherited_fds(void);
+
 #endif

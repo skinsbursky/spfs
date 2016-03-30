@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <dirent.h>
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -176,3 +177,30 @@ err:
 	free(p);
 	return err;
 }
+
+int close_inherited_fds(void)
+{
+	DIR *fds;
+	struct dirent *d;
+	char *dir = "/proc/self/fd/";
+
+	fds = opendir(dir);
+	if (!fds) {
+		pr_perror("failed to open %s", dir);
+		return -1;
+	}
+
+	while ((d = readdir(fds)) != NULL) {
+		int fd;
+
+		fd = atoi(d->d_name);
+		if (fd > STDERR_FILENO) {
+			if (close(fd))
+				pr_perror("failed to close %d", fd);
+		}
+	}
+
+	closedir(fds);
+	return 0;
+}
+

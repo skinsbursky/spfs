@@ -322,6 +322,8 @@ struct spfs_manager_context_s *create_context(int argc, char **argv)
 
 	ctx->progname = __progname;
 
+	(void) close_inherited_fds();
+
 	if (parse_options(argc, argv, &ctx->start_mode, &ctx->work_dir, &ctx->log_file,
 			  &ctx->socket_path, &ctx->verbosity, &ctx->daemonize,
 			  &ctx->process_id, &ctx->root, &ctx->namespaces, &ctx->cgroups,
