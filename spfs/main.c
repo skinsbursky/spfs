@@ -66,6 +66,7 @@ int parse_options(int *orig_argc, char ***orig_argv,
 	int oind = 0, nind = 1;
 	int argc = *orig_argc, new_argc = 0, prev_optind = 0, help_level = 0;
 	char **argv = *orig_argv, **new_argv;
+	char *mode_str = "stub";
 
 	new_argv = malloc(sizeof(char *) * (argc + 1));
 	if (!new_argv) {
@@ -103,10 +104,7 @@ int parse_options(int *orig_argc, char ***orig_argv,
 				nind += 2;
 				break;
 			case 'm':
-				if (xatol(optarg, mode)) {
-					pr_err("mode is invalid\n");
-					return -EINVAL;
-				}
+				mode_str = optarg;
 				nind += 2;
 				break;
 			case 'l':
@@ -145,10 +143,9 @@ int parse_options(int *orig_argc, char ***orig_argv,
 		exit(0);
 	}
 
-	if ((*mode == SPFS_PROXY_MODE) && (!*proxy_dir)) {
-		pr_crit("Proxy directory must be specified\n");
+	*mode = spfs_mode(mode_str, *proxy_dir);
+	if (*mode < 0)
 		return -EINVAL;
-	}
 
 	optind = *orig_argc;
 	copy_args(argv, &nind, new_argv, &new_argc);
