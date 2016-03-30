@@ -55,9 +55,9 @@ static int mount_spfs(struct spfs_manager_context_s *ctx)
 		case 0:
 			execvp_print(spfs, (char *[]){ "spfs", "-vvvv",
 				"--mode", ctx->start_mode,
-				"--proxy_dir", ctx->proxy_dir,
+				"--proxy-dir", ctx->proxy_dir,
 				"--root", ctx->root,
-				"--socket_path", ctx->spfs_socket,
+				"--socket-path", ctx->spfs_socket,
 				"--log", log_path,
 				mountpoint, NULL });
 
