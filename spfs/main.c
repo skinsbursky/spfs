@@ -35,6 +35,7 @@ static void help(int argc, char **argv, int help_level)
 	printf("general options:\n");
 	printf("\t-m   --mode            work mode\n");
 	printf("\t-p   --proxy-dir       path for proxy mode\n");
+	printf("\t-r   --root            directory to chroot to\n");
 	printf("\t-l   --log             log file\n");
 	printf("\t-s   --socket-path     control socket bind path\n");
 	printf("\t-h   --help            print help (for double option will print fuse help)\n");
@@ -51,12 +52,13 @@ static void help(int argc, char **argv, int help_level)
 
 int parse_options(int *orig_argc, char ***orig_argv,
 		  char **proxy_dir, long *mode, char **log, char **socket_path,
-		  int *verbosity)
+		  int *verbosity, char **root)
 {
 	static struct option opts[] = {
 		{"proxy-dir",	required_argument,	0, 'p'},
 		{"mode",	required_argument,	0, 'm'},
 		{"log",		required_argument,	0, 'l'},
+		{"root",	required_argument,	0, 'r'},
 		{"socket-path",	required_argument,	0, 's'},
 		{"help",	no_argument,		0, 'h'},
 		{0,		0,			0,  0 }
@@ -82,7 +84,7 @@ int parse_options(int *orig_argc, char ***orig_argv,
 	while (1) {
 		char c;
 
-		c = getopt_long(argc, argv, "p:l:m:s:vh", opts, &oind);
+		c = getopt_long(argc, argv, "p:r:l:m:s:vh", opts, &oind);
 		if (c == -1)
 			break;
 
@@ -113,6 +115,10 @@ int parse_options(int *orig_argc, char ***orig_argv,
 				break;
 			case 's':
 				*socket_path = optarg;
+				nind += 2;
+				break;
+			case 'r':
+				*root = optarg;
 				nind += 2;
 				break;
 			case 'v':
@@ -243,7 +249,7 @@ static int report_to_parent(int pipe, int res)
 }
 
 static int mount_fuse(const char *proxy_dir, int mode, const char *log_file,
-		      const char *socket_path, int pipe, int verbosity,
+		      const char *socket_path, int pipe, int verbosity, const char *root,
 		      int argc, char *argv[])
 {
 	int err;
@@ -268,6 +274,11 @@ static int mount_fuse(const char *proxy_dir, int mode, const char *log_file,
 	if (fuse == NULL) {
 		pr_crit("failed to setup fuse\n");
 		goto destroy_ctx;
+	}
+
+	if (root && chroot(root)) {
+		pr_perror("failed to chroot to %s\n", root);
+		goto teardown;
 	}
 
 	if (report_to_parent(pipe, 0) < 0) {
@@ -376,12 +387,13 @@ int main(int argc, char *argv[])
 	char *proxy_dir = NULL;
 	char *log_file = "/var/log/fuse_spfs.log";
 	char *socket_path = "/var/run/fuse_control.sock";
+	char *root = NULL;
 	long mode = SPFS_STUB_MODE;
 	pid_t pid;
 	int err, pipes[2], verbosity = 0;
 
 	if (parse_options(&argc, &argv, &proxy_dir, &mode, &log_file,
-			  &socket_path, &verbosity))
+			  &socket_path, &verbosity, &root))
 		return -1;
 
 	/* This is the control pipe, used to inform parent, that child
@@ -411,7 +423,7 @@ int main(int argc, char *argv[])
 		case 0:
 			close(pipes[0]);
 			return mount_fuse(proxy_dir, mode, log_file,
-					  socket_path, pipes[1], verbosity,
+					  socket_path, pipes[1], verbosity, root,
 					  argc, argv);
 	}
 
