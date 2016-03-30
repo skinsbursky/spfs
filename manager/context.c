@@ -139,6 +139,10 @@ static int configure(struct spfs_manager_context_s *ctx)
 		pr_info("log path wasn't provided: using %s\n", ctx->log_file);
 	}
 
+	/*TODO: fix verbosity */
+	if (setup_log(ctx->log_file, 8))
+		return -1;
+
 	sock = seqpacket_sock(ctx->socket_path, true, true, NULL);
 	if (sock < 0)
 		return sock;
@@ -151,6 +155,8 @@ static int configure(struct spfs_manager_context_s *ctx)
 
 	if (ctx->process_id) {
 		long pid;
+
+		pr_debug("Join process %s context\n", ctx->process_id);
 
 		err = xatol(ctx->process_id, &pid);
 		if (err < 0)
