@@ -10,6 +10,7 @@ struct spfs_manager_context_s {
 	char	*start_mode;
 	char	*work_dir;
 	char	*log_file;
+	char	*root;
 	char	*socket_path;
 	int	verbosity;
 	bool	daemonize;

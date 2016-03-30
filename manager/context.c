@@ -195,6 +195,7 @@ static void help(const char *program)
 	printf("general options:\n");
 	printf("\t-p   --mode            spfs start mode\n");
 	printf("\t     --proxy-dir       path for proxy mode\n");
+	printf("\t     --root            directory to chroot to\n");
 	printf("\t-p   --work-dir        spfs working directory\n");
 	printf("\t-l   --log             log file\n");
 	printf("\t-s   --socket-path     interface socket path\n");
@@ -209,7 +210,7 @@ static void help(const char *program)
 
 static int parse_options(int argc, char **argv, char **start_mode,
 			 char **work_dir, char **log, char **socket_path,
-			 int *verbosity, bool *daemonize, char **pid,
+			 int *verbosity, bool *daemonize, char **pid, char **root,
 			 char **namespaces, char **cgroups, char **proxy_dir,
 			 char **mountpoint)
 {
@@ -223,6 +224,7 @@ static int parse_options(int argc, char **argv, char **start_mode,
 		{"namespaces",	required_argument,      0, 1000},
 		{"cgroups",	required_argument,      0, 1001},
 		{"proxy-dir",	required_argument,      0, 1002},
+		{"root",        required_argument,      0, 1003},
 		{"help",        no_argument,            0, 'h'},
 		{0,             0,                      0,  0 }
 	};
@@ -265,6 +267,9 @@ static int parse_options(int argc, char **argv, char **start_mode,
 			case 1002:
 				*proxy_dir = optarg;
 				break;
+			case 1003:
+				*root = optarg;
+				break;
 			case 'h':
 				help(argv[0]);
 				exit(EXIT_SUCCESS);
@@ -306,7 +311,7 @@ struct spfs_manager_context_s *create_context(int argc, char **argv)
 
 	if (parse_options(argc, argv, &ctx->start_mode, &ctx->work_dir, &ctx->log_file,
 			  &ctx->socket_path, &ctx->verbosity, &ctx->daemonize,
-			  &ctx->process_id, &ctx->namespaces, &ctx->cgroups,
+			  &ctx->process_id, &ctx->root, &ctx->namespaces, &ctx->cgroups,
 			  &ctx->proxy_dir, &ctx->mountpoint)) {
 		pr_err("failed to parse options\n");
 		return NULL;
