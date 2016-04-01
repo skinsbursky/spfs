@@ -300,18 +300,16 @@ int context_init(const char *proxy_dir, int mode, const char *log_file,
 	}
 
 	pr_debug("fuse: creating context\n");
-	pr_debug("%s: log         : %s\n", __func__, log_file);
 	pr_debug("%s: socket path : %s\n", __func__, socket_path);
 	pr_debug("%s: verbosity   : +%d\n", __func__, verbosity);
+	pr_debug("%s: proxy_dir   : %s\n", __func__, proxy_dir);
+	pr_debug("%s: mode        : %s\n", __func__, work_modes[mode]);
 
 	err = setup_context(ctx, proxy_dir, mode);
 	if (err) {
 		pr_crit("failed to setup context: %d\n", err);
 		return err;
 	}
-
-	pr_debug("%s: proxy_dir   : %s\n", __func__, ctx->wm->proxy_dir);
-	pr_debug("%s: mode        : %s\n", __func__, work_modes[ctx->wm->mode]);
 
 	ctx->packet_socket = seqpacket_sock(socket_path, true, true,
 					    &ctx->sock_addr);
