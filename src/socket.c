@@ -17,13 +17,13 @@ static int seqpacket_sock_send(int sock, void *packet, size_t psize)
 
 	bytes = send(sock, packet, psize, MSG_EOR);
 	if (bytes < 0) {
-		printf("failed to send packet: %d\n", -errno);
+		pr_perror("failed to send packet via sock %d", sock);
 		return -1;
 	}
 
 	bytes = recv(sock, &err, sizeof(err), 0);
 	if (bytes < 0) {
-		printf("failed to receive reply: %d", -errno);
+		pr_perror("failed to receive reply via sock %d", sock);
 		return -1;
 	}
 
