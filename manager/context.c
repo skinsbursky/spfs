@@ -154,8 +154,7 @@ static int configure(struct spfs_manager_context_s *ctx)
 		pr_info("log path wasn't provided: using %s\n", ctx->log_file);
 	}
 
-	/*TODO: fix verbosity */
-	if (setup_log(ctx->log_file, 8))
+	if (setup_log(ctx->log_file, ctx->verbosity))
 		return -1;
 
 	sock = seqpacket_sock(ctx->socket_path, true, true, NULL);
