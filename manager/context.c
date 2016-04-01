@@ -206,16 +206,16 @@ static void help(const char *program)
 	printf("usage: %s [options] mountpoint\n", program);
 	printf("\n");
 	printf("general options:\n");
-	printf("\t-p   --mode            spfs start mode\n");
-	printf("\t     --proxy-dir       path for proxy mode\n");
-	printf("\t     --root            directory to chroot to\n");
-	printf("\t-p   --work-dir        spfs working directory\n");
+	printf("\t-w   --work-dir        working directory\n");
 	printf("\t-l   --log             log file\n");
 	printf("\t-s   --socket-path     interface socket path\n");
 	printf("\t-d   --daemon          daemonize\n");
 	printf("\t-p   --pid             pid of the process to join\n");
 	printf("\t     --namespaces      list of namespaces to join\n");
 	printf("\t     --cgroups         list of cgroups to join\n");
+	printf("\t     --spfs-mode       spfs start mode\n");
+	printf("\t     --spfs-proxy      path for spfs in proxy mode\n");
+	printf("\t     --spfs-root       directory for spfs to chroot to\n");
 	printf("\t-h   --help            print this help and exit\n");
 	printf("\t-v                     increase verbosity (can be used multiple times)\n");
 	printf("\n");
@@ -228,7 +228,6 @@ static int parse_options(int argc, char **argv, char **start_mode,
 			 char **mountpoint)
 {
 	static struct option opts[] = {
-		{"mode",	required_argument,      0, 'm'},
 		{"work-dir",	required_argument,      0, 'w'},
 		{"log",         required_argument,      0, 'l'},
 		{"socket-path",	required_argument,      0, 's'},
@@ -236,8 +235,9 @@ static int parse_options(int argc, char **argv, char **start_mode,
 		{"pid",		required_argument,      0, 'p'},
 		{"namespaces",	required_argument,      0, 1000},
 		{"cgroups",	required_argument,      0, 1001},
-		{"proxy-dir",	required_argument,      0, 1002},
-		{"root",        required_argument,      0, 1003},
+		{"spfs-proxy",	required_argument,      0, 1002},
+		{"spfs-root",   required_argument,      0, 1003},
+		{"spfs-mode",	required_argument,      0, 1004},
 		{"help",        no_argument,            0, 'h'},
 		{0,             0,                      0,  0 }
 	};
@@ -245,14 +245,11 @@ static int parse_options(int argc, char **argv, char **start_mode,
 	while (1) {
 		int c;
 
-		c = getopt_long(argc, argv, "m:w:l:s:p:vhd", opts, NULL);
+		c = getopt_long(argc, argv, "w:l:s:p:vhd", opts, NULL);
 		if (c == -1)
 			break;
 
 		switch (c) {
-			case 'm':
-				*start_mode = optarg;
-				break;
 			case 'w':
 				*work_dir = optarg;
 				break;
@@ -282,6 +279,9 @@ static int parse_options(int argc, char **argv, char **start_mode,
 				break;
 			case 1003:
 				*root = optarg;
+				break;
+			case 1004:
+				*start_mode = optarg;
 				break;
 			case 'h':
 				help(argv[0]);
