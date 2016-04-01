@@ -186,7 +186,7 @@ int seqpacket_sock(const char *path, bool move_fd, bool start_listen,
 		pr_info("listening to %s\n", addr.sun_path);
 	} else {
 		if (connect(sock, (struct sockaddr *)&addr, sizeof(addr))) {
-			printf("failed to connect to socket %s\n", addr.sun_path);
+			pr_perror("failed to connect to socket %s", addr.sun_path);
 			return -1;
 		}
 		pr_info("connected to %s\n", addr.sun_path);
