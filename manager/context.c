@@ -121,6 +121,9 @@ static int configure(struct spfs_manager_context_s *ctx)
 		return -EINVAL;
 	}
 
+	if (create_dir(ctx->work_dir))
+		return -1;
+
 	if (!ctx->socket_path) {
 		ctx->socket_path = xsprintf("/var/run/%s-%d.sock",
 						ctx->progname, getpid());
@@ -176,13 +179,6 @@ static int configure(struct spfs_manager_context_s *ctx)
 			pr_err("Pid was specified, but no namespaces provided\n");
 			return -EINVAL;
 		}
-	}
-
-	/* Check work directory and mountpoint _after_ namespaces to satisfy
-	 * mount namespace if provided */
-	if (mkdir(ctx->work_dir, 0755) && (errno != EEXIST)) {
-		pr_perror("failed to create %s", ctx->work_dir);
-		return -errno;
 	}
 #if 0
 	if (access(work_dir, R_OK | W_OK)) {
