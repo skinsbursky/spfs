@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/capability.h>
 
 #include "include/log.h"
 #include "include/util.h"
@@ -222,4 +223,28 @@ int collect_child(int pid, int *status)
 	}
 	pr_debug("child %d exited successfully\n", pid);
 	return 0;
+}
+
+int check_capabilities(unsigned long cap_set, pid_t pid)
+{
+	struct __user_cap_header_struct hdr = {
+		.version = _LINUX_CAPABILITY_VERSION_3,
+		.pid = pid,
+	};
+	struct __user_cap_data_struct data[2];
+	long cap_effective;
+
+	pr_debug("checking for capabilities 0x%016lx\n", cap_set);
+
+	if (capget(&hdr, data)) {
+		pr_perror("capget(%d) failed\n", getpid());
+		return -errno;
+	}
+
+	pr_debug("CapEffective: 0x%08x%08x\n", data[1].effective, data[0].effective);
+	pr_debug("CapPermitted: 0x%08x%08x\n", data[1].permitted, data[0].permitted);
+	pr_debug("CapInherited: 0x%08x%08x\n", data[1].inheritable, data[0].inheritable);
+
+	cap_effective = ((long)data[1].effective << 32) | data[0].effective;
+	return cap_set & cap_effective;
 }

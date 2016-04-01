@@ -16,4 +16,6 @@ int close_inherited_fds(void);
 
 int collect_child(int pid, int *status);
 
+int check_capabilities(unsigned long cap_set, pid_t pid);
+
 #endif
