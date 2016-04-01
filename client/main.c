@@ -277,12 +277,9 @@ static int execude_mode_cmd(int argc, char **argv)
 		help(argv[0]);
 		return 1;
 	}
-#if 0
-	if (xatol(mode, &m)) {
-#else
+
 	m = spfs_mode(mode, path_to_send);
 	if (m < 0) {
-#endif
 		help(argv[0]);
 		return 1;
 	}

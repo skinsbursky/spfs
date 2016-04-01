@@ -160,14 +160,6 @@ int seqpacket_sock(const char *path, bool move_fd, bool start_listen,
 		pr_debug("Socket was moved to fd: %d\n", sock);
 	}
 
-#if 0
-	if (!access(path, F_OK) && (unlink(path) < 0)) {
-		err = -errno;
-		pr_crit("fuse: failed to unlink %s: %d\n", path, -errno);
-		return err;
-	}
-#endif
-
 	memset(&addr, 0, sizeof(struct sockaddr_un));
 	addr.sun_family = AF_UNIX;
 	strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);

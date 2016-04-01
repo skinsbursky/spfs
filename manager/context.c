@@ -180,12 +180,7 @@ static int configure(struct spfs_manager_context_s *ctx)
 			return -EINVAL;
 		}
 	}
-#if 0
-	if (access(work_dir, R_OK | W_OK)) {
-		pr_perror("directory %s is not accessible for rw", work_dir);
-		return -EINVAL;
-	}
-#endif
+
 	if (access(ctx->mountpoint, R_OK | W_OK)) {
 		pr_perror("mountpoint %s is not accessible for RW", ctx->mountpoint);
 		return -EINVAL;
