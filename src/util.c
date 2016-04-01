@@ -12,6 +12,7 @@
 #include <sys/wait.h>
 
 #include "include/log.h"
+#include "include/util.h"
 
 /*
  * This function reallocates passed str pointer.
