@@ -14,4 +14,6 @@ int create_dir(const char *fmt, ...);
 
 int close_inherited_fds(void);
 
+int collect_child(int pid, int *status);
+
 #endif

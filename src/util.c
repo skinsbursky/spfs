@@ -9,6 +9,7 @@
 
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 
 #include "include/log.h"
 
@@ -204,3 +205,20 @@ int close_inherited_fds(void)
 	return 0;
 }
 
+int collect_child(int pid, int *status)
+{
+	if (waitpid(pid, status, 0) < 0) {
+		pr_perror("Wait for %d failed", pid);
+		return -errno;
+	}
+
+	if (WIFSIGNALED(*status)) {
+		pr_err("child %d was killed by %d\n", pid, WTERMSIG(status));
+		return -EINTR;
+	} else if (WEXITSTATUS(*status)) {
+		pr_err("child %d exited with error %d\n", pid, WEXITSTATUS(status));
+		return WEXITSTATUS(*status);
+	}
+	pr_debug("child %d exited successfully\n", pid);
+	return 0;
+}
