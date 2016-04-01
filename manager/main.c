@@ -41,10 +41,9 @@ static int mount_spfs(struct spfs_manager_context_s *ctx)
 	if (!proxy_dir)
 		return -ENOMEM;
 
-	if (mkdir(proxy_dir, 0755) && (errno != EEXIST)) {
-		pr_perror("failed to create %s", proxy_dir);
-		return -errno;
-	}
+	/* TODO WTF? Mode can be Stub */
+	if (create_dir("%s%s", ctx->root ? ctx->root : "", proxy_dir))
+		return -EINVAL;
 
 	pid = fork();
 	switch (pid) {
