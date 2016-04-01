@@ -6,7 +6,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <poll.h>
+
 #include <sys/wait.h>
+#include <sys/capability.h>
 
 #include "include/log.h"
 #include "include/util.h"
@@ -270,6 +272,10 @@ static int mount_fuse(const char *proxy_dir, int mode, const char *log_file,
 			  &mountpoint, &multithreaded, NULL);
 	if (fuse == NULL) {
 		pr_crit("failed to setup fuse\n");
+
+		err = check_capabilities(1 << CAP_SYS_ADMIN, getpid());
+		if (err == 0)
+			pr_info("CAP_SYS_ADMIN is not set.\n");
 		goto destroy_ctx;
 	}
 
