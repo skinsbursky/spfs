@@ -77,11 +77,9 @@ int wait_mode_change(int current_mode)
 	return -ERESTARTSYS;
 }
 
-static int wake_mode_waiters(void)
+static int wake_mode_waiters(struct work_mode_s *wm)
 {
-	struct spfs_context_s *ctx = get_context();
-
-	return syscall(SYS_futex, &ctx->wm->mode, FUTEX_WAKE, INT_MAX, NULL, NULL, 0);
+	return syscall(SYS_futex, &wm->mode, FUTEX_WAKE, INT_MAX, NULL, NULL, 0);
 }
 
 static int create_work_mode(int mode, const char *path, struct work_mode_s **wm)
@@ -214,13 +212,14 @@ int set_work_mode(struct spfs_context_s *ctx, int mode, const char *path)
 			get_context()->wm = new_wm;
 		        pthread_mutex_unlock(&ctx->wm_lock);
 
+			wake_mode_waiters(cur_wm);
+
 			destroy_work_mode(cur_wm);
 			break;
 		default:
 			pr_err("%s: unsupported mode: %d\n", mode);
 			return -EINVAL;
 	}
-	wake_mode_waiters();
 	return 0;
 }
 
