@@ -161,11 +161,9 @@ static int configure(struct spfs_manager_context_s *ctx)
 	}
 
 	if (ctx->process_id) {
-		long pid;
-
 		pr_debug("Join process %s context\n", ctx->process_id);
 
-		err = xatol(ctx->process_id, &pid);
+		err = xatol(ctx->process_id, &ctx->ns_pid);
 		if (err < 0)
 			return -EINVAL;
 
@@ -173,10 +171,6 @@ static int configure(struct spfs_manager_context_s *ctx)
 			pr_err("Pid was specified, but no namespaces provided\n");
 			return -EINVAL;
 		}
-
-		err = join_namespaces(pid, ctx->namespaces);
-		if (err)
-			return err;
 	}
 
 	/* Check work directory and mountpoint _after_ namespaces to satisfy

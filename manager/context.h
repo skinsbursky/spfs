@@ -21,6 +21,7 @@ struct spfs_manager_context_s {
 	char	*mountpoint;
 
 	int	mode;
+	long	ns_pid;
 
 	int	sock;
 

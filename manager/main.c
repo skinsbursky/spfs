@@ -52,6 +52,9 @@ static int mount_spfs(struct spfs_manager_context_s *ctx)
 			pr_perror("failed to fork");
 			return -errno;
 		case 0:
+			if (join_namespaces(ctx->ns_pid, ctx->namespaces))
+				_exit(EXIT_FAILURE);
+
 			execvp_print(spfs, (char *[]){ "spfs", "-vvvv",
 				"--mode", ctx->start_mode,
 				"--proxy-dir", ctx->proxy_dir,
