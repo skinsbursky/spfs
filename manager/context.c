@@ -74,13 +74,20 @@ static int get_namespace_type(const char *ns)
 	return -EINVAL;
 }
 
-static int join_namespaces(int pid, char *namespaces)
+static int join_namespaces(int pid, const char *namespaces)
 {
-	char *ns;
+	char *ns, *ns_list;
 
-	while ((ns = strsep(&namespaces, ",")) != NULL) {
-		int ns_type;
-		int err;
+	pr_debug("Join process %d namespaces: %s\n", pid, namespaces);
+
+	ns_list = strdup(namespaces);
+	if (!ns_list) {
+		pr_err("failed to duplicate namespaces\n");
+		return -ENOMEM;
+	}
+
+	while ((ns = strsep(&ns_list, ",")) != NULL) {
+		int ns_type, err;
 
 		ns_type = get_namespace_type(ns);
 		if (ns_type < 0)
