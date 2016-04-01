@@ -22,12 +22,9 @@
 
 static int mount_spfs(struct spfs_manager_context_s *ctx)
 {
-	const char *work_dir = ctx->work_dir;
-	char *mountpoint = ctx->mountpoint;
+	const char *work_dir = ctx->work_dir, *spfs = FS_NAME;
+	char *proxy_dir, *log_path;
 	int pid, status;
-	const char *spfs = FS_NAME;
-	char *proxy_dir;
-	char *log_path;
 
 	log_path = xsprintf("%s/spfs.log", work_dir);
 	if (!log_path)
@@ -37,7 +34,7 @@ static int mount_spfs(struct spfs_manager_context_s *ctx)
 	if (!ctx->spfs_socket)
 		return -ENOMEM;
 
-	proxy_dir = xsprintf("%s/mnt", work_dir);
+	proxy_dir = xsprintf("%s/mnt", ctx->spfs_dir);
 	if (!proxy_dir)
 		return -ENOMEM;
 
@@ -60,7 +57,7 @@ static int mount_spfs(struct spfs_manager_context_s *ctx)
 				"--root", ctx->root,
 				"--socket-path", ctx->spfs_socket,
 				"--log", log_path,
-				mountpoint, NULL });
+				ctx->mountpoint, NULL });
 
 			_exit(EXIT_FAILURE);
 	}
@@ -72,7 +69,8 @@ static int mount_spfs(struct spfs_manager_context_s *ctx)
 		return -1;
 
 	if (!status)
-		pr_info("%s: spfs on %s started successfully\n", __func__, mountpoint);
+		pr_info("%s: spfs on %s started successfully\n", __func__,
+				ctx->mountpoint);
 
 	return status;
 }
