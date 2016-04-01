@@ -6,6 +6,9 @@
 #include <fcntl.h>
 #include <limits.h>
 
+#include <sys/stat.h>
+#include <sys/types.h>
+
 #include "include/log.h"
 
 /*
@@ -134,4 +137,42 @@ int xatol(const char *string, long *number)
 	return 0;
 }
 
+int create_dir(const char *fmt, ...)
+{
+	int err = -1;
+	char *p, *d, *cp = NULL;
+	va_list args;
 
+	va_start(args, fmt);
+	p = xvstrcat(NULL, fmt, args);
+	va_end(args);
+	if (!p) {
+		pr_err("failed to allocate string\n");
+		return -ENOMEM;
+	}
+
+	pr_debug("creating directory %s\n", p);
+
+	while ((d = strsep(&p, "/")) != NULL) {
+		cp = xstrcat(cp, "%s/", d);
+		if (!cp) {
+			err = -ENOMEM;
+			goto err;
+		}
+
+		err = mkdir(cp, 0777);
+		if (!err) {
+			pr_debug("created dir: '%s'\n", cp);
+			continue;
+		}
+		if (errno != EEXIST) {
+			pr_perror("failed to mkdir %s", cp);
+			goto err;
+		}
+	}
+	err = 0;
+err:
+	free(cp);
+	free(p);
+	return err;
+}

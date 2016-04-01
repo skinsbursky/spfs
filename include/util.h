@@ -10,4 +10,6 @@ int save_fd(int fd);
 
 void execvp_print(const char *file, char *const argv[]);
 
+int create_dir(const char *fmt, ...);
+
 #endif
