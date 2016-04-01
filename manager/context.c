@@ -74,7 +74,7 @@ static int get_namespace_type(const char *ns)
 	return -EINVAL;
 }
 
-static int join_namespaces(int pid, const char *namespaces)
+int join_namespaces(int pid, const char *namespaces)
 {
 	char *ns, *ns_list;
 

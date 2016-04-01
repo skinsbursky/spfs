@@ -31,4 +31,6 @@ struct spfs_manager_context_s *create_context(int argc, char **argv);
 
 extern int spfs_manager_packet_handler(void *data, void *package, size_t psize);
 
+int join_namespaces(int pid, const char *namespaces);
+
 #endif
