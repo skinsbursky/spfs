@@ -54,7 +54,7 @@ static int reliable_conn_handler(int sock, void *data,
 
 	bytes = recv(sock, page, sizeof(page), 0);
 	if (bytes < 0) {
-		pr_perror("%s: read failed", __func__, bytes);
+		pr_perror("%s: recv failed", __func__);
 		return -errno;
 	}
 	if (bytes == 0) {
@@ -68,12 +68,12 @@ static int reliable_conn_handler(int sock, void *data,
 
 	bytes = send(sock, &err, sizeof(&err), MSG_NOSIGNAL | MSG_DONTWAIT | MSG_EOR);
 	if (bytes < 0) {
-		pr_perror("%s: write failed", __func__, bytes);
+		pr_perror("%s: send failed", __func__);
 		return -errno;
 	}
 
 	if (bytes == 0) {
-		pr_debug("%s: peer was closed\n", __func__);
+		pr_info("%s: peer was closed\n", __func__);
 		return -ECONNABORTED;
 	}
 
