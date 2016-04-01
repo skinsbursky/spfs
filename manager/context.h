@@ -9,6 +9,7 @@ struct spfs_manager_context_s {
 
 	char	*start_mode;
 	char	*work_dir;
+	char	*spfs_dir;
 	char	*log_file;
 	char	*root;
 	char	*socket_path;

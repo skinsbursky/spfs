@@ -111,6 +111,11 @@ static int configure(struct spfs_manager_context_s *ctx)
 		return -EINVAL;
 	}
 
+	if (!ctx->spfs_dir) {
+		pr_err("spfs directory wasn't provided\n");
+		return -EINVAL;
+	}
+
 	if (!ctx->mountpoint) {
 		pr_err("mountpoint wasn't provided\n");
 		return -EINVAL;
@@ -209,13 +214,14 @@ static void help(const char *program)
 	printf("\t     --cgroups         list of cgroups to join\n");
 	printf("\t     --spfs-mode       spfs start mode\n");
 	printf("\t     --spfs-proxy      path for spfs in proxy mode\n");
+	printf("\t     --spfs-dir        spfs working directory\n");
 	printf("\t     --spfs-root       directory for spfs to chroot to\n");
 	printf("\t-h   --help            print this help and exit\n");
 	printf("\t-v                     increase verbosity (can be used multiple times)\n");
 	printf("\n");
 }
 
-static int parse_options(int argc, char **argv, char **start_mode,
+static int parse_options(int argc, char **argv, char **start_mode, char **spfs_dir,
 			 char **work_dir, char **log, char **socket_path,
 			 int *verbosity, bool *daemonize, char **pid, char **root,
 			 char **namespaces, char **cgroups, char **proxy_dir,
@@ -232,6 +238,7 @@ static int parse_options(int argc, char **argv, char **start_mode,
 		{"spfs-proxy",	required_argument,      0, 1002},
 		{"spfs-root",   required_argument,      0, 1003},
 		{"spfs-mode",	required_argument,      0, 1004},
+		{"spfs-dir",	required_argument,      0, 1005},
 		{"help",        no_argument,            0, 'h'},
 		{0,             0,                      0,  0 }
 	};
@@ -277,6 +284,9 @@ static int parse_options(int argc, char **argv, char **start_mode,
 			case 1004:
 				*start_mode = optarg;
 				break;
+			case 1005:
+				*spfs_dir = optarg;
+				break;
 			case 'h':
 				help(argv[0]);
 				exit(EXIT_SUCCESS);
@@ -318,7 +328,7 @@ struct spfs_manager_context_s *create_context(int argc, char **argv)
 
 	(void) close_inherited_fds();
 
-	if (parse_options(argc, argv, &ctx->start_mode, &ctx->work_dir, &ctx->log_file,
+	if (parse_options(argc, argv, &ctx->start_mode, &ctx->spfs_dir, &ctx->work_dir, &ctx->log_file,
 			  &ctx->socket_path, &ctx->verbosity, &ctx->daemonize,
 			  &ctx->process_id, &ctx->root, &ctx->namespaces, &ctx->cgroups,
 			  &ctx->proxy_dir, &ctx->mountpoint)) {
