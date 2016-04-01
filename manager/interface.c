@@ -9,6 +9,7 @@
 
 #include "context.h"
 #include "interface.h"
+#include "mount.h"
 
 int spfs_manager_packet_handler(void *data, void *package, size_t psize)
 {
