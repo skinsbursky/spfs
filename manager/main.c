@@ -2,7 +2,6 @@
 
 #include <errno.h>
 #include <sys/types.h>
-#include <sys/wait.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <stdlib.h>
@@ -67,24 +66,13 @@ static int mount_spfs(struct spfs_manager_context_s *ctx)
 	free(log_path);
 	free(proxy_dir);
 
-	pid = waitpid(pid, &status, 0);
-	if (pid < 0) {
-		pr_perror("Wait for %d failed", pid);
-		return -errno;
-	}
+	if (collect_child(pid, &status))
+		return -1;
 
-	if (WIFSIGNALED(status)) {
-		pr_err("spfs(%d) was killed by %d\n", pid, WTERMSIG(status));
-		return -ECANCELED;
-	}
+	if (!status)
+		pr_info("%s: spfs on %s started successfully\n", __func__, mountpoint);
 
-	if (WEXITSTATUS(status)) {
-		pr_err("spfs(%d) exited with error %d\n", pid, WEXITSTATUS(status));
-		return WEXITSTATUS(status);
-	}
-
-	pr_info("%s: spfs on %s started successfully\n", __func__, mountpoint);
-	return WEXITSTATUS(status);
+	return status;
 }
 
 int main(int argc, char *argv[])

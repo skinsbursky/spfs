@@ -352,17 +352,11 @@ static int kill_child_and_collect(int pid)
 				break;
 		}
 	}
-	pid = waitpid(pid, &status, 0);
-	if (pid < 0) {
-		pr_perror("Wait for %d failed", pid);
-		return -errno;
-	}
 
-	if (WIFEXITED(status))
-		pr_info("Child exited with the following reason: %d\n", WEXITSTATUS(status));
-	else
-		pr_info("Child was killed by signal %d\n", WTERMSIG(status));
-	return -1;
+	if (collect_child(pid, &status))
+		return -ECHILD;
+
+	return status;
 }
 
 static int wait_child_report(int pipe)
@@ -430,7 +424,8 @@ int main(int argc, char *argv[])
 	if (err) {
 		pr_crit("Child failed to initialize: %d\n", err);
 		pr_info("See %s\n", log_file);
-		return kill_child_and_collect(pid);
+		(void) kill_child_and_collect(pid);
+		return -1;
 	}
 	pr_info("Fuse master started successfully with pid %d\n", pid);
 	if (proxy_dir)
