@@ -42,7 +42,7 @@ bin_spfs_client_SOURCES =	client/main.c			\
 				include/socket.h		\
 				include/util.h
 
-bin_spfs_client_CFLAGS =
+bin_spfs_client_CFLAGS = $(AM_CFLAGS)
 bin_spfs_client_LDADD =
 bin_spfs_client_LDFLAGS =
 bin_spfs_client_DEPENDENCIES =
@@ -64,7 +64,7 @@ bin_spfs_manager_SOURCES =	manager/main.c			\
 				include/socket.h		\
 				include/util.h
 
-bin_spfs_manager_CFLAGS =
+bin_spfs_manager_CFLAGS = $(AM_CFLAGS)
 bin_spfs_manager_LDADD =
 bin_spfs_manager_LDFLAGS =
 bin_spfs_manager_DEPENDENCIES =
