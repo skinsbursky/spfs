@@ -312,9 +312,14 @@ static int parse_options(int argc, char **argv, char **start_mode, char **spfs_d
 
 static void cleanup(void)
 {
-	if (spfs_manager_context.socket_path)
+	if (spfs_manager_context.sock) {
+		/* We assume, that:
+		 * 1) Is sock is non-zero, then socket path was initialized
+		 * 2) Sock fd was moved about standart descriptors region.
+		 */
 		if (unlink(spfs_manager_context.socket_path))
 			pr_perror("failed ot unlink %s", spfs_manager_context.socket_path);
+	}
 }
 
 extern const char *__progname;
