@@ -134,8 +134,7 @@ static int configure(struct spfs_manager_context_s *ctx)
 		return -1;
 
 	if (!ctx->socket_path) {
-		ctx->socket_path = xsprintf("/var/run/%s-%d.sock",
-						ctx->progname, getpid());
+		ctx->socket_path = xsprintf("%s/%s.sock", ctx->work_dir, ctx->progname);
 		if (!ctx->socket_path) {
 			pr_err("failed to allocate\n");
 			return -ENOMEM;
@@ -154,8 +153,7 @@ static int configure(struct spfs_manager_context_s *ctx)
 	}
 
 	if (!ctx->log_file) {
-		ctx->log_file = xsprintf("/var/log/%s-%d.log", ctx->progname,
-								getpid());
+		ctx->log_file = xsprintf("%s/%s.log", ctx->work_dir, ctx->progname);
 		if (!ctx->log_file) {
 			pr_err("failed to allocate\n");
 			return -ENOMEM;
