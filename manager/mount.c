@@ -138,7 +138,7 @@ static int mount_loop(struct spfs_manager_context_s *ctx,
 	}
 
 	if (err) {
-		pr_perror("failed to mount %s to %s: %s\n", fstype, mnt,
+		pr_perror("failed to mount %s to %s: %s", fstype, mnt,
 					strerror(errno));
 		goto rmdir_mnt;
 	}
@@ -196,7 +196,7 @@ int mount_fs(struct spfs_manager_context_s *ctx, void *package, size_t psize)
 			}
 
 			if (ctx->root && chroot(ctx->root)) {
-				pr_perror("failed to chroot to %s\n", ctx->root);
+				pr_perror("failed to chroot to %s", ctx->root);
 				_exit(EXIT_FAILURE);
 			}
 

@@ -237,7 +237,7 @@ int check_capabilities(unsigned long cap_set, pid_t pid)
 	pr_debug("checking for capabilities 0x%016lx\n", cap_set);
 
 	if (capget(&hdr, data)) {
-		pr_perror("capget(%d) failed\n", getpid());
+		pr_perror("capget(%d) failed", getpid());
 		return -errno;
 	}
 

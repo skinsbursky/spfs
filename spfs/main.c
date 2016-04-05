@@ -280,7 +280,7 @@ static int mount_fuse(const char *proxy_dir, int mode, const char *log_file,
 	}
 
 	if (root && chroot(root)) {
-		pr_perror("failed to chroot to %s\n", root);
+		pr_perror("failed to chroot to %s", root);
 		goto teardown;
 	}
 
