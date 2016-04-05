@@ -148,7 +148,7 @@ static int setup_signal_handlers(struct spfs_manager_context_s *ctx)
 
 static int configure(struct spfs_manager_context_s *ctx)
 {
-	int err, sock;
+	int err;
 
 	if (!ctx->work_dir) {
 		pr_err("work directory wasn't provided\n");
@@ -208,9 +208,9 @@ static int configure(struct spfs_manager_context_s *ctx)
 	if (setup_log(ctx->log_file, ctx->verbosity))
 		return -1;
 
-	sock = seqpacket_sock(ctx->socket_path, true, true, NULL);
-	if (sock < 0)
-		return sock;
+	ctx->sock = seqpacket_sock(ctx->socket_path, true, true, NULL);
+	if (ctx->sock < 0)
+		return ctx->sock;
 
 	if (ctx->cgroups) {
 		err = join_cgroups(ctx->cgroups);
@@ -238,8 +238,6 @@ static int configure(struct spfs_manager_context_s *ctx)
 
 	if (setup_signal_handlers(ctx))
 		return -1;
-
-	ctx->sock = sock;
 
 	return 0;
 }
