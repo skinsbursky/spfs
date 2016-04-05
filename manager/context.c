@@ -121,6 +121,15 @@ static int configure(struct spfs_manager_context_s *ctx)
 		return -EINVAL;
 	}
 
+	/* TODO move to spfs */
+	if (ctx->root && ctx->root[strlen(ctx->root)-1] != '/') {
+		ctx->root = xsprintf("%s/", ctx->root);
+		if (!ctx->root) {
+			pr_err("failed to allocate\n");
+			return -ENOMEM;
+		}
+	}
+
 	if (create_dir(ctx->work_dir))
 		return -1;
 
