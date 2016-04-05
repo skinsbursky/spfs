@@ -102,6 +102,50 @@ int join_namespaces(int pid, const char *namespaces)
 	return 0;
 }
 
+static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)
+{
+	pid_t pid;
+	int status;
+
+	while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+		if (WIFEXITED(status))
+			pr_info("%d exited, status=%d\n", pid, WEXITSTATUS(status));
+		else
+			pr_err("%d killed by signal %d (%s)\n", pid, WTERMSIG(status), strsignal(WTERMSIG(status)));
+	}
+
+	if ((pid < 0) && (errno != ECHILD))
+		pr_perror("failed to collect pid");
+}
+
+static int setup_signal_handlers(struct spfs_manager_context_s *ctx)
+{
+	struct sigaction act;
+	sigset_t blockmask;
+	int err;
+
+	sigfillset(&blockmask);
+	sigdelset(&blockmask, SIGCHLD);
+
+	err = sigprocmask(SIG_SETMASK, &blockmask, NULL);
+	if (err < 0) {
+		pr_perror("Can't block signals");
+		return -1;
+	}
+
+	act.sa_flags = SA_NOCLDSTOP | SA_SIGINFO | SA_RESTART;
+	act.sa_sigaction = sigchld_handler;
+	sigemptyset(&act.sa_mask);
+	sigaddset(&act.sa_mask, SIGCHLD);
+
+	err = sigaction(SIGCHLD, &act, NULL);
+	if (err < 0) {
+		pr_perror("sigaction() failed");
+		return -1;
+	}
+	return 0;
+}
+
 static int configure(struct spfs_manager_context_s *ctx)
 {
 	int err, sock;
@@ -191,6 +235,9 @@ static int configure(struct spfs_manager_context_s *ctx)
 		pr_perror("mountpoint %s is not accessible for RW", ctx->mountpoint);
 		return -EINVAL;
 	}
+
+	if (setup_signal_handlers(ctx))
+		return -1;
 
 	ctx->sock = sock;
 
