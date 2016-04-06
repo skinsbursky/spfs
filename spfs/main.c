@@ -371,9 +371,16 @@ static int wait_child_report(int pipe)
 
 	err = poll_child_status(pipe);
 	if (!err) {
-		if (read(pipe, &err, sizeof(int)) < 0) {
+		ssize_t bytes;
+
+		bytes = read(pipe, &err, sizeof(err));
+		if (bytes < 0) {
 			pr_perror("failed to read from control pipe");
 			err = -errno;
+		}
+		if (bytes != sizeof(err)) {
+			pr_err("Read less than expected\n");
+			return -EINTR;
 		}
 	}
 	return err;
