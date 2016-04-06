@@ -82,7 +82,7 @@ static int wake_mode_waiters(struct work_mode_s *wm)
 	return syscall(SYS_futex, &wm->mode, FUTEX_WAKE, INT_MAX, NULL, NULL, 0);
 }
 
-static int create_work_mode(int mode, const char *path, struct work_mode_s **wm)
+static int create_work_mode(spfs_mode_t mode, const char *path, struct work_mode_s **wm)
 {
 	struct work_mode_s *new;
 	int err = -ENOMEM;
@@ -179,7 +179,7 @@ void destroy_work_mode(struct work_mode_s *wm)
 	free(wm);
 }
 
-int stale_work_mode(int mode, const char *proxy_dir)
+int stale_work_mode(spfs_mode_t mode, const char *proxy_dir)
 {
 	struct spfs_context_s *ctx = get_context();
 
@@ -189,7 +189,7 @@ int stale_work_mode(int mode, const char *proxy_dir)
 	return !!strcmp(proxy_dir, ctx->wm->proxy_dir);
 }
 
-int set_work_mode(struct spfs_context_s *ctx, int mode, const char *path)
+int set_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode, const char *path)
 {
 	struct work_mode_s *cur_wm = get_context()->wm;
 	struct work_mode_s *new_wm = NULL;
@@ -223,7 +223,7 @@ int set_work_mode(struct spfs_context_s *ctx, int mode, const char *path)
 	return 0;
 }
 
-int change_work_mode(struct spfs_context_s *ctx, int mode, const char *path)
+int change_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode, const char *path)
 {
 	pr_info("%s: changing work mode from %d to %d (path: %s)\n", __func__, ctx->wm->mode, mode, path);
 	if (!stale_work_mode(mode, path)) {
@@ -235,7 +235,7 @@ int change_work_mode(struct spfs_context_s *ctx, int mode, const char *path)
 
 
 static int setup_context(struct spfs_context_s *ctx, const char *proxy_dir,
-			 int mode)
+			 spfs_mode_t mode)
 {
 	int err = -ENOMEM;
 
@@ -285,7 +285,7 @@ static void *sock_routine(void *ptr)
 	return NULL;
 }
 
-int context_init(const char *proxy_dir, int mode, const char *log_file,
+int context_init(const char *proxy_dir, spfs_mode_t mode, const char *log_file,
 		 const char *socket_path, int verbosity)
 {
 	struct spfs_context_s *ctx = get_context();

@@ -4,6 +4,8 @@
 #include <sys/stat.h>
 #include <string.h>
 
+#include "spfs/context.h"
+
 struct external_cmd {
 	unsigned int	cmd;
 	unsigned long	pad;
@@ -11,7 +13,7 @@ struct external_cmd {
 };
 
 struct cmd_package_s {
-	int		mode;
+	spfs_mode_t	mode;
 	char		path[0];
 };
 
@@ -49,7 +51,7 @@ static inline void fill_path_packet(struct external_cmd *package,
 	strcpy(dp->path, path);
 }
 
-static inline void fill_mode_packet(struct external_cmd *package, unsigned mode,
+static inline void fill_mode_packet(struct external_cmd *package, spfs_mode_t mode,
 			const char *path)
 {
 	struct cmd_package_s *cp = (struct cmd_package_s *)&package->ctx;

@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include <spfs/context.h>
+
 struct spfs_manager_context_s {
 	const char	*progname;
 
@@ -21,7 +23,7 @@ struct spfs_manager_context_s {
 	char	*proxy_dir;
 	char	*mountpoint;
 
-	int	mode;
+	spfs_mode_t mode;
 	long	ns_pid;
 
 	int	sock;

@@ -64,7 +64,7 @@ static int send_path(const char *socket_path, const char *path_to_send, const ch
 	return err;
 }
 
-static int send_mode(const char *socket_path, int mode, const char *path_to_send)
+static int send_mode(const char *socket_path, spfs_mode_t mode, const char *path_to_send)
 {
 	size_t len;
 	struct external_cmd *package;
@@ -250,7 +250,7 @@ static int execude_mode_cmd(int argc, char **argv)
 		{"help",		no_argument,		0,	'h'},
 		{0,			0,			0,	0 }
 	};
-	long m;
+	spfs_mode_t m;
 
 	while (1) {
 		char c;

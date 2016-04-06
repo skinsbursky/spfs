@@ -14,7 +14,7 @@
 #include "interface.h"
 #include "mount.h"
 
-static int send_mode(const char *socket_path, int mode, const char *path_to_send)
+static int send_mode(const char *socket_path, spfs_mode_t mode, const char *path_to_send)
 {
 	size_t len;
 	struct external_cmd *package;

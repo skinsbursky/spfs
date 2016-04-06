@@ -12,12 +12,12 @@
 
 #define ERESTARTSYS		512
 
-enum {
+typedef enum {
 	SPFS_PROXY_MODE,
 	SPFS_STUB_MODE,
 	SPFS_GOLEM_MODE,
 	SPFS_MAX_MODE,
-};
+} spfs_mode_t;
 
 struct dentry_info_s {
 	char   *name;
@@ -28,7 +28,7 @@ struct dentry_info_s {
 };
 
 struct work_mode_s {
-	int			mode;
+	spfs_mode_t		mode;
 	char                    *proxy_dir;
 	int			proxy_root_fd;
 };
@@ -47,7 +47,7 @@ struct spfs_context_s {
 	pthread_t		sock_pthread;
 };
 
-int context_init(const char *proxy_dir, int mode, const char *log_file,
+int context_init(const char *proxy_dir, spfs_mode_t mode, const char *log_file,
 		 const char *socket_path, int verbosity);
 int context_store_mnt_stat(const char *mountpoint);
 
@@ -56,18 +56,18 @@ void context_fini(void);
 struct spfs_context_s *get_context(void);
 const struct fuse_operations *get_operations(struct work_mode_s *wm);
 
-int change_work_mode(struct spfs_context_s *ctx, int mode, const char *path);
-int set_work_mode(struct spfs_context_s *ctx, int mode, const char *path);
+int change_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode, const char *path);
+int set_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode, const char *path);
 int wait_mode_change(int current_mode);
 
 const struct work_mode_s *ctx_work_mode(void);
 int copy_work_mode(struct work_mode_s **wm);
 void destroy_work_mode(struct work_mode_s *wm);
-int stale_work_mode(int mode, const char *proxy_dir);
+int stale_work_mode(spfs_mode_t mode, const char *proxy_dir);
 
 extern int spfs_execute_cmd(void *data, void *package, size_t psize);
 
-static inline int spfs_mode(const char *mode, const char *path)
+static inline spfs_mode_t spfs_mode(const char *mode, const char *path)
 {
 	if (!strcmp(mode, "stub"))
 		return SPFS_STUB_MODE;
