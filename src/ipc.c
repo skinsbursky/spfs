@@ -6,6 +6,15 @@
 #include "include/util.h"
 #include "include/log.h"
 
+int report_status(int pipe, int status)
+{
+	if (write(pipe, &status, sizeof(status)) < 0) {
+		pr_perror("failed to write to fd %d", pipe);
+		return -errno;
+	}
+	return 0;
+}
+
 static int poll_child_status(int pipe)
 {
 	struct pollfd pfd = {

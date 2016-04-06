@@ -236,16 +236,6 @@ err_free:
 	return NULL;
 }
 
-static int report_to_parent(int pipe, int res)
-{
-	if (write(pipe, &res, sizeof(res)) < 0) {
-		pr_perror("failed to write to fd %d", pipe);
-		return -errno;
-	}
-	close(pipe);
-	return 0;
-}
-
 static int mount_fuse(const char *proxy_dir, spfs_mode_t mode, const char *log_file,
 		      const char *socket_path, int pipe, int verbosity, const char *root,
 		      int argc, char *argv[])
@@ -281,7 +271,7 @@ static int mount_fuse(const char *proxy_dir, spfs_mode_t mode, const char *log_f
 	if (secure_chroot(root))
 		goto teardown;
 
-	if (report_to_parent(pipe, 0) < 0) {
+	if (report_status(pipe, 0) < 0) {
 		pr_crit("failed to send report to parent\n");
 		goto teardown;
 	}
@@ -299,7 +289,7 @@ teardown:
 destroy_ctx:
 	context_fini();
 err:
-	report_to_parent(pipe, -1);
+	report_status(pipe, -1);
 	return -1;
 }
 
