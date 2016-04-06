@@ -146,8 +146,10 @@ int parse_options(int *orig_argc, char ***orig_argv,
 	}
 
 	*mode = spfs_mode(mode_str, *proxy_dir);
-	if (*mode < 0)
+	if (*mode < 0) {
+		free(new_argv);
 		return -EINVAL;
+	}
 
 	optind = *orig_argc;
 	copy_args(argv, &nind, new_argv, &new_argc);
