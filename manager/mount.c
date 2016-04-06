@@ -182,7 +182,7 @@ int mount_fs(struct spfs_manager_context_s *ctx, void *package, size_t psize)
 		goto free_mount_data;
 	}
 
-	if (create_dir(mnt)) {
+	if (create_dir("%s%s", ctx->spfs_root, mnt)) {
 		pr_perror("failed to create mountpoint %s", mnt);
 		goto free_mnt;
 	}
