@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "spfs/interface.h"
 #include "spfs/context.h"
@@ -14,6 +15,7 @@ static int send_mount(const char *socket_path, const char *source, const char *t
 {
 	size_t len;
 	struct external_cmd *package;
+	int err;
 
 	printf("mounting %s with flags %ld and options '%s'\n", type,
 			mountflags, options);
@@ -27,7 +29,10 @@ static int send_mount(const char *socket_path, const char *source, const char *t
 	}
 	fill_mount_packet(package, source, type, options, mountflags);
 
-	return send_packet(socket_path, package, len);
+	err = send_packet(socket_path, package, len);
+
+	free(package);
+	return err;
 }
 
 static int send_path(const char *socket_path, const char *path_to_send, const char *path_to_stat)
@@ -35,6 +40,7 @@ static int send_path(const char *socket_path, const char *path_to_send, const ch
 	size_t len;
 	struct external_cmd *package;
 	struct stat st;
+	int err;
 
 	printf("stat \"%s\"\n", path_to_stat);
 	if (stat(path_to_stat, &st) < 0) {
@@ -52,13 +58,17 @@ static int send_path(const char *socket_path, const char *path_to_send, const ch
 	}
 	fill_path_packet(package, path_to_send, &st);
 
-	return send_packet(socket_path, package, len);
+	err = send_packet(socket_path, package, len);
+
+	free(package);
+	return err;
 }
 
 static int send_mode(const char *socket_path, int mode, const char *path_to_send)
 {
 	size_t len;
 	struct external_cmd *package;
+	int err;
 
 	printf("changing mode to %d (path: %s)\n", mode, path_to_send ? : "none");
 	len = mode_packet_size(path_to_send);
@@ -70,7 +80,10 @@ static int send_mode(const char *socket_path, int mode, const char *path_to_send
 	}
 	fill_mode_packet(package, mode, path_to_send);
 
-	return send_packet(socket_path, package, len);
+	err = send_packet(socket_path, package, len);
+
+	free(package);
+	return err;
 }
 
 static void help(char *program)
