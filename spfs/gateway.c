@@ -225,7 +225,6 @@ inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 	__err = GATEWAY_METHOD_FH_RESTARTABLE(_func, _path, __gw_fh,		\
 					      ##__VA_ARGS__);			\
 										\
-	destroy_work_mode(__gw_fh->wm);						\
 	__err;									\
 })
 
