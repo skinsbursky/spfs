@@ -11,7 +11,7 @@ struct spfs_manager_context_s {
 	char	*work_dir;
 	char	*spfs_dir;
 	char	*log_file;
-	char	*root;
+	char	*spfs_root;
 	char	*socket_path;
 	int	verbosity;
 	bool	daemonize;

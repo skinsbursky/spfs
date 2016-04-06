@@ -172,9 +172,9 @@ static int configure(struct spfs_manager_context_s *ctx)
 	}
 
 	/* TODO move to spfs */
-	if (ctx->root && ctx->root[strlen(ctx->root)-1] != '/') {
-		ctx->root = xsprintf("%s/", ctx->root);
-		if (!ctx->root) {
+	if (ctx->spfs_root && ctx->spfs_root[strlen(ctx->spfs_root)-1] != '/') {
+		ctx->spfs_root = xsprintf("%s/", ctx->spfs_root);
+		if (!ctx->spfs_root) {
 			pr_err("failed to allocate\n");
 			return -ENOMEM;
 		}
@@ -271,7 +271,7 @@ static void help(const char *program)
 
 static int parse_options(int argc, char **argv, char **start_mode, char **spfs_dir,
 			 char **work_dir, char **log, char **socket_path,
-			 int *verbosity, bool *daemonize, char **pid, char **root,
+			 int *verbosity, bool *daemonize, char **pid, char **spfs_root,
 			 char **namespaces, char **cgroups, char **proxy_dir,
 			 char **mountpoint)
 {
@@ -327,7 +327,7 @@ static int parse_options(int argc, char **argv, char **start_mode, char **spfs_d
 				*proxy_dir = optarg;
 				break;
 			case 1003:
-				*root = optarg;
+				*spfs_root = optarg;
 				break;
 			case 1004:
 				*start_mode = optarg;
@@ -383,7 +383,7 @@ struct spfs_manager_context_s *create_context(int argc, char **argv)
 
 	if (parse_options(argc, argv, &ctx->start_mode, &ctx->spfs_dir, &ctx->work_dir, &ctx->log_file,
 			  &ctx->socket_path, &ctx->verbosity, &ctx->daemonize,
-			  &ctx->process_id, &ctx->root, &ctx->namespaces, &ctx->cgroups,
+			  &ctx->process_id, &ctx->spfs_root, &ctx->namespaces, &ctx->cgroups,
 			  &ctx->proxy_dir, &ctx->mountpoint)) {
 		pr_err("failed to parse options\n");
 		return NULL;
