@@ -3,10 +3,10 @@
 
 #include "spfs/interface.h"
 
-enum {
+typedef enum {
 	SPFS_MANAGER_MOUNT_FS = SPFS_CMD_MAX,
 	SPFS_MANAGER_CMD_MAX,
-};
+} spfs_manager_cmd_t;
 
 struct mount_fs_package_s {
 	unsigned long	mountflags;
