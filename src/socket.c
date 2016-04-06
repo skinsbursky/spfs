@@ -44,13 +44,28 @@ int send_packet(const char *socket_path, void *package, size_t psize)
 	return err;
 }
 
+int send_status(int sock, int res)
+{
+	ssize_t bytes;
+
+	bytes = send(sock, &res, sizeof(res), MSG_NOSIGNAL | MSG_DONTWAIT | MSG_EOR);
+	if (bytes < 0) {
+		pr_perror("%s: send failed", __func__);
+		return -errno;
+	}
+
+	if (bytes == 0) {
+		pr_info("%s: peer was closed\n", __func__);
+		return -ECONNABORTED;
+	}
+	return 0;
+}
 
 static int reliable_conn_handler(int sock, void *data,
 				 int (*packet_handler)(void *data, void *packet, size_t psize))
 {
 	char page[4096];
 	ssize_t bytes;
-	int err;
 
 	bytes = recv(sock, page, sizeof(page), 0);
 	if (bytes < 0) {
@@ -64,20 +79,7 @@ static int reliable_conn_handler(int sock, void *data,
 
 	pr_debug("received %ld bytes\n", bytes);
 
-	err = packet_handler(data, page, bytes);
-
-	bytes = send(sock, &err, sizeof(err), MSG_NOSIGNAL | MSG_DONTWAIT | MSG_EOR);
-	if (bytes < 0) {
-		pr_perror("%s: send failed", __func__);
-		return -errno;
-	}
-
-	if (bytes == 0) {
-		pr_info("%s: peer was closed\n", __func__);
-		return -ECONNABORTED;
-	}
-
-	return 0;
+	return send_status(sock, packet_handler(data, page, bytes));
 }
 
 int reliable_socket_loop(int psock, void *data, bool async,
