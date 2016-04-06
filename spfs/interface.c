@@ -104,7 +104,7 @@ err:
 	return err;
 }
 
-int spfs_execute_cmd(void *data, void *package, size_t psize)
+int spfs_execute_cmd(int sock, void *data, void *package, size_t psize)
 {
 	struct spfs_context_s *ctx = data;
 	struct external_cmd *order;

@@ -62,7 +62,7 @@ int send_status(int sock, int res)
 }
 
 static int reliable_conn_handler(int sock, void *data,
-				 int (*packet_handler)(void *data, void *packet, size_t psize))
+				 int (*packet_handler)(int sock, void *data, void *packet, size_t psize))
 {
 	char page[4096];
 	ssize_t bytes;
@@ -79,11 +79,11 @@ static int reliable_conn_handler(int sock, void *data,
 
 	pr_debug("received %ld bytes\n", bytes);
 
-	return send_status(sock, packet_handler(data, page, bytes));
+	return send_status(sock, packet_handler(sock, data, page, bytes));
 }
 
 int reliable_socket_loop(int psock, void *data, bool async,
-			 int (*packet_handler)(void *data, void *packet, size_t psize))
+			 int (*packet_handler)(int sock, void *data, void *packet, size_t psize))
 {
 	pr_info("%s: socket loop started\n", __func__);
 
