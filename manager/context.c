@@ -77,7 +77,7 @@ static int get_namespace_type(const char *ns)
 int join_namespaces(int pid, const char *namespaces)
 {
 	char *ns, *ns_list;
-	int err;
+	int err = 0;
 
 	pr_debug("Join process %d namespaces: %s\n", pid, namespaces);
 
@@ -102,8 +102,6 @@ int join_namespaces(int pid, const char *namespaces)
 
 		pr_debug("joined %s namespace of process %d\n", ns, pid);
 	}
-
-	err = 0;
 
 free_ns_list:
 	free(ns_list);
