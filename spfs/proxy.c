@@ -410,7 +410,7 @@ static int proxy_flush(const char *path, struct fuse_file_info *fi)
 	   close the file.  This is important if used on a network
 	   filesystem like NFS which flush the ctx/metadata on close() */
 	res = dup(fi->fh);
-	if (res)
+	if (res < 0)
 		return -errno;
 	res = close(res);
 	if (res == -1)
