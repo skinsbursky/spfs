@@ -77,6 +77,7 @@ static int get_namespace_type(const char *ns)
 int join_namespaces(int pid, const char *namespaces)
 {
 	char *ns, *ns_list;
+	int err;
 
 	pr_debug("Join process %d namespaces: %s\n", pid, namespaces);
 
@@ -90,16 +91,23 @@ int join_namespaces(int pid, const char *namespaces)
 		int ns_type, err;
 
 		ns_type = get_namespace_type(ns);
-		if (ns_type < 0)
-			return -EINVAL;
+		if (ns_type < 0) {
+			err = ns_type;
+			goto free_ns_list;
+		}
 
 		err = join_one_namespace(pid, ns, ns_type);
 		if (err)
-			return err;
+			goto free_ns_list;
 
 		pr_debug("joined %s namespace of process %d\n", ns, pid);
 	}
-	return 0;
+
+	err = 0;
+
+free_ns_list:
+	free(ns_list);
+	return err;
 }
 
 static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)
