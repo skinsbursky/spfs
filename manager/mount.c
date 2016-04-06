@@ -195,10 +195,8 @@ int mount_fs(struct spfs_manager_context_s *ctx, void *package, size_t psize)
 					_exit(EXIT_FAILURE);
 			}
 
-			if (ctx->root && chroot(ctx->root)) {
-				pr_perror("failed to chroot to %s", ctx->root);
+			if (secure_chroot(ctx->root))
 				_exit(EXIT_FAILURE);
-			}
 
 			_exit(mount_loop(ctx, source, mnt, fstype, p->mountflags, options));
 	}
