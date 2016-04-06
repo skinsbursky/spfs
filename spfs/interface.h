@@ -6,8 +6,14 @@
 
 #include "spfs/context.h"
 
+typedef enum {
+	SPFS_CMD_SET_MODE,
+	SPFS_CMD_INSTALL_PATH,
+	SPFS_CMD_MAX,
+} spfs_cmd_t;
+
 struct external_cmd {
-	unsigned int	cmd;
+	spfs_cmd_t	cmd;
 	unsigned long	pad;
 	char		ctx[0];
 };
@@ -20,12 +26,6 @@ struct cmd_package_s {
 struct dentry_package_s {
 	struct stat	stat;
 	char		path[0];
-};
-
-enum {
-	SPFS_CMD_SET_MODE,
-	SPFS_CMD_INSTALL_PATH,
-	SPFS_CMD_MAX,
 };
 
 static inline size_t path_packet_size(const char *path)
