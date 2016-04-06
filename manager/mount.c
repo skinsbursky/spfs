@@ -18,6 +18,7 @@ static int send_mode(const char *socket_path, int mode, const char *path_to_send
 {
 	size_t len;
 	struct external_cmd *package;
+	int err;
 
 	pr_debug("changind mode to %d (path: %s)\n", mode, path_to_send ? : "none");
 	len = mode_packet_size(path_to_send);
@@ -29,7 +30,10 @@ static int send_mode(const char *socket_path, int mode, const char *path_to_send
 	}
 	fill_mode_packet(package, mode, path_to_send);
 
-	return send_packet(socket_path, package, len);
+	err = send_packet(socket_path, package, len);
+
+	free(package);
+	return err;
 }
 
 static int parse_mount_data(struct mount_fs_package_s *p,
