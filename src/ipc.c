@@ -47,25 +47,37 @@ static int poll_child_status(int pipe)
 	return -1;
 }
 
-int kill_child_and_collect(int pid)
+int kill_process(int pid)
 {
-	int status;
+	int err = 0;
 	int signal = SIGKILL;
 
-	pr_info("Killing child %d\n", pid);
+	pr_info("Killing process %d\n", pid);
+
 	if (kill(pid, signal)) {
+		err = -errno;
 		switch (errno) {
 			case EINVAL:
 				pr_err("Wrong signal?!\n");
-				return -EINVAL;
+				break;
 			case EPERM:
 				pr_err("Can't kill own child?!\n");
-				return -EPERM;
+				break;
 			case ESRCH:
 				pr_err("Process doesn't exist (or dead).\n");
 				break;
 		}
 	}
+	return err;
+}
+
+int kill_child_and_collect(int pid)
+{
+	int status;
+
+	status = kill_process(pid);
+	if (status != -ESRCH)
+		return status;
 
 	if (collect_child(pid, &status))
 		return -ECHILD;
