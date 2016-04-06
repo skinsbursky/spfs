@@ -48,7 +48,7 @@ int setup_log(const char *log_file, int verbosity)
 	int fd;
 	FILE *log;
 
-	fd = open(log_file, O_CREAT | O_TRUNC | O_RDWR | O_CLOEXEC);
+	fd = open(log_file, O_CREAT | O_TRUNC | O_RDWR | O_CLOEXEC, 0644);
 	if (fd < 0) {
 		pr_perror("%s: failed to open log file", __func__);
 		return -errno;
