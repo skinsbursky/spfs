@@ -179,7 +179,7 @@ int seqpacket_sock(const char *path, bool move_fd, bool start_listen,
 	} else {
 		if (connect(sock, (struct sockaddr *)&addr, sizeof(addr))) {
 			pr_perror("failed to connect to socket %s", addr.sun_path);
-			return -1;
+			goto err;
 		}
 		pr_info("connected to %s\n", addr.sun_path);
 	}
