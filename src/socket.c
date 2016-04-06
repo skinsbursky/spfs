@@ -107,6 +107,7 @@ int reliable_socket_loop(int psock, void *data, bool async,
 					pr_err("failed to fork\n");
 					break;
 				case 0:
+					close(psock);
 					_exit(reliable_conn_handler(sock, data, packet_handler));
 			}
 		} else
