@@ -39,7 +39,7 @@ static int mount_spfs(struct spfs_manager_context_s *ctx)
 		goto free_spfs_socket;
 
 	/* TODO WTF? Mode can be Stub */
-	status = create_dir("%s%s", ctx->spfs_root ? ctx->spfs_root : "", proxy_dir);
+	status = create_dir("%s%s", ctx->spfs_root, proxy_dir);
 	if (status)
 		goto free_proxy_dir;
 

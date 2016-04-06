@@ -20,7 +20,9 @@
 
 #include "context.h"
 
-static struct spfs_manager_context_s spfs_manager_context;
+static struct spfs_manager_context_s spfs_manager_context = {
+	.spfs_root = "",
+};
 
 static int join_cgroups(char *cgroups)
 {
@@ -171,8 +173,7 @@ static int configure(struct spfs_manager_context_s *ctx)
 		return -EINVAL;
 	}
 
-	/* TODO move to spfs */
-	if (ctx->spfs_root && ctx->spfs_root[strlen(ctx->spfs_root)-1] != '/') {
+	if (strlen(ctx->spfs_root) && ctx->spfs_root[strlen(ctx->spfs_root)-1] != '/') {
 		ctx->spfs_root = xsprintf("%s/", ctx->spfs_root);
 		if (!ctx->spfs_root) {
 			pr_err("failed to allocate\n");

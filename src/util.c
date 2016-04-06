@@ -252,7 +252,7 @@ int check_capabilities(unsigned long cap_set, pid_t pid)
 
 int secure_chroot(const char *root)
 {
-	if (root) {
+	if (strlen(root)) {
 		if (chroot(root)) {
 			pr_perror("failed to chroot to %s", root);
 			return -errno;
