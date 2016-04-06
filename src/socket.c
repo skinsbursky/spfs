@@ -66,7 +66,7 @@ static int reliable_conn_handler(int sock, void *data,
 
 	err = packet_handler(data, page, bytes);
 
-	bytes = send(sock, &err, sizeof(&err), MSG_NOSIGNAL | MSG_DONTWAIT | MSG_EOR);
+	bytes = send(sock, &err, sizeof(err), MSG_NOSIGNAL | MSG_DONTWAIT | MSG_EOR);
 	if (bytes < 0) {
 		pr_perror("%s: send failed", __func__);
 		return -errno;
