@@ -279,10 +279,8 @@ static int mount_fuse(const char *proxy_dir, int mode, const char *log_file,
 		goto destroy_ctx;
 	}
 
-	if (root && chroot(root)) {
-		pr_perror("failed to chroot to %s", root);
+	if (secure_chroot(root))
 		goto teardown;
-	}
 
 	if (report_to_parent(pipe, 0) < 0) {
 		pr_crit("failed to send report to parent\n");
