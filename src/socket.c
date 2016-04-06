@@ -160,7 +160,7 @@ int seqpacket_sock(const char *path, bool move_fd, bool start_listen,
 		pr_debug("Socket was moved to fd: %d\n", sock);
 	}
 
-	memset(&addr, 0, sizeof(struct sockaddr_un));
+	memset(&addr, 0, sizeof(addr.sun_path));
 	addr.sun_family = AF_UNIX;
 	strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
 
