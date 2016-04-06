@@ -5,6 +5,6 @@
 
 struct spfs_manager_context_s;
 
-int mount_fs(struct spfs_manager_context_s *ctx, void *package, size_t psize);
+int mount_fs(int sock, struct spfs_manager_context_s *ctx, void *package, size_t psize);
 
 #endif

@@ -158,7 +158,7 @@ rmdir_mnt:
 
 }
 
-int mount_fs(struct spfs_manager_context_s *ctx, void *package, size_t psize)
+int mount_fs(int sock, struct spfs_manager_context_s *ctx, void *package, size_t psize)
 {
 	struct mount_fs_package_s *p = package;
 	char *mnt;
@@ -201,6 +201,9 @@ int mount_fs(struct spfs_manager_context_s *ctx, void *package, size_t psize)
 			}
 
 			if (secure_chroot(ctx->spfs_root))
+				_exit(EXIT_FAILURE);
+
+			if (send_status(sock, 0))
 				_exit(EXIT_FAILURE);
 
 			_exit(mount_loop(ctx, source, mnt, fstype, p->mountflags, options));
