@@ -409,7 +409,10 @@ static int proxy_flush(const char *path, struct fuse_file_info *fi)
 	   called multiple times for an open file, this must not really
 	   close the file.  This is important if used on a network
 	   filesystem like NFS which flush the ctx/metadata on close() */
-	res = close(dup(fi->fh));
+	res = dup(fi->fh);
+	if (res)
+		return -errno;
+	res = close(res);
 	if (res == -1)
 		return -errno;
 
