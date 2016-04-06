@@ -248,3 +248,18 @@ int check_capabilities(unsigned long cap_set, pid_t pid)
 	cap_effective = ((long)data[1].effective << 32) | data[0].effective;
 	return cap_set & cap_effective;
 }
+
+int secure_chroot(const char *root)
+{
+	if (root) {
+		if (chroot(root)) {
+			pr_perror("failed to chroot to %s", root);
+			return -errno;
+		}
+		if (chdir("/")) {
+			pr_perror("failed to chdir to /");
+			return -errno;
+		}
+	}
+	return 0;
+}
