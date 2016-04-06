@@ -164,6 +164,7 @@ int mount_fs(struct spfs_manager_context_s *ctx, void *package, size_t psize)
 	char *mnt;
 	int err = -1, pid, status;
 	char *source = NULL, *fstype = NULL, *options = NULL;
+	int mode = SPFS_PROXY_MODE;
 
 	if (parse_mount_data(p, &source, &fstype, &options)) {
 		pr_err("failed to parse mount data\n");
@@ -206,17 +207,17 @@ int mount_fs(struct spfs_manager_context_s *ctx, void *package, size_t psize)
 	}
 
 	err = collect_child(pid, &status);
-	if (!err)
-		err = status;
-
 	if (!err) {
-		err = send_mode(ctx->socket_path, SPFS_PROXY_MODE, mnt);
-		if (err)
-			pr_err("failed to switch spfs to proxy mode to %s: %d\n", mnt,
-					err);
+		err = status;
+		goto free_mnt;
 	}
 
-	pr_debug("spfs mode was changed to %d (path: %s)\n", SPFS_PROXY_MODE, mnt);
+	err = send_mode(ctx->socket_path, mode, mnt);
+	if (err)
+		pr_err("failed to switch spfs to proxy mode to %s: %d\n", mnt,
+				err);
+	else
+		pr_debug("spfs mode was changed to %d (path: %s)\n", mode, mnt);
 
 free_mnt:
 	free(mnt);
