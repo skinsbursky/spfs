@@ -46,6 +46,7 @@ static char *xvstrcat(char *str, const char *fmt, va_list args)
 				str = new;
 				ret = 0;
 			}
+			va_end(tmp);
 		}
 	} while (ret == 0);
 
