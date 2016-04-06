@@ -20,6 +20,7 @@ bin_spfs_SOURCES =		spfs/main.c			\
 				src/util.c			\
 				src/log.c			\
 				src/socket.c			\
+				src/ipc.c			\
 								\
 				include/log.h			\
 				include/socket.h		\
