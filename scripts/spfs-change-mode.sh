@@ -9,7 +9,7 @@ SPFS_CLIENT="/usr/sbin/spfs-client"
 
 set -o pipefail
 
-for sock in $SPFS_DIR_PATTERN*/*/spfs-manager.sock; do
+for sock in `ls $SPFS_DIR_PATTERN/spfs-manager.sock 2> /dev/null`; do
 	echo "$SPFS_CLIENT mode --mode $SPFS_MODE --socket_path $sock"
 	$SPFS_CLIENT mode --mode $SPFS_MODE --socket_path $sock
 	[ $? -eq 0 ] || exit 3
