@@ -210,12 +210,12 @@ int mount_fs(int sock, struct spfs_manager_context_s *ctx, void *package, size_t
 	}
 
 	err = collect_child(pid, &status);
-	if (!err) {
+	if (!err)
 		err = status;
+	if (err)
 		goto free_mnt;
-	}
 
-	err = send_mode(ctx->socket_path, mode, mnt);
+	err = send_mode(ctx->spfs_socket, mode, mnt);
 	if (err)
 		pr_err("failed to switch spfs to proxy mode to %s: %d\n", mnt,
 				err);
