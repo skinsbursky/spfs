@@ -23,7 +23,7 @@
 static int mount_spfs(struct spfs_manager_context_s *ctx)
 {
 	const char *work_dir = ctx->work_dir, *spfs = FS_NAME;
-	char *proxy_dir, *log_path;
+	char *proxy_dir, *log_path, *mountpoint;
 	int pid, status = -ENOMEM;
 
 	log_path = xsprintf("%s/spfs.log", work_dir);
@@ -34,9 +34,13 @@ static int mount_spfs(struct spfs_manager_context_s *ctx)
 	if (!proxy_dir)
 		goto free_log_path;
 
+	mountpoint = xsprintf("%s%s", ctx->spfs_root, ctx->mountpoint);
+	if (!mountpoint)
+		goto free_proxy_dir;
+
 	ctx->spfs_socket = xsprintf("%s/spfs.sock", work_dir);
 	if (!ctx->spfs_socket)
-		goto free_proxy_dir;
+		goto free_mountpoint;
 
 	/* TODO WTF? Mode can be Stub */
 	status = create_dir("%s%s", ctx->spfs_root, proxy_dir);
@@ -59,7 +63,7 @@ static int mount_spfs(struct spfs_manager_context_s *ctx)
 				"--root", ctx->spfs_root,
 				"--socket-path", ctx->spfs_socket,
 				"--log", log_path,
-				ctx->mountpoint, NULL });
+				mountpoint, NULL });
 
 			_exit(EXIT_FAILURE);
 	}
@@ -71,6 +75,8 @@ static int mount_spfs(struct spfs_manager_context_s *ctx)
 		pr_info("%s: spfs on %s started successfully\n", __func__,
 				ctx->mountpoint);
 
+free_mountpoint:
+	free(mountpoint);
 free_proxy_dir:
 	free(proxy_dir);
 free_log_path:
@@ -79,7 +85,7 @@ free_log_path:
 
 free_spfs_socket:
 	free(ctx->spfs_socket);
-	goto free_proxy_dir;
+	goto free_mountpoint;
 }
 
 static int move_to_freezer_root(void)
