@@ -1,8 +1,10 @@
 #include <errno.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/mount.h>
+#include <fcntl.h>
 
 #include "include/util.h"
 #include "include/log.h"
@@ -158,11 +160,140 @@ rmdir_mnt:
 
 }
 
+static int freezer_set_state(const char *freezer_cgroup, const char state[])
+{
+	int fd;
+	char path[PATH_MAX];
+
+	snprintf(path, sizeof(path), "%s/freezer.state", freezer_cgroup);
+	fd = open(path, O_RDWR);
+	if (fd < 0) {
+		pr_perror("Unable to open %s", path);
+		return -1;
+	}
+
+	if (write(fd, state, sizeof(state)) != sizeof(state)) {
+		pr_perror("Unable to set %s state to %s", freezer_cgroup, state);
+		close(fd);
+		return -1;
+	}
+	close(fd);
+	return 0;
+}
+
+static int thaw_cgroup(const char *freezer_cgroup)
+{
+	return freezer_set_state(freezer_cgroup, "THAWED");
+}
+
+static int freeze_cgroup(const char *freezer_cgroup)
+{
+	return freezer_set_state(freezer_cgroup, "FROZEN");
+}
+
+
+static int replace_mounts(struct spfs_manager_context_s *ctx, const char *source, const char *target, const char *freezer_cgroup)
+{
+	int pid, status;
+	int err, err2;
+
+	if (freezer_cgroup) {
+		err2 = freeze_cgroup(freezer_cgroup);
+		if (err2) {
+			pr_err("failed to freeze cgroup %s\n", freezer_cgroup);
+			return err2;
+		}
+		pr_debug("cgroup %s was freezed\n", freezer_cgroup);
+	}
+
+	pid = fork();
+	switch (pid) {
+		case -1:
+			pr_perror("failed to fork");
+			err = -errno;
+			goto thaw_cgroup;
+		case 0:
+			if (ctx->ns_pid) {
+				if (join_namespaces(ctx->ns_pid, ctx->namespaces))
+					_exit(EXIT_FAILURE);
+			}
+
+			err = umount2(target, MNT_DETACH);
+			if (err) {
+				pr_perror("failed to umount %s", target);
+				_exit(EXIT_FAILURE);
+			}
+
+			pr_debug("mountpoint %s was lazily umounted\n", target);
+
+			err = mount(source, target, NULL, MS_BIND, NULL);
+			if (err) {
+				pr_perror("failed to bind-mount %s to %s", source, target);
+				_exit(EXIT_FAILURE);
+			}
+
+			pr_debug("mountpoint %s was bind-mounted to %s\n", source, target);
+			_exit(EXIT_SUCCESS);
+	}
+
+	err = collect_child(pid, &status);
+	if (!err)
+		err = status;
+
+thaw_cgroup:
+	if (freezer_cgroup) {
+		err2 = thaw_cgroup(freezer_cgroup);
+		if (err2)
+			pr_err("failed to thaw cgroup %s\n", freezer_cgroup);
+		else
+			pr_debug("cgroup %s was thawed\n", freezer_cgroup);
+	}
+#if 0
+	if (!err) {
+		if (umount2(source, MNT_DETACH))
+			pr_perror("failed to umount %s", source);
+		pr_debug("mountpoint %s was lazily umounted\n", source);
+	}
+#endif
+	return err ? err : err2;
+}
+
+static int mount_target(int sock, struct spfs_manager_context_s *ctx,
+			const char *source, const char *mnt, const char *fstype,
+			long mountflags, const char *options)
+{
+	int pid, err, status;
+
+	pid = fork();
+	switch (pid) {
+		case -1:
+			pr_perror("failed to fork");
+			return -errno;
+		case 0:
+			if (ctx->ns_pid) {
+				if (join_namespaces(ctx->ns_pid, ctx->namespaces))
+					_exit(EXIT_FAILURE);
+			}
+
+			if (secure_chroot(ctx->spfs_root))
+				_exit(EXIT_FAILURE);
+
+			if (send_status(sock, 0))
+				_exit(EXIT_FAILURE);
+
+			_exit(mount_loop(ctx, source, mnt, fstype, mountflags, options));
+	}
+
+	err = collect_child(pid, &status);
+
+	return err ? err : status;
+}
+
 int mount_fs(int sock, struct spfs_manager_context_s *ctx, void *package, size_t psize)
 {
 	struct mount_fs_package_s *p = package;
 	char *mnt;
-	int err = -1, pid, status;
+	int err = -1;
 	char *source = NULL, *fstype = NULL, *options = NULL;
 	int mode = SPFS_PROXY_MODE;
 
@@ -188,39 +319,37 @@ int mount_fs(int sock, struct spfs_manager_context_s *ctx, void *package, size_t
 		goto free_mnt;
 	}
 
-	pid = fork();
-	switch (pid) {
-		case -1:
-			pr_perror("failed to fork");
-			err = -errno;
-			goto free_mnt;
-		case 0:
-			if (ctx->ns_pid) {
-				if (join_namespaces(ctx->ns_pid, ctx->namespaces))
-					_exit(EXIT_FAILURE);
-			}
-
-			if (secure_chroot(ctx->spfs_root))
-				_exit(EXIT_FAILURE);
-
-			if (send_status(sock, 0))
-				_exit(EXIT_FAILURE);
-
-			_exit(mount_loop(ctx, source, mnt, fstype, p->mountflags, options));
-	}
-
-	err = collect_child(pid, &status);
-	if (!err)
-		err = status;
+	err = mount_target(sock, ctx, source, mnt, fstype, p->mountflags, options);
 	if (err)
 		goto free_mnt;
 
+	pr_debug("successfully mounted %s to %s\n", fstype, mnt);
+
 	err = send_mode(ctx->spfs_socket, mode, mnt);
-	if (err)
+	if (err) {
 		pr_err("failed to switch spfs to proxy mode to %s: %d\n", mnt,
 				err);
-	else
-		pr_debug("spfs mode was changed to %d (path: %s)\n", mode, mnt);
+		goto free_mnt;
+	}
+
+	pr_debug("spfs mode was changed to %d (path: %s)\n", mode, mnt);
+
+	err = replace_mounts(ctx, mnt, ctx->mountpoint, ctx->freeze_cgroup);
+	if (err) {
+		pr_err("failed to repalce mounts\n");
+		goto free_mnt;
+	}
+
+	pr_debug("mountpoint %s replaced %s\n", mnt, ctx->mountpoint);
+
+	err = send_mode(ctx->spfs_socket, mode, ctx->mountpoint);
+	if (err) {
+		pr_err("failed to switch spfs to proxy mode to %s: %d\n", mnt,
+				err);
+		goto free_mnt;
+	}
+
+	pr_debug("spfs mode was changed to %d (path: %s)\n", mode, ctx->mountpoint);
 
 free_mnt:
 	free(mnt);
