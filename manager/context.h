@@ -21,6 +21,7 @@ struct spfs_manager_context_s {
 	char	*namespaces;
 	char	*cgroups;
 	char	*proxy_dir;
+	char	*freeze_cgroup;
 	char	*mountpoint;
 
 	spfs_mode_t mode;

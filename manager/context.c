@@ -246,6 +246,8 @@ static int configure(struct spfs_manager_context_s *ctx)
 	if (setup_signal_handlers(ctx))
 		return -1;
 
+	pr_info("freezer cgroup: %s\n", ctx->freeze_cgroup);
+
 	return 0;
 }
 
@@ -265,6 +267,7 @@ static void help(const char *program)
 	printf("\t     --spfs-proxy      path for spfs in proxy mode\n");
 	printf("\t     --spfs-dir        spfs working directory\n");
 	printf("\t     --spfs-root       directory for spfs to chroot to\n");
+	printf("\t     --freeze-cgroup   cgroup, that can be used to swap mountpoints in race-free manner\n");
 	printf("\t-h   --help            print this help and exit\n");
 	printf("\t-v                     increase verbosity (can be used multiple times)\n");
 	printf("\n");
@@ -273,7 +276,7 @@ static void help(const char *program)
 static int parse_options(int argc, char **argv, char **start_mode, char **spfs_dir,
 			 char **work_dir, char **log, char **socket_path,
 			 int *verbosity, bool *daemonize, char **pid, char **spfs_root,
-			 char **namespaces, char **cgroups, char **proxy_dir,
+			 char **namespaces, char **cgroups, char **proxy_dir, char **freeze_cgroup,
 			 char **mountpoint)
 {
 	static struct option opts[] = {
@@ -288,6 +291,7 @@ static int parse_options(int argc, char **argv, char **start_mode, char **spfs_d
 		{"spfs-root",   required_argument,      0, 1003},
 		{"spfs-mode",	required_argument,      0, 1004},
 		{"spfs-dir",	required_argument,      0, 1005},
+		{"freeze-cgroup",	required_argument,      0, 1006},
 		{"help",        no_argument,            0, 'h'},
 		{0,             0,                      0,  0 }
 	};
@@ -335,6 +339,9 @@ static int parse_options(int argc, char **argv, char **start_mode, char **spfs_d
 				break;
 			case 1005:
 				*spfs_dir = optarg;
+				break;
+			case 1006:
+				*freeze_cgroup = optarg;
 				break;
 			case 'h':
 				help(argv[0]);
@@ -385,7 +392,7 @@ struct spfs_manager_context_s *create_context(int argc, char **argv)
 	if (parse_options(argc, argv, &ctx->start_mode, &ctx->spfs_dir, &ctx->work_dir, &ctx->log_file,
 			  &ctx->socket_path, &ctx->verbosity, &ctx->daemonize,
 			  &ctx->process_id, &ctx->spfs_root, &ctx->namespaces, &ctx->cgroups,
-			  &ctx->proxy_dir, &ctx->mountpoint)) {
+			  &ctx->proxy_dir, &ctx->freeze_cgroup, &ctx->mountpoint)) {
 		pr_err("failed to parse options\n");
 		return NULL;
 	}
