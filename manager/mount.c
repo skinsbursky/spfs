@@ -258,6 +258,36 @@ thaw_cgroup:
 	return err ? err : err2;
 }
 
+static int umount_target(struct spfs_manager_context_s *ctx, const char *mnt)
+{
+	int pid, err, status;
+
+	pid = fork();
+	switch (pid) {
+		case -1:
+			pr_perror("failed to fork");
+			return -errno;
+		case 0:
+			if (ctx->ns_pid) {
+				if (join_namespaces(ctx->ns_pid, ctx->namespaces))
+					_exit(EXIT_FAILURE);
+			}
+
+//			if (secure_chroot(ctx->spfs_root))
+//				_exit(EXIT_FAILURE);
+
+			if (umount2(mnt, MNT_DETACH)) {
+				pr_perror("failed to umount %s");
+				_exit(EXIT_FAILURE);
+			}
+			_exit(EXIT_SUCCESS);
+	}
+
+	err = collect_child(pid, &status);
+
+	return err ? err : status;
+}
+
 static int mount_target(int sock, struct spfs_manager_context_s *ctx,
 			const char *source, const char *mnt, const char *fstype,
 			long mountflags, const char *options)
@@ -350,6 +380,8 @@ int mount_fs(int sock, struct spfs_manager_context_s *ctx, void *package, size_t
 	}
 
 	pr_debug("spfs mode was changed to %d (path: %s)\n", mode, ctx->mountpoint);
+
+	(void) umount_target(ctx, mnt);
 
 free_mnt:
 	free(mnt);
