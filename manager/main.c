@@ -30,25 +30,25 @@ static int mount_spfs(struct spfs_manager_context_s *ctx)
 	if (!log_path)
 		return -ENOMEM;
 
-	ctx->spfs_socket = xsprintf("%s/spfs.sock", work_dir);
-	if (!ctx->spfs_socket)
-		goto free_log_path;
-
 	proxy_dir = xsprintf("%s/mnt", ctx->spfs_dir);
 	if (!proxy_dir)
-		goto free_spfs_socket;
+		goto free_log_path;
+
+	ctx->spfs_socket = xsprintf("%s/spfs.sock", work_dir);
+	if (!ctx->spfs_socket)
+		goto free_proxy_dir;
 
 	/* TODO WTF? Mode can be Stub */
 	status = create_dir("%s%s", ctx->spfs_root, proxy_dir);
 	if (status)
-		goto free_proxy_dir;
+		goto free_spfs_socket;
 
 	pid = fork();
 	switch (pid) {
 		case -1:
 			pr_perror("failed to fork");
 			status = -errno;
-			goto free_proxy_dir;
+			goto free_spfs_socket;
 		case 0:
 			if (join_namespaces(ctx->ns_pid, ctx->namespaces))
 				_exit(EXIT_FAILURE);
@@ -73,11 +73,13 @@ static int mount_spfs(struct spfs_manager_context_s *ctx)
 
 free_proxy_dir:
 	free(proxy_dir);
-free_spfs_socket:
-	free(ctx->spfs_socket);
 free_log_path:
 	free(log_path);
 	return status;
+
+free_spfs_socket:
+	free(ctx->spfs_socket);
+	goto free_proxy_dir;
 }
 
 int main(int argc, char *argv[])
