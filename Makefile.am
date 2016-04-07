@@ -23,6 +23,7 @@ bin_spfs_SOURCES =		spfs/main.c			\
 				src/ipc.c			\
 								\
 				include/log.h			\
+				include/ipc.h			\
 				include/socket.h		\
 				include/util.h
 
@@ -39,6 +40,7 @@ bin_spfs_client_SOURCES =	client/main.c			\
 				src/util.c			\
 								\
 				spfs/interface.h		\
+				spfs/context.h			\
 								\
 				include/socket.h		\
 				include/util.h
@@ -60,6 +62,9 @@ bin_spfs_manager_SOURCES =	manager/main.c			\
 				src/util.c			\
 				src/socket.c			\
 				src/log.c			\
+								\
+				spfs/interface.h		\
+				spfs/context.h			\
 								\
 				include/log.h			\
 				include/socket.h		\
