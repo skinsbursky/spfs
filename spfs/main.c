@@ -38,6 +38,7 @@ static void help(int argc, char **argv, int help_level)
 	printf("\t-l   --log             log file\n");
 	printf("\t-s   --socket-path     control socket bind path\n");
 	printf("\t-h   --help            print help (for double option will print fuse help)\n");
+	printf("\t     --ready-fd        fd number to report ready status\n");
 	printf("\t-v                     increase verbosity (can be used multiple times)\n");
 	printf("\n");
 
@@ -51,7 +52,7 @@ static void help(int argc, char **argv, int help_level)
 
 int parse_options(int *orig_argc, char ***orig_argv,
 		  char **proxy_dir, spfs_mode_t *mode, char **log, char **socket_path,
-		  int *verbosity, char **root)
+		  int *verbosity, char **root, int *ready_fd)
 {
 	static struct option opts[] = {
 		{"proxy-dir",	required_argument,	0, 'p'},
@@ -60,12 +61,14 @@ int parse_options(int *orig_argc, char ***orig_argv,
 		{"root",	required_argument,	0, 'r'},
 		{"socket-path",	required_argument,	0, 's'},
 		{"help",	no_argument,		0, 'h'},
+		{"ready-fd",	required_argument,	0, 1000},
 		{0,		0,			0,  0 }
 	};
 	int oind = 0, nind = 1;
 	int argc = *orig_argc, new_argc = 0, prev_optind = 0, help_level = 0;
 	char **argv = *orig_argv, **new_argv;
 	char *mode_str = "stub";
+	char *ready_fd_str = NULL;
 
 	new_argv = malloc(sizeof(char *) * (argc + 1));
 	if (!new_argv) {
@@ -82,7 +85,7 @@ int parse_options(int *orig_argc, char ***orig_argv,
 	opterr = 0;
 
 	while (1) {
-		char c;
+		int c;
 
 		c = getopt_long(argc, argv, "p:r:l:m:s:vh", opts, &oind);
 		if (c == -1)
@@ -127,6 +130,10 @@ int parse_options(int *orig_argc, char ***orig_argv,
 				if (help_level++)
 					new_argv[new_argc++] = "-h";
 				break;
+			case 1000:
+				ready_fd_str = optarg;
+				nind += 2;
+				break;
 			case '?':
 				copy_args(argv, &nind, new_argv, &new_argc);
 				break;
@@ -143,9 +150,19 @@ int parse_options(int *orig_argc, char ***orig_argv,
 	}
 
 	*mode = spfs_mode(mode_str, *proxy_dir);
-	if (*mode < 0) {
-		free(new_argv);
-		return -EINVAL;
+	if (*mode < 0)
+		goto inval_args;
+
+	if (ready_fd_str) {
+		if (xatol(ready_fd_str, (long *)ready_fd) < 0) {
+			pr_err("failed to convert --ready-fd\n");
+			goto inval_args;
+		}
+
+		if (fcntl(*ready_fd, F_GETFD) == -1) {
+			pr_err("fd %d is invalid\n");
+			goto inval_args;
+		}
 	}
 
 	optind = *orig_argc;
@@ -160,6 +177,10 @@ int parse_options(int *orig_argc, char ***orig_argv,
 	opterr = 1;
 
 	return 0;
+
+inval_args:
+	free(new_argv);
+	return -EINVAL;
 }
 
 static struct fuse *setup_fuse(struct fuse_args *args,
@@ -196,16 +217,14 @@ int main(int argc, char *argv[])
 	char *proxy_dir = NULL;
 	char *log_file = "/var/log/fuse_spfs.log";
 	char *socket_path = "/var/run/fuse_control.sock";
-	char *root = "";
+	int ready_fd = -1, multithreaded, foreground, err, verbosity = 0;
+	char *root = "", *mountpoint;
 	spfs_mode_t mode = SPFS_STUB_MODE;
-	int err = -1, verbosity = 0;
 	struct fuse *fuse;
 	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
-	char *mountpoint;
-	int multithreaded, foreground;
 
 	if (parse_options(&argc, &argv, &proxy_dir, &mode, &log_file,
-			  &socket_path, &verbosity, &root))
+			  &socket_path, &verbosity, &root, &ready_fd))
 		return -1;
 
 	args.argc = argc;
@@ -225,6 +244,7 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
+	pr_debug("%s: daemon      : %s\n", __func__, foreground ? "no" : "yes");
 	pr_debug("%s: mode        : %d\n", __func__, mode);
 	if (proxy_dir)
 		pr_debug("%s: proxy_dir   : %s\n", __func__, proxy_dir);
@@ -245,6 +265,7 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
+	err = -1;
 	if (secure_chroot(root))
 		goto teardown;
 
@@ -256,6 +277,16 @@ int main(int argc, char *argv[])
 	}
 
 	pr_info("SPFS master started successfully\n");
+
+	if (ready_fd != -1) {
+		/* This is how SPFS indicates, that it's ready to acceps
+		 * requests.
+		 * If parent process would like to catch this moment, it has to
+		 * poll for POLLHUP the passed fd, and once it's closed, check
+		 * whether process is still alive wia waitpid with ECHILD. */
+		pr_debug("closing fd %d\n");
+		close(ready_fd);
+	}
 
 	if (multithreaded)
 		err = fuse_loop_mt(fuse);
