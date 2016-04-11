@@ -162,63 +162,20 @@ int parse_options(int *orig_argc, char ***orig_argv,
 	return 0;
 }
 
-static int my_fuse_daemonize(int foreground)
-{
-	(void) chdir("/");
-
-	/* TODO: foreground mode doesn't work because of fork. Either fix it of
-	 * drop it. */
-	if (!foreground) {
-		int nullfd;
-
-		if (setsid() == -1) {
-			perror("fuse_daemonize: setsid");
-			return -1;
-		}
-
-		nullfd = open("/dev/null", O_RDWR, 0);
-		if (nullfd != -1) {
-			(void) dup2(nullfd, 0);
-			(void) dup2(nullfd, 1);
-			(void) dup2(nullfd, 2);
-			if (nullfd > 2)
-				close(nullfd);
-		}
-	}
-	return 0;
-}
-
-static struct fuse *setup_fuse(int argc, char *argv[],
+static struct fuse *setup_fuse(struct fuse_args *args,
 		const struct fuse_operations *op, size_t op_size,
-		char **mountpoint, int *multithreaded, void *user_data)
+		char *mountpoint, void *user_data)
 {
-	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 	struct fuse_chan *ch;
 	struct fuse *fuse;
-	int foreground;
 	int res;
 
-	res = fuse_parse_cmdline(&args, mountpoint, multithreaded, &foreground);
-	if (res == -1)
+	ch = fuse_mount(mountpoint, args);
+	if (!ch)
 		return NULL;
 
-	res = context_store_mnt_stat(*mountpoint);
-	if (res)
-		return NULL;
-
-	ch = fuse_mount(*mountpoint, &args);
-	if (!ch) {
-		fuse_opt_free_args(&args);
-		goto err_free;
-	}
-
-	fuse = fuse_new(ch, &args, op, op_size, user_data);
-	fuse_opt_free_args(&args);
+	fuse = fuse_new(ch, args, op, op_size, user_data);
 	if (fuse == NULL)
-		goto err_unmount;
-
-	res = my_fuse_daemonize(foreground);
-	if (res == -1)
 		goto err_unmount;
 
 	res = fuse_set_signal_handlers(fuse_get_session(fuse));
@@ -228,53 +185,77 @@ static struct fuse *setup_fuse(int argc, char *argv[],
 	return fuse;
 
 err_unmount:
-	fuse_unmount(*mountpoint, ch);
+	fuse_unmount(mountpoint, ch);
 	if (fuse)
 		fuse_destroy(fuse);
-err_free:
-	free(*mountpoint);
 	return NULL;
 }
 
-static int mount_fuse(const char *proxy_dir, spfs_mode_t mode, const char *log_file,
-		      const char *socket_path, int pipe, int verbosity, const char *root,
-		      int argc, char *argv[])
+int main(int argc, char *argv[])
 {
-	int err;
+	char *proxy_dir = NULL;
+	char *log_file = "/var/log/fuse_spfs.log";
+	char *socket_path = "/var/run/fuse_control.sock";
+	char *root = "";
+	spfs_mode_t mode = SPFS_STUB_MODE;
+	int err = -1, verbosity = 0;
 	struct fuse *fuse;
+	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 	char *mountpoint;
-	int multithreaded;
+	int multithreaded, foreground;
 
-	err = context_init(proxy_dir, mode, log_file, socket_path, verbosity);
-	if (err) {
-		pr_crit("failed to create gateway ctx\n");
-		goto err;
-	}
+	if (parse_options(&argc, &argv, &proxy_dir, &mode, &log_file,
+			  &socket_path, &verbosity, &root))
+		return -1;
+
+	args.argc = argc;
+	args.argv = argv;
+	args.allocated = 0;
+
+	if (fuse_parse_cmdline(&args, &mountpoint, &multithreaded, &foreground) == -1)
+		return -1;
 
 	if (access("/dev/fuse", R_OK | W_OK)) {
 		pr_crit("/dev/fuse is not accessible");
-		goto err;
+		return -1;
 	}
 
-	fuse = setup_fuse(argc, argv,
-			  &gateway_operations, sizeof(gateway_operations),
-			  &mountpoint, &multithreaded, NULL);
+	if (context_init(proxy_dir, mode, log_file, socket_path, verbosity, mountpoint)) {
+		pr_crit("failed to create gateway ctx\n");
+		return -1;
+	}
+
+	pr_debug("%s: mode        : %d\n", __func__, mode);
+	if (proxy_dir)
+		pr_debug("%s: proxy_dir   : %s\n", __func__, proxy_dir);
+	pr_debug("%s: log         : %s\n", __func__, log_file);
+	pr_debug("%s: socket path : %s\n", __func__, socket_path);
+	pr_debug("%s: mountpoint  : %d\n", __func__, mountpoint);
+	pr_debug("%s: root        : %d\n", __func__, root);
+	pr_debug("%s: verbosity   : +%d\n", __func__, verbosity);
+
+	fuse = setup_fuse(&args, &gateway_operations,
+			  sizeof(gateway_operations), mountpoint, NULL);
 	if (fuse == NULL) {
 		pr_crit("failed to setup fuse\n");
 
 		err = check_capabilities(1 << CAP_SYS_ADMIN, getpid());
 		if (err == 0)
 			pr_info("CAP_SYS_ADMIN is not set.\n");
-		goto destroy_ctx;
+		return -1;
 	}
 
 	if (secure_chroot(root))
 		goto teardown;
 
-	if (report_status(pipe, 0) < 0) {
-		pr_crit("failed to send report to parent\n");
-		goto teardown;
+	if (!foreground) {
+		if (daemon(0, 0)) {
+			pr_perror("failed to daemonize");
+			goto teardown;
+		}
 	}
+
+	pr_info("SPFS master started successfully\n");
 
 	if (multithreaded)
 		err = fuse_loop_mt(fuse);
@@ -285,75 +266,4 @@ teardown:
 	fuse_teardown(fuse, mountpoint);
 	context_fini();
 	return (err == -1) ? 1 : 0;
-
-destroy_ctx:
-	context_fini();
-err:
-	report_status(pipe, -1);
-	return -1;
-}
-
-int main(int argc, char *argv[])
-{
-	char *proxy_dir = NULL;
-	char *log_file = "/var/log/fuse_spfs.log";
-	char *socket_path = "/var/run/fuse_control.sock";
-	char *root = NULL;
-	spfs_mode_t mode = SPFS_STUB_MODE;
-	pid_t pid;
-	int err, pipes[2], verbosity = 0;
-
-	if (parse_options(&argc, &argv, &proxy_dir, &mode, &log_file,
-			  &socket_path, &verbosity, &root))
-		return -1;
-
-	/* This is the control pipe, used to inform parent, that child
-	 * succeeded initialization phase and parent can exit. After exit the
-	 * child will be reparented to init and become a daemon.
-	 * One might ask, why tht pipe is needed? Isn't it enough to wait for
-	 * child, which, in turn will call daemonize(), when initialization
-	 * phase is over?
-	 * Unfortunatelly, fuse process (child) will need to create another
-	 * thread to server control socket. Thus daemonize() can't be used (new
-	 * child will be the only thread).
-	 * Node: creation of a socket thread can fail and it
-	 * won't be possible to catch this error after daemonize().
-	 * So, this solution is a bit different: child will report it's state
-	 * via pipe.
-	 */
-	if (pipe(pipes) < 0) {
-		pr_crit("failed to create info pipe\n");
-		return -1;
-	}
-
-	pid = fork();
-	switch (pid) {
-		case -1:
-			pr_crit("failed to fork fuse master\n");
-			return -1;
-		case 0:
-			close(pipes[0]);
-			return mount_fuse(proxy_dir, mode, log_file,
-					  socket_path, pipes[1], verbosity, root,
-					  argc, argv);
-	}
-
-	close(pipes[1]);
-
-	err = wait_child_report(pipes[0]);
-	if (err) {
-		pr_crit("Child failed to initialize: %d\n", err);
-		pr_info("See %s\n", log_file);
-		(void) kill_child_and_collect(pid);
-		return -1;
-	}
-	pr_info("Fuse master started successfully with pid %d\n", pid);
-	if (proxy_dir)
-		pr_debug("%s: proxy_dir   : %s\n", __func__, proxy_dir);
-	pr_debug("%s: mode        : %d\n", __func__, mode);
-	pr_debug("%s: log         : %s\n", __func__, log_file);
-	pr_debug("%s: socket path : %s\n", __func__, socket_path);
-	pr_debug("%s: verbosity   : +%d\n", __func__, verbosity);
-
-	return 0;
 }

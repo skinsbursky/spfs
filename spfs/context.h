@@ -48,7 +48,7 @@ struct spfs_context_s {
 };
 
 int context_init(const char *proxy_dir, spfs_mode_t mode, const char *log_file,
-		 const char *socket_path, int verbosity);
+		 const char *socket_path, int verbosity, const char *mountpoint);
 int context_store_mnt_stat(const char *mountpoint);
 
 void context_fini(void);

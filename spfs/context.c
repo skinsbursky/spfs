@@ -286,7 +286,7 @@ static void *sock_routine(void *ptr)
 }
 
 int context_init(const char *proxy_dir, spfs_mode_t mode, const char *log_file,
-		 const char *socket_path, int verbosity)
+		 const char *socket_path, int verbosity, const char *mountpoint)
 {
 	struct spfs_context_s *ctx = get_context();
 	int err;
@@ -299,17 +299,14 @@ int context_init(const char *proxy_dir, spfs_mode_t mode, const char *log_file,
 		return err;
 	}
 
-	pr_debug("fuse: creating context\n");
-	pr_debug("%s: socket path : %s\n", __func__, socket_path);
-	pr_debug("%s: verbosity   : +%d\n", __func__, verbosity);
-	pr_debug("%s: proxy_dir   : %s\n", __func__, proxy_dir);
-	pr_debug("%s: mode        : %s\n", __func__, work_modes[mode]);
-
 	err = setup_context(ctx, proxy_dir, mode);
 	if (err) {
 		pr_crit("failed to setup context: %d\n", err);
 		return err;
 	}
+
+	if (context_store_mnt_stat(mountpoint))
+		return -1;
 
 	ctx->packet_socket = seqpacket_sock(socket_path, true, true,
 					    &ctx->sock_addr);
