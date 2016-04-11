@@ -112,6 +112,7 @@ free_ns_list:
 
 static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)
 {
+	const struct spfs_manager_context_s *ctx = &spfs_manager_context;
 	pid_t pid;
 	int status;
 
@@ -120,6 +121,11 @@ static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)
 			pr_info("%d exited, status=%d\n", pid, WEXITSTATUS(status));
 		else
 			pr_err("%d killed by signal %d (%s)\n", pid, WTERMSIG(status), strsignal(WTERMSIG(status)));
+
+		if (ctx->exit_with_spfs && (ctx->spfs_pid == pid)) {
+			pr_info("spfs exited. Shutting down\n");
+			exit(0);
+		}
 	}
 
 	if ((pid < 0) && (errno != ECHILD))
@@ -259,7 +265,6 @@ static void help(const char *program)
 	printf("\t-w   --work-dir        working directory\n");
 	printf("\t-l   --log             log file\n");
 	printf("\t-s   --socket-path     interface socket path\n");
-	printf("\t-d   --daemon          daemonize\n");
 	printf("\t-p   --pid             pid of the process to join\n");
 	printf("\t     --namespaces      list of namespaces to join\n");
 	printf("\t     --cgroups         list of cgroups to join\n");
@@ -268,6 +273,8 @@ static void help(const char *program)
 	printf("\t     --spfs-dir        spfs working directory\n");
 	printf("\t     --spfs-root       directory for spfs to chroot to\n");
 	printf("\t     --freeze-cgroup   cgroup, that can be used to swap mountpoints in race-free manner\n");
+	printf("\t-d   --daemon          daemonize\n");
+	printf("\t     --exit-with-spfs  exit, when spfs has exited\n");
 	printf("\t-h   --help            print this help and exit\n");
 	printf("\t-v                     increase verbosity (can be used multiple times)\n");
 	printf("\n");
@@ -277,23 +284,24 @@ static int parse_options(int argc, char **argv, char **start_mode, char **spfs_d
 			 char **work_dir, char **log, char **socket_path,
 			 int *verbosity, bool *daemonize, char **pid, char **spfs_root,
 			 char **namespaces, char **cgroups, char **proxy_dir, char **freeze_cgroup,
-			 char **mountpoint)
+			 char **mountpoint, bool *exit_with_spfs)
 {
 	static struct option opts[] = {
-		{"work-dir",	required_argument,      0, 'w'},
-		{"log",         required_argument,      0, 'l'},
-		{"socket-path",	required_argument,      0, 's'},
-		{"daemon",	required_argument,      0, 'd'},
-		{"pid",		required_argument,      0, 'p'},
-		{"namespaces",	required_argument,      0, 1000},
-		{"cgroups",	required_argument,      0, 1001},
-		{"spfs-proxy",	required_argument,      0, 1002},
-		{"spfs-root",   required_argument,      0, 1003},
-		{"spfs-mode",	required_argument,      0, 1004},
-		{"spfs-dir",	required_argument,      0, 1005},
+		{"work-dir",		required_argument,      0, 'w'},
+		{"log",			required_argument,      0, 'l'},
+		{"socket-path",		required_argument,      0, 's'},
+		{"daemon",		required_argument,      0, 'd'},
+		{"pid",			required_argument,      0, 'p'},
+		{"namespaces",		required_argument,      0, 1000},
+		{"cgroups",		required_argument,      0, 1001},
+		{"spfs-proxy",		required_argument,      0, 1002},
+		{"spfs-root",		required_argument,      0, 1003},
+		{"spfs-mode",		required_argument,      0, 1004},
+		{"spfs-dir",		required_argument,      0, 1005},
 		{"freeze-cgroup",	required_argument,      0, 1006},
-		{"help",        no_argument,            0, 'h'},
-		{0,             0,                      0,  0 }
+		{"exit-with-spfs",	no_argument,		0, 1007},
+		{"help",		no_argument,		0, 'h'},
+		{0,			0,			0,  0 }
 	};
 
 	while (1) {
@@ -342,6 +350,9 @@ static int parse_options(int argc, char **argv, char **start_mode, char **spfs_d
 				break;
 			case 1006:
 				*freeze_cgroup = optarg;
+				break;
+			case 1007:
+				*exit_with_spfs = true;
 				break;
 			case 'h':
 				help(argv[0]);
@@ -392,7 +403,7 @@ struct spfs_manager_context_s *create_context(int argc, char **argv)
 	if (parse_options(argc, argv, &ctx->start_mode, &ctx->spfs_dir, &ctx->work_dir, &ctx->log_file,
 			  &ctx->socket_path, &ctx->verbosity, &ctx->daemonize,
 			  &ctx->process_id, &ctx->spfs_root, &ctx->namespaces, &ctx->cgroups,
-			  &ctx->proxy_dir, &ctx->freeze_cgroup, &ctx->mountpoint)) {
+			  &ctx->proxy_dir, &ctx->freeze_cgroup, &ctx->mountpoint, &ctx->exit_with_spfs)) {
 		pr_err("failed to parse options\n");
 		return NULL;
 	}

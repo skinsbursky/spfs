@@ -23,6 +23,7 @@ struct spfs_manager_context_s {
 	char	*proxy_dir;
 	char	*freeze_cgroup;
 	char	*mountpoint;
+	bool	exit_with_spfs;
 
 	spfs_mode_t mode;
 	long	ns_pid;
