@@ -210,10 +210,16 @@ int close_inherited_fds(void)
 
 int collect_child(int pid, int *status, int options)
 {
-	if (waitpid(pid, status, options) < 0) {
+	int p;
+
+	p = waitpid(pid, status, options);
+	if (p < 0) {
 		pr_perror("Wait for %d failed", pid);
 		return -errno;
 	}
+
+	if ((p == 0) && (options & WNOHANG))
+		return ECHILD;
 
 	if (WIFSIGNALED(*status)) {
 		pr_err("child %d was killed by %d\n", pid, WTERMSIG(status));

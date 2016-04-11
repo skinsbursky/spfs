@@ -30,6 +30,7 @@ struct spfs_manager_context_s {
 	int	sock;
 
 	char	*spfs_socket;
+	pid_t	spfs_pid;
 };
 
 struct spfs_manager_context_s *create_context(int argc, char **argv);

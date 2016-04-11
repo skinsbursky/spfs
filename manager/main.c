@@ -10,10 +10,12 @@
 #include <stdbool.h>
 #include <getopt.h>
 #include <string.h>
+#include <poll.h>
 
 #include "include/util.h"
 #include "include/log.h"
 #include "include/socket.h"
+#include "include/ipc.h"
 
 #include "spfs/context.h"
 
@@ -24,11 +26,18 @@ static int mount_spfs(struct spfs_manager_context_s *ctx)
 {
 	const char *work_dir = ctx->work_dir, *spfs = FS_NAME;
 	char *proxy_dir, *log_path, *mountpoint;
-	int pid, status = -ENOMEM;
+	int status = -ENOMEM, initpipe[2], timeout_ms = 5000;
+	char wpipe[16];
+	struct pollfd pfd;
+
+	if (pipe(initpipe)) {
+		pr_err("failed to create pipe\n");
+		return -errno;
+	}
 
 	log_path = xsprintf("%s/spfs.log", work_dir);
 	if (!log_path)
-		return -ENOMEM;
+		goto close_pipe;
 
 	proxy_dir = xsprintf("%s/mnt", ctx->spfs_dir);
 	if (!proxy_dir)
@@ -47,33 +56,73 @@ static int mount_spfs(struct spfs_manager_context_s *ctx)
 	if (status)
 		goto free_spfs_socket;
 
-	pid = fork();
-	switch (pid) {
+	ctx->spfs_pid = fork();
+	switch (ctx->spfs_pid) {
 		case -1:
 			pr_perror("failed to fork");
 			status = -errno;
 			goto free_spfs_socket;
 		case 0:
+			close(initpipe[0]);
+			sprintf(wpipe, "%d", initpipe[1]);
+
 			if (join_namespaces(ctx->ns_pid, ctx->namespaces))
 				_exit(EXIT_FAILURE);
 
-			execvp_print(spfs, (char *[]){ "spfs", "-vvvv",
+			execvp_print(spfs, (char *[]){ "spfs", "-vvvv", "-f",
 				"--mode", ctx->start_mode,
 				"--proxy-dir", ctx->proxy_dir,
 				"--root", ctx->spfs_root,
 				"--socket-path", ctx->spfs_socket,
+				"--ready-fd", wpipe,
 				"--log", log_path,
 				mountpoint, NULL });
 
 			_exit(EXIT_FAILURE);
 	}
 
-	if (collect_child(pid, &status, 0))
-		status = -ECHILD;
 
-	if (!status)
-		pr_info("%s: spfs on %s started successfully\n", __func__,
-				ctx->mountpoint);
+	/* First, close write end of the pipe */
+	close(initpipe[1]);
+	initpipe[1] = -1;
+
+	/* Now wait till "ready fd" is closed */
+	pfd.fd = initpipe[0];
+	pfd.events = POLLERR | POLLHUP;
+	pfd.revents = 0;
+
+repeat:
+	switch (poll(&pfd, 1, timeout_ms)) {
+		case -1:
+			if (errno == EINTR)
+				goto repeat;
+
+			pr_perror("poll failed");
+			status = -errno;
+			goto kill_spfs;
+		case 0:
+			pr_err("Child wasn't ready for %d ms.\n"
+			       "Something bad happened\n", timeout_ms);
+			status = -ETIMEDOUT;
+			goto kill_spfs;
+	}
+
+	status = -EPERM;
+
+	if (pfd.revents & POLLERR) {
+		pr_err("poll return POLERR\n");
+		goto kill_spfs;
+	}
+
+	/* And check, that process is still alive */
+	if (collect_child(ctx->spfs_pid, &status, WNOHANG) != ECHILD) {
+		pr_err("%s exited unexpectedly\n");
+		goto free_spfs_socket;
+	}
+
+	status = 0;
+	pr_info("%s: spfs on %s started successfully\n", __func__,
+			ctx->mountpoint);
 
 free_mountpoint:
 	free(mountpoint);
@@ -81,8 +130,14 @@ free_proxy_dir:
 	free(proxy_dir);
 free_log_path:
 	free(log_path);
+close_pipe:
+	if (initpipe[1] >= 0)
+		close(initpipe[1]);
+	close(initpipe[0]);
 	return status;
 
+kill_spfs:
+	kill_child_and_collect(ctx->spfs_pid);
 free_spfs_socket:
 	free(ctx->spfs_socket);
 	goto free_mountpoint;
@@ -145,9 +200,6 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	if (mount_spfs(ctx))
-		return -EINVAL;
-
 	if (ctx->daemonize) {
 		if (daemon(0, 0)) {
 			pr_perror("failed to daemonize");
@@ -155,6 +207,8 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	if (mount_spfs(ctx))
+		return -EINVAL;
 
 	return reliable_socket_loop(ctx->sock, ctx, true, spfs_manager_packet_handler);
 }
