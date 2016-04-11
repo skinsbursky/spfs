@@ -68,7 +68,7 @@ static int mount_spfs(struct spfs_manager_context_s *ctx)
 			_exit(EXIT_FAILURE);
 	}
 
-	if (collect_child(pid, &status))
+	if (collect_child(pid, &status, 0))
 		status = -ECHILD;
 
 	if (!status)

@@ -236,7 +236,7 @@ static int replace_mounts(struct spfs_manager_context_s *ctx, const char *source
 			_exit(EXIT_SUCCESS);
 	}
 
-	err = collect_child(pid, &status);
+	err = collect_child(pid, &status, 0);
 	if (!err)
 		err = status;
 
@@ -283,7 +283,7 @@ static int umount_target(struct spfs_manager_context_s *ctx, const char *mnt)
 			_exit(EXIT_SUCCESS);
 	}
 
-	err = collect_child(pid, &status);
+	err = collect_child(pid, &status, 0);
 
 	return err ? err : status;
 }
@@ -314,7 +314,7 @@ static int mount_target(int sock, struct spfs_manager_context_s *ctx,
 			_exit(mount_loop(ctx, source, mnt, fstype, mountflags, options));
 	}
 
-	err = collect_child(pid, &status);
+	err = collect_child(pid, &status, 0);
 
 	return err ? err : status;
 }

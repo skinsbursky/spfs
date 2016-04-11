@@ -79,7 +79,7 @@ int kill_child_and_collect(int pid)
 	if (status != -ESRCH)
 		return status;
 
-	if (collect_child(pid, &status))
+	if (collect_child(pid, &status, 0))
 		return -ECHILD;
 
 	return status;

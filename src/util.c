@@ -208,9 +208,9 @@ int close_inherited_fds(void)
 	return 0;
 }
 
-int collect_child(int pid, int *status)
+int collect_child(int pid, int *status, int options)
 {
-	if (waitpid(pid, status, 0) < 0) {
+	if (waitpid(pid, status, options) < 0) {
 		pr_perror("Wait for %d failed", pid);
 		return -errno;
 	}
