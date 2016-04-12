@@ -1,8 +1,7 @@
 TODO list:
-0) Replace "Golem mode" with Proxy on actual fs (tmpfs is, probably, the best?)
-1) script to mount NFS and change FUSE to proxy mode.
-2) Makefile "install" goal.
-3) Locks support.
-4) Automake.
-5) RPM
-6) Make sure fuse if forked beyond process pids limit to avoid collision.
+1) Locks support.
+2) RPM
+3) Do multiple SPFS mounts via command. This (with semaphore synchronisation
+via shm) will allow to order cgroup freezing among multiple NFS remounters.
+4) Do something with "--exit-with-spfs" option, when there are a lot of them.
+5) Mount tmpfs on spfs working directory. Ans umount and unlink this directory on exit.
