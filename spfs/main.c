@@ -32,7 +32,7 @@ static void help(int argc, char **argv, int help_level)
 	printf("usage: %s mountpoint [options]\n", argv[0]);
 	printf("\n");
 	printf("general options:\n");
-	printf("\t-m   --mode            work mode\n");
+	printf("\t-m   --mode            work mode (\"stub\" or \"proxy\")\n");
 	printf("\t-p   --proxy-dir       path for proxy mode\n");
 	printf("\t-r   --root            directory to chroot to\n");
 	printf("\t-l   --log             log file\n");

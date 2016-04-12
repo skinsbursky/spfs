@@ -18,13 +18,11 @@
 
 extern struct fuse_operations stub_operations;
 extern struct fuse_operations proxy_operations;
-extern struct fuse_operations golem_operations;
 
 struct spfs_context_s fs_context = {
 	.operations		= {
 		[SPFS_PROXY_MODE]	= &proxy_operations,
 		[SPFS_STUB_MODE]	= &stub_operations,
-		[SPFS_GOLEM_MODE]	= &golem_operations,
 	},
 	.root_lock		= PTHREAD_MUTEX_INITIALIZER,
 	.wm_lock		= PTHREAD_MUTEX_INITIALIZER,
@@ -34,7 +32,6 @@ struct spfs_context_s fs_context = {
 const char *work_modes[] = {
 	[SPFS_PROXY_MODE]	= "Proxy",
 	[SPFS_STUB_MODE]	= "Stub",
-	[SPFS_GOLEM_MODE]	= "Golem",
 };
 
 struct spfs_context_s *get_context(void)
@@ -50,7 +47,6 @@ const struct fuse_operations *get_operations(struct work_mode_s *wm)
 	switch (wm->mode) {
 		case SPFS_PROXY_MODE:
 		case SPFS_STUB_MODE:
-		case SPFS_GOLEM_MODE:
 			ops = ctx->operations[wm->mode];
 			break;
 		default:
@@ -197,7 +193,6 @@ int set_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode, const char *path
 
 	switch (mode) {
 		case SPFS_PROXY_MODE:
-		case SPFS_GOLEM_MODE:
 		case SPFS_STUB_MODE:
 			err = create_work_mode(mode, path, &new_wm);
 			if (err)

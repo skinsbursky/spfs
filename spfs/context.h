@@ -15,7 +15,6 @@
 typedef enum {
 	SPFS_PROXY_MODE,
 	SPFS_STUB_MODE,
-	SPFS_GOLEM_MODE,
 	SPFS_MAX_MODE,
 } spfs_mode_t;
 
@@ -71,8 +70,6 @@ static inline spfs_mode_t spfs_mode(const char *mode, const char *path)
 {
 	if (!strcmp(mode, "stub"))
 		return SPFS_STUB_MODE;
-	if (!strcmp(mode, "golem"))
-		return SPFS_GOLEM_MODE;
 	if (!strcmp(mode, "proxy")) {
 		if (!path) {
 			printf("Proxy directory path wasn't provided\n");

@@ -11,7 +11,6 @@ bin_spfs_SOURCES =		spfs/main.c			\
 				spfs/proxy.c			\
 				spfs/stub.c			\
 				spfs/context.c			\
-				spfs/golem.c			\
 				spfs/interface.c		\
 								\
 				spfs/interface.h		\
