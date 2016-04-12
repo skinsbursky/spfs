@@ -12,6 +12,8 @@
 #include <getopt.h>
 #include <string.h>
 
+#include <sys/mman.h>
+
 #include "include/util.h"
 #include "include/log.h"
 #include "include/socket.h"
@@ -161,6 +163,21 @@ static int setup_signal_handlers(struct spfs_manager_context_s *ctx)
 	return 0;
 }
 
+static int init_semaphores(struct spfs_manager_context_s *ctx)
+{
+	ctx->freeze_sem = shm_alloc(sizeof(*ctx->freeze_sem));
+	if (!ctx->freeze_sem) {
+		pr_perror("failed to allocate freeze semaphore");
+		return -ENOMEM;
+	}
+
+	if (sem_init(ctx->freeze_sem, 1, 1)) {
+		pr_perror("failed to initialize freeze semaphore");
+		return -errno;
+	}
+	return 0;
+}
+
 static int configure(struct spfs_manager_context_s *ctx)
 {
 	int err;
@@ -254,6 +271,9 @@ static int configure(struct spfs_manager_context_s *ctx)
 		return -1;
 
 	if (shm_init_pool())
+		return -1;
+
+	if (init_semaphores(ctx))
 		return -1;
 
 	pr_info("freezer cgroup: %s\n", ctx->freeze_cgroup);
