@@ -191,20 +191,69 @@ static int freeze_cgroup(const char *freezer_cgroup)
 	return freezer_set_state(freezer_cgroup, "FROZEN");
 }
 
+static int thaw_cgroup_and_unlock(sem_t *sem, const char *freezer_cgroup)
+{
+	int err;
+
+	if (!freezer_cgroup)
+		return 0;
+
+	err = thaw_cgroup(freezer_cgroup);
+	if (err) {
+		pr_err("failed to thaw cgroup %s\n", freezer_cgroup);
+		return err;
+	}
+
+	pr_debug("cgroup %s was thawed\n", freezer_cgroup);
+
+	if (sem_post(sem)) {
+		pr_perror("failed to unlock cgroup semaphore");
+		return -errno;
+	}
+
+	pr_debug("cgroup %s was unlocked\n", freezer_cgroup);
+
+	return 0;
+}
+
+static int lock_cgroup_and_freeze(sem_t *sem, const char *freezer_cgroup)
+{
+	int err;
+
+	if (!freezer_cgroup)
+		return 0;
+
+	if (sem_wait(sem)) {
+		pr_perror("failed to lock cgroup semaphore");
+		return -errno;
+	}
+
+	pr_debug("cgroup %s was locked\n", freezer_cgroup);
+
+	err = freeze_cgroup(freezer_cgroup);
+	if (err) {
+		pr_err("failed to freeze cgroup %s\n", freezer_cgroup);
+
+		if (sem_post(sem)) {
+			pr_perror("failed to unlock cgroup semaphore");
+			return -errno;
+		}
+		return err;
+	}
+
+	pr_debug("cgroup %s was freezed\n", freezer_cgroup);
+
+	return 0;
+}
 
 static int replace_mounts(struct spfs_manager_context_s *ctx, const char *source, const char *target, const char *freezer_cgroup)
 {
 	int pid, status;
-	int err, err2;
+	int err;
 
-	if (freezer_cgroup) {
-		err2 = freeze_cgroup(freezer_cgroup);
-		if (err2) {
-			pr_err("failed to freeze cgroup %s\n", freezer_cgroup);
-			return err2;
-		}
-		pr_debug("cgroup %s was freezed\n", freezer_cgroup);
-	}
+	err = lock_cgroup_and_freeze(ctx->freeze_sem, freezer_cgroup);
+	if (err)
+		return err;
 
 	pid = fork();
 	switch (pid) {
@@ -241,21 +290,11 @@ static int replace_mounts(struct spfs_manager_context_s *ctx, const char *source
 		err = status;
 
 thaw_cgroup:
-	if (freezer_cgroup) {
-		err2 = thaw_cgroup(freezer_cgroup);
-		if (err2)
-			pr_err("failed to thaw cgroup %s\n", freezer_cgroup);
-		else
-			pr_debug("cgroup %s was thawed\n", freezer_cgroup);
-	}
-#if 0
-	if (!err) {
-		if (umount2(source, MNT_DETACH))
-			pr_perror("failed to umount %s", source);
-		pr_debug("mountpoint %s was lazily umounted\n", source);
-	}
-#endif
-	return err ? err : err2;
+
+	if (thaw_cgroup_and_unlock(ctx->freeze_sem, freezer_cgroup))
+		return -1;
+
+	return err ? err : status;
 }
 
 static int umount_target(struct spfs_manager_context_s *ctx, const char *mnt)
