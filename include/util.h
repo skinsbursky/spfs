@@ -1,6 +1,8 @@
 #ifndef __SPFS_UTIL_H_
 #define __SPFS_UTIL_H_
 
+#include <unistd.h>
+
 extern char *xstrcat(char *str, const char *fmt, ...);
 extern char *xsprintf(const char *fmt, ...);
 

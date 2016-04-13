@@ -20,8 +20,6 @@ int spfs_manager_packet_handler(int sock, void *data, void *package, size_t psiz
 	pr_debug("%s: cmd: %d\n", __func__, order->cmd);
 	switch (order->cmd) {
 		case SPFS_CMD_SET_MODE:
-		case SPFS_CMD_INSTALL_PATH:
-			return send_packet(ctx->spfs_socket, package, psize);
 		case SPFS_MANAGER_MOUNT_FS:
 			return mount_fs(sock, ctx, order->ctx, psize);
 		default:

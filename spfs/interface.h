@@ -8,7 +8,6 @@
 
 typedef enum {
 	SPFS_CMD_SET_MODE,
-	SPFS_CMD_INSTALL_PATH,
 	SPFS_CMD_MAX,
 } spfs_cmd_t;
 
@@ -23,32 +22,11 @@ struct cmd_package_s {
 	char		path[0];
 };
 
-struct dentry_package_s {
-	struct stat	stat;
-	char		path[0];
-};
-
-static inline size_t path_packet_size(const char *path)
-{
-	return sizeof(struct external_cmd) + sizeof(struct dentry_package_s) + strlen(path) + 1;
-}
-
 static inline size_t mode_packet_size(const char *path)
 {
 	size_t len = path ? (strlen(path) + 1) : 0;
 
 	return len + sizeof(struct external_cmd) + sizeof(struct cmd_package_s);
-}
-
-static inline void fill_path_packet(struct external_cmd *package,
-		      const char *path, const struct stat *stat)
-{
-	struct dentry_package_s *dp = (struct dentry_package_s *)&package->ctx;
-
-	package->cmd = SPFS_CMD_INSTALL_PATH;
-
-	memcpy(&dp->stat, stat, sizeof(dp->stat));
-	strcpy(dp->path, path);
 }
 
 static inline void fill_mode_packet(struct external_cmd *package, spfs_mode_t mode,

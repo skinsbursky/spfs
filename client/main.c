@@ -35,35 +35,6 @@ static int send_mount(const char *socket_path, const char *source, const char *t
 	return err;
 }
 
-static int send_path(const char *socket_path, const char *path_to_send, const char *path_to_stat)
-{
-	size_t len;
-	struct external_cmd *package;
-	struct stat st;
-	int err;
-
-	printf("stat \"%s\"\n", path_to_stat);
-	if (stat(path_to_stat, &st) < 0) {
-		printf("failed to stat %s\n", path_to_stat);
-		return -1;
-	}
-
-	printf("sending \"%s\"\n", path_to_send);
-	len = path_packet_size(path_to_send);
-
-	package = malloc(len);
-	if (!package) {
-		printf("failed to allocate package\n");
-		return -ENOMEM;
-	}
-	fill_path_packet(package, path_to_send, &st);
-
-	err = send_packet(socket_path, package, len);
-
-	free(package);
-	return err;
-}
-
 static int send_mode(const char *socket_path, spfs_mode_t mode, const char *path_to_send)
 {
 	size_t len;
@@ -92,8 +63,7 @@ static void help(char *program)
 	printf("\n");
 	printf("commands:\n");
 	printf("\tmode                   allows to change mode work mode.\n");
-	printf("\tpath                   allows to send a path to be used in Golem mode.\n");
-	printf("\tmount                  allows to request for mount a filesystem.\n");
+	printf("\treplace                allows to request for spfs replacement.\n");
 	printf("\n");
 	printf("general options:\n");
 	printf("\t-s   --socket_path     control socket bind path\n");
@@ -102,10 +72,6 @@ static void help(char *program)
 	printf("Mode options:\n");
 	printf("\t--mode                 mode string (\"proxy\", \"stub\", or \"golem\")\n");
 	printf("\t--path_to_send         proxy directory path to send to spfs\n");
-	printf("\n");
-	printf("Path options:\n");
-	printf("\t--path_to_send         file path to send to spfs\n");
-	printf("\t--path_to_stat         file path to stat\n");
 	printf("\n");
 	printf("Mount options:\n");
 	printf("\t--source               file system fype source (default: \"none\")\n");
@@ -179,65 +145,6 @@ static int execude_mount_cmd(int argc, char **argv)
 	return send_mount(socket_path, source, type, mountflags, options);
 }
 
-static int execude_path_cmd(int argc, char **argv)
-{
-	char *path_to_send = NULL, *path_to_stat = NULL;
-	char *socket_path = NULL;
-	static struct option opts[] = {
-		{"path_to_send",	required_argument,	0,	1 },
-		{"path_to_stat",	required_argument,	0,	2 },
-		{"socket_path",		required_argument,	0,	3 },
-		{"help",		no_argument,		0,	'h'},
-		{0,			0,			0,	0 }
-	};
-
-	while (1) {
-		char c;
-
-		c = getopt_long(argc, argv, "h", opts, NULL);
-		if (c == -1)
-			break;
-
-		switch (c) {
-			case 1:
-				path_to_send = optarg;
-				break;
-			case 2:
-				path_to_stat = optarg;
-				break;
-			case 3:
-				socket_path = optarg;
-				break;
-			case 'h':
-				help(argv[0]);
-				return 0;
-			case '?':
-				help(argv[0]);
-				return 1;
-		}
-	}
-
-	if (!path_to_send) {
-		printf("Path to send wasn't provided\n");
-		help(argv[0]);
-		return 1;
-	}
-
-	if (!path_to_stat) {
-		printf("Path to stat wasn't provided\n");
-		help(argv[0]);
-		return 1;
-	}
-
-	if (!socket_path) {
-		printf("Socket path wasn't provided\n");
-		help(argv[0]);
-		return 1;
-	}
-
-	return send_path(socket_path, path_to_send, path_to_stat);
-}
-
 static int execude_mode_cmd(int argc, char **argv)
 {
 	char *mode = NULL;
@@ -309,8 +216,6 @@ int main(int argc, char **argv)
 	}
 	if (!strcmp(argv[1], "mode"))
 		err = execude_mode_cmd(argc, argv);
-	else if (!strcmp(argv[1], "path"))
-		err = execude_path_cmd(argc, argv);
 	else if (!strcmp(argv[1], "mount"))
 		err = execude_mount_cmd(argc, argv);
 	else {
