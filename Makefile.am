@@ -50,6 +50,7 @@ bin_spfs_manager_SOURCES =	manager/main.c			\
 				src/socket.c			\
 				src/ipc.c			\
 				src/log.c			\
+				src/shm.c			\
 								\
 				spfs/interface.h		\
 				spfs/context.h			\

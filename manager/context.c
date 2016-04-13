@@ -15,6 +15,7 @@
 #include "include/util.h"
 #include "include/log.h"
 #include "include/socket.h"
+#include "include/shm.h"
 
 #include "spfs/context.h"
 
@@ -250,6 +251,9 @@ static int configure(struct spfs_manager_context_s *ctx)
 	}
 
 	if (setup_signal_handlers(ctx))
+		return -1;
+
+	if (shm_init_pool())
 		return -1;
 
 	pr_info("freezer cgroup: %s\n", ctx->freeze_cgroup);
