@@ -403,7 +403,7 @@ int mount_fs(int sock, struct spfs_manager_context_s *ctx, void *package, size_t
 
 	pr_debug("spfs mode was changed to %d (path: %s)\n", mode, mnt);
 
-	err = replace_mounts(ctx, mnt, ctx->mountpoint, ctx->freeze_cgroup);
+	err = replace_mounts(ctx, mnt, ctx->mountpoint, NULL);
 	if (err) {
 		pr_err("failed to repalce mounts\n");
 		goto free_mnt;
