@@ -279,7 +279,28 @@ static void *sock_routine(void *ptr)
 {
         struct spfs_context_s *ctx = ptr;
 
-	(void) reliable_socket_loop(ctx->packet_socket, ctx, false, spfs_execute_cmd);
+	pr_info("%s: socket loop started\n", __func__);
+
+	while(1) {
+		int sock, err;;
+
+		sock = accept(ctx->packet_socket, NULL, NULL);
+		if (sock < 0) {
+			pr_perror("%s: accept failed", __func__);
+			break;
+		}
+
+		pr_debug("%s: accepted new socket\n", __func__);
+
+		do {
+			err = reliable_conn_handler(sock, ctx, spfs_execute_cmd);
+		} while (ctx->single_user && (err == 0));
+
+		pr_debug("%s: closed interface socket\n", __func__);
+
+		close(sock);
+	}
+
 	return NULL;
 }
 
