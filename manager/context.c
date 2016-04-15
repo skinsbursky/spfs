@@ -25,9 +25,7 @@
 #include "spfs.h"
 #include "freeze.h"
 
-static struct spfs_manager_context_s spfs_manager_context = {
-	.spfs_root = "",
-};
+static struct spfs_manager_context_s spfs_manager_context;
 
 static int join_one_namespace(int pid, const char *ns, int ns_type)
 {
@@ -181,29 +179,9 @@ static int setup_signal_handlers(struct spfs_manager_context_s *ctx)
 
 static int configure(struct spfs_manager_context_s *ctx)
 {
-	int err;
-
 	if (!ctx->work_dir) {
 		pr_err("work directory wasn't provided\n");
 		return -EINVAL;
-	}
-
-	if (!ctx->spfs_dir) {
-		pr_err("spfs directory wasn't provided\n");
-		return -EINVAL;
-	}
-
-	if (!ctx->mountpoint) {
-		pr_err("mountpoint wasn't provided\n");
-		return -EINVAL;
-	}
-
-	if (strlen(ctx->spfs_root) && ctx->spfs_root[strlen(ctx->spfs_root)-1] != '/') {
-		ctx->spfs_root = xsprintf("%s/", ctx->spfs_root);
-		if (!ctx->spfs_root) {
-			pr_err("failed to allocate\n");
-			return -ENOMEM;
-		}
 	}
 
 	if (create_dir(ctx->work_dir))
@@ -219,13 +197,8 @@ static int configure(struct spfs_manager_context_s *ctx)
 	}
 
 	if (!access(ctx->socket_path, X_OK)) {
-		pr_err("socket %s already exists. Stale?", ctx->socket_path);
+		pr_err("socket %s already exists. Stale?\n", ctx->socket_path);
 		return -EINVAL;
-	}
-
-	if (ctx->start_mode) {
-		if (spfs_mode(ctx->start_mode, ctx->proxy_dir) < 0)
-			return -EINVAL;
 	}
 
 	if (!ctx->log_file) {
@@ -243,24 +216,6 @@ static int configure(struct spfs_manager_context_s *ctx)
 	ctx->sock = seqpacket_sock(ctx->socket_path, true, true, NULL);
 	if (ctx->sock < 0)
 		return ctx->sock;
-
-	if (ctx->process_id) {
-		pr_debug("Join process %s context\n", ctx->process_id);
-
-		err = xatol(ctx->process_id, &ctx->ns_pid);
-		if (err < 0)
-			return -EINVAL;
-
-		if (!ctx->namespaces) {
-			pr_err("Pid was specified, but no namespaces provided\n");
-			return -EINVAL;
-		}
-	}
-
-	if (access(ctx->mountpoint, R_OK | W_OK)) {
-		pr_perror("mountpoint %s is not accessible for RW", ctx->mountpoint);
-		return -EINVAL;
-	}
 
 	if (setup_signal_handlers(ctx))
 		return -1;
@@ -287,13 +242,6 @@ static void help(const char *program)
 	printf("\t-w   --work-dir        working directory\n");
 	printf("\t-l   --log             log file\n");
 	printf("\t-s   --socket-path     interface socket path\n");
-	printf("\t-p   --pid             pid of the process to join\n");
-	printf("\t     --namespaces      list of namespaces to join\n");
-	printf("\t     --spfs-mode       spfs start mode\n");
-	printf("\t     --spfs-proxy      path for spfs in proxy mode\n");
-	printf("\t     --spfs-dir        spfs working directory\n");
-	printf("\t     --spfs-root       directory for spfs to chroot to\n");
-	printf("\t     --freeze-cgroup   cgroup, that can be used to swap mountpoints in race-free manner\n");
 	printf("\t-d   --daemon          daemonize\n");
 	printf("\t     --exit-with-spfs  exit, when spfs has exited\n");
 	printf("\t-h   --help            print this help and exit\n");
@@ -301,24 +249,16 @@ static void help(const char *program)
 	printf("\n");
 }
 
-static int parse_options(int argc, char **argv, char **start_mode, char **spfs_dir,
-			 char **work_dir, char **log, char **socket_path,
-			 int *verbosity, bool *daemonize, char **pid, char **spfs_root,
-			 char **namespaces, char **proxy_dir,
-			 char **mountpoint, bool *exit_with_spfs)
+static int parse_options(int argc, char **argv, char **work_dir, char **log,
+			 char **socket_path, int *verbosity, bool *daemonize,
+			 bool *exit_with_spfs)
 {
 	static struct option opts[] = {
 		{"work-dir",		required_argument,      0, 'w'},
 		{"log",			required_argument,      0, 'l'},
 		{"socket-path",		required_argument,      0, 's'},
 		{"daemon",		required_argument,      0, 'd'},
-		{"pid",			required_argument,      0, 'p'},
-		{"namespaces",		required_argument,      0, 1000},
-		{"spfs-proxy",		required_argument,      0, 1002},
-		{"spfs-root",		required_argument,      0, 1003},
-		{"spfs-mode",		required_argument,      0, 1004},
-		{"spfs-dir",		required_argument,      0, 1005},
-		{"exit-with-spfs",	no_argument,		0, 1007},
+		{"exit-with-spfs",	no_argument,		0, 1000},
 		{"help",		no_argument,		0, 'h'},
 		{0,			0,			0,  0 }
 	};
@@ -346,25 +286,7 @@ static int parse_options(int argc, char **argv, char **start_mode, char **spfs_d
 			case 'd':
 				*daemonize = true;
 				break;
-			case 'p':
-				*pid = optarg;
-				break;
 			case 1000:
-				*namespaces = optarg;
-				break;
-			case 1002:
-				*proxy_dir = optarg;
-				break;
-			case 1003:
-				*spfs_root = optarg;
-				break;
-			case 1004:
-				*start_mode = optarg;
-				break;
-			case 1005:
-				*spfs_dir = optarg;
-				break;
-			case 1007:
 				*exit_with_spfs = true;
 				break;
 			case 'h':
@@ -380,11 +302,8 @@ static int parse_options(int argc, char **argv, char **start_mode, char **spfs_d
 		}
 	}
 
-	if (optind < argc)
-		*mountpoint = argv[optind++];
-
 	if (optind < argc) {
-		pr_err("only one mountpoint can be provided\n");
+		pr_err("trailing parameter: %s\n", argv[optind]);
 		return -EINVAL;
 	}
 
@@ -413,10 +332,9 @@ struct spfs_manager_context_s *create_context(int argc, char **argv)
 
 	(void) close_inherited_fds();
 
-	if (parse_options(argc, argv, &ctx->start_mode, &ctx->spfs_dir, &ctx->work_dir, &ctx->log_file,
+	if (parse_options(argc, argv, &ctx->work_dir, &ctx->log_file,
 			  &ctx->socket_path, &ctx->verbosity, &ctx->daemonize,
-			  &ctx->process_id, &ctx->spfs_root, &ctx->namespaces,
-			  &ctx->proxy_dir, &ctx->mountpoint, &ctx->exit_with_spfs)) {
+			  &ctx->exit_with_spfs)) {
 		pr_err("failed to parse options\n");
 		return NULL;
 	}

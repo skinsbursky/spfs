@@ -12,27 +12,14 @@ struct spfs_mounts_s;
 struct spfs_manager_context_s {
 	const char	*progname;
 
-	char	*start_mode;
 	char	*work_dir;
-	char	*spfs_dir;
 	char	*log_file;
-	char	*spfs_root;
 	char	*socket_path;
 	int	verbosity;
 	bool	daemonize;
-	char	*process_id;
-	char	*namespaces;
-	char	*proxy_dir;
-	char	*mountpoint;
 	bool	exit_with_spfs;
 
-	spfs_mode_t mode;
-	long	ns_pid;
-
 	int	sock;
-
-	char	*spfs_socket;
-	pid_t	spfs_pid;
 
 	struct shared_list *spfs_mounts;
 	struct shared_list *freeze_cgroups;
