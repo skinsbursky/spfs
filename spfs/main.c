@@ -39,6 +39,7 @@ static void help(int argc, char **argv, int help_level)
 	printf("\t-s   --socket-path     control socket bind path\n");
 	printf("\t-h   --help            print help (for double option will print fuse help)\n");
 	printf("\t     --ready-fd        fd number to report ready status\n");
+	printf("\t     --single-user     spfs won't close socket connection\n");
 	printf("\t-v                     increase verbosity (can be used multiple times)\n");
 	printf("\n");
 
@@ -52,7 +53,7 @@ static void help(int argc, char **argv, int help_level)
 
 int parse_options(int *orig_argc, char ***orig_argv,
 		  char **proxy_dir, spfs_mode_t *mode, char **log, char **socket_path,
-		  int *verbosity, char **root, int *ready_fd)
+		  int *verbosity, char **root, int *ready_fd, bool *single_user)
 {
 	static struct option opts[] = {
 		{"proxy-dir",	required_argument,	0, 'p'},
@@ -62,6 +63,7 @@ int parse_options(int *orig_argc, char ***orig_argv,
 		{"socket-path",	required_argument,	0, 's'},
 		{"help",	no_argument,		0, 'h'},
 		{"ready-fd",	required_argument,	0, 1000},
+		{"single-user",	no_argument,		0, 1001},
 		{0,		0,			0,  0 }
 	};
 	int oind = 0, nind = 1;
@@ -134,6 +136,10 @@ int parse_options(int *orig_argc, char ***orig_argv,
 				ready_fd_str = optarg;
 				nind += 2;
 				break;
+			case 1001:
+				*single_user = true;
+				nind += 1;
+				break;
 			case '?':
 				copy_args(argv, &nind, new_argv, &new_argc);
 				break;
@@ -160,7 +166,7 @@ int parse_options(int *orig_argc, char ***orig_argv,
 		}
 
 		if (fcntl(*ready_fd, F_GETFD) == -1) {
-			pr_err("fd %d is invalid\n");
+			pr_err("fd %d is invalid\n", *ready_fd);
 			goto inval_args;
 		}
 	}
@@ -219,12 +225,14 @@ int main(int argc, char *argv[])
 	char *socket_path = "/var/run/fuse_control.sock";
 	int ready_fd = -1, multithreaded, foreground, err, verbosity = 0;
 	char *root = "", *mountpoint;
+	bool single_user = false;
 	spfs_mode_t mode = SPFS_STUB_MODE;
 	struct fuse *fuse;
 	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 
 	if (parse_options(&argc, &argv, &proxy_dir, &mode, &log_file,
-			  &socket_path, &verbosity, &root, &ready_fd))
+			  &socket_path, &verbosity, &root, &ready_fd,
+			  &single_user))
 		return -1;
 
 	args.argc = argc;
@@ -239,7 +247,7 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	if (context_init(proxy_dir, mode, log_file, socket_path, verbosity, mountpoint)) {
+	if (context_init(proxy_dir, mode, log_file, socket_path, verbosity, mountpoint, single_user)) {
 		pr_crit("failed to create gateway ctx\n");
 		return -1;
 	}

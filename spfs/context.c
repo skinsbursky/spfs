@@ -230,7 +230,7 @@ int change_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode, const char *p
 
 
 static int setup_context(struct spfs_context_s *ctx, const char *proxy_dir,
-			 spfs_mode_t mode)
+			 spfs_mode_t mode, bool single_user)
 {
 	int err = -ENOMEM;
 
@@ -249,6 +249,7 @@ static int setup_context(struct spfs_context_s *ctx, const char *proxy_dir,
 	INIT_LIST_HEAD(&ctx->root.children);
 	INIT_LIST_HEAD(&ctx->root.siblings);
 	ctx->root.parent = &ctx->root;
+	ctx->single_user = single_user;
 
 	return 0;
 }
@@ -271,17 +272,20 @@ int context_store_mnt_stat(const char *mountpoint)
 	return 0;
 }
 
+#include <sys/types.h>          /* See NOTES */
+#include <sys/socket.h>
+
 static void *sock_routine(void *ptr)
 {
         struct spfs_context_s *ctx = ptr;
 
 	(void) reliable_socket_loop(ctx->packet_socket, ctx, false, spfs_execute_cmd);
-
 	return NULL;
 }
 
 int context_init(const char *proxy_dir, spfs_mode_t mode, const char *log_file,
-		 const char *socket_path, int verbosity, const char *mountpoint)
+		 const char *socket_path, int verbosity, const char *mountpoint,
+		 bool single_user)
 {
 	struct spfs_context_s *ctx = get_context();
 	int err;
@@ -294,7 +298,7 @@ int context_init(const char *proxy_dir, spfs_mode_t mode, const char *log_file,
 		return err;
 	}
 
-	err = setup_context(ctx, proxy_dir, mode);
+	err = setup_context(ctx, proxy_dir, mode, single_user);
 	if (err) {
 		pr_crit("failed to setup context: %d\n", err);
 		return err;

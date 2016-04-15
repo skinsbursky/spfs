@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <string.h>
 #include <errno.h>
+#include <stdbool.h>
 
 #include "include/list.h"
 
@@ -44,10 +45,12 @@ struct spfs_context_s {
 	int			packet_socket;
 	struct sockaddr_un	sock_addr;
 	pthread_t		sock_pthread;
+	bool			single_user;
 };
 
 int context_init(const char *proxy_dir, spfs_mode_t mode, const char *log_file,
-		 const char *socket_path, int verbosity, const char *mountpoint);
+		 const char *socket_path, int verbosity, const char *mountpoint,
+		 bool single_user);
 int context_store_mnt_stat(const char *mountpoint);
 
 void context_fini(void);
