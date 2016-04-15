@@ -6,6 +6,7 @@
 struct sockaddr_un;
 int seqpacket_sock(const char *path, bool save_fd, bool start_listen,
 		   struct sockaddr_un *address);
+int seqpacket_sock_send(int sock, void *packet, size_t psize);
 int send_packet(const char *socket_path, void *package, size_t psize);
 
 int reliable_socket_loop(int psock, void *data, bool async,

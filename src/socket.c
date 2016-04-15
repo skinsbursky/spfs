@@ -10,7 +10,7 @@
 #include "include/log.h"
 #include "include/socket.h"
 
-static int seqpacket_sock_send(int sock, void *packet, size_t psize)
+int seqpacket_sock_send(int sock, void *packet, size_t psize)
 {
 	ssize_t bytes;
 	int err;
