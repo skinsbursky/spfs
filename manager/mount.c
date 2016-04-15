@@ -251,7 +251,7 @@ static int replace_mounts(struct spfs_manager_context_s *ctx, const char *source
 	int pid, status;
 	int err;
 
-	err = lock_cgroup_and_freeze(ctx->freeze_sem, freezer_cgroup);
+	err = lock_cgroup_and_freeze(NULL, freezer_cgroup);
 	if (err)
 		return err;
 
@@ -291,7 +291,7 @@ static int replace_mounts(struct spfs_manager_context_s *ctx, const char *source
 
 thaw_cgroup:
 
-	if (thaw_cgroup_and_unlock(ctx->freeze_sem, freezer_cgroup))
+	if (thaw_cgroup_and_unlock(NULL, freezer_cgroup))
 		return -1;
 
 	return err ? err : status;

@@ -33,8 +33,6 @@ struct spfs_manager_context_s {
 
 	char	*spfs_socket;
 	pid_t	spfs_pid;
-
-	sem_t	*freeze_sem;
 };
 
 struct spfs_manager_context_s *create_context(int argc, char **argv);
