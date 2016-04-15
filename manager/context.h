@@ -7,6 +7,8 @@
 
 #include <spfs/context.h>
 
+struct spfs_mounts_s;
+
 struct spfs_manager_context_s {
 	const char	*progname;
 
@@ -32,6 +34,8 @@ struct spfs_manager_context_s {
 
 	char	*spfs_socket;
 	pid_t	spfs_pid;
+
+	struct shared_list *spfs_mounts;
 };
 
 struct spfs_manager_context_s *create_context(int argc, char **argv);

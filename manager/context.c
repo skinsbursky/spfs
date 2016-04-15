@@ -22,6 +22,7 @@
 #include "spfs/context.h"
 
 #include "context.h"
+#include "spfs.h"
 
 static struct spfs_manager_context_s spfs_manager_context = {
 	.spfs_root = "",
@@ -256,6 +257,10 @@ static int configure(struct spfs_manager_context_s *ctx)
 		return -1;
 
 	if (shm_init_pool())
+		return -1;
+
+	ctx->spfs_mounts = create_shared_list();
+	if (!ctx->spfs_mounts)
 		return -1;
 
 	return 0;
