@@ -61,8 +61,8 @@ int send_status(int sock, int res)
 	return 0;
 }
 
-static int reliable_conn_handler(int sock, void *data,
-				 int (*packet_handler)(int sock, void *data, void *packet, size_t psize))
+int reliable_conn_handler(int sock, void *data,
+			  int (*packet_handler)(int sock, void *data, void *packet, size_t psize))
 {
 	char page[4096];
 	ssize_t bytes;
