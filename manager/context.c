@@ -23,6 +23,7 @@
 
 #include "context.h"
 #include "spfs.h"
+#include "freeze.h"
 
 static struct spfs_manager_context_s spfs_manager_context = {
 	.spfs_root = "",
@@ -261,6 +262,10 @@ static int configure(struct spfs_manager_context_s *ctx)
 
 	ctx->spfs_mounts = create_shared_list();
 	if (!ctx->spfs_mounts)
+		return -1;
+
+	ctx->freeze_cgroups = create_shared_list();
+	if (!ctx->freeze_cgroups)
 		return -1;
 
 	return 0;

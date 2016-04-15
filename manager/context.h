@@ -36,6 +36,7 @@ struct spfs_manager_context_s {
 	pid_t	spfs_pid;
 
 	struct shared_list *spfs_mounts;
+	struct shared_list *freeze_cgroups;
 };
 
 struct spfs_manager_context_s *create_context(int argc, char **argv);
