@@ -18,13 +18,13 @@ int seqpacket_sock_send(int sock, void *packet, size_t psize)
 	bytes = send(sock, packet, psize, MSG_EOR);
 	if (bytes < 0) {
 		pr_perror("failed to send packet via sock %d", sock);
-		return -1;
+		return -errno;
 	}
 
 	bytes = recv(sock, &err, sizeof(err), 0);
 	if (bytes < 0) {
 		pr_perror("failed to receive reply via sock %d", sock);
-		return -1;
+		return -errno;
 	}
 
 	return err;
@@ -50,12 +50,12 @@ int send_status(int sock, int res)
 
 	bytes = send(sock, &res, sizeof(res), MSG_NOSIGNAL | MSG_DONTWAIT | MSG_EOR);
 	if (bytes < 0) {
-		pr_perror("%s: send failed", __func__);
+		pr_perror("%s: send failed via fd %d", __func__, sock);
 		return -errno;
 	}
 
 	if (bytes == 0) {
-		pr_info("%s: peer was closed\n", __func__);
+		pr_info("%s: peer was closed for fd %d\n", __func__, sock);
 		return -ECONNABORTED;
 	}
 	return 0;
@@ -151,8 +151,6 @@ int seqpacket_sock(const char *path, bool move_fd, bool start_listen,
 		pr_perror("failed to create socket");
 		return -errno;
 	}
-
-	pr_debug("socket fd: %d\n", sock);
 
 	if (move_fd) {
 		sock = save_fd(sock);
