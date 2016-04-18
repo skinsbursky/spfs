@@ -59,14 +59,15 @@ static int send_mode(const char *socket_path, spfs_mode_t mode, const char *path
 
 static void help(char *program)
 {
-	printf("usage: %s command options\n", program);
+	printf("usage: %s command [options|payload]\n", program);
 	printf("\n");
 	printf("commands:\n");
 	printf("\tmode                   allows to change mode work mode.\n");
 	printf("\treplace                allows to request for spfs replacement.\n");
+	printf("\tmanage                 send request to spfs manager\n");
 	printf("\n");
 	printf("general options:\n");
-	printf("\t-s   --socket_path     control socket bind path\n");
+	printf("\t-s   --socket-path     control socket bind path\n");
 	printf("\t-h   --help            print help (for double option will print fuse help)\n");
 	printf("\n");
 	printf("Mode options:\n");
@@ -92,13 +93,13 @@ static int execude_mount_cmd(int argc, char **argv)
 		{"mountflags",		required_argument,	0,	'f' },
 		{"fstype",		required_argument,	0,	't' },
 		{"options",		required_argument,	0,	'o' },
-		{"socket_path",		required_argument,	0,	3 },
+		{"socket-path",		required_argument,	0,	1003 },
 		{"help",		no_argument,		0,	'h'},
 		{0,			0,			0,	0 }
 	};
 
 	while (1) {
-		char c;
+		int c;
 
 		c = getopt_long(argc, argv, "f:t:o:h", opts, NULL);
 		if (c == -1)
@@ -118,7 +119,7 @@ static int execude_mount_cmd(int argc, char **argv)
 			case 'o':
 				options = optarg;
 				break;
-			case 3:
+			case 1003:
 				socket_path = optarg;
 				break;
 			case 'h':
@@ -145,35 +146,84 @@ static int execude_mount_cmd(int argc, char **argv)
 	return send_mount(socket_path, source, type, mountflags, options);
 }
 
+static int execude_manage_cmd(int argc, char **argv)
+{
+	char *payload = NULL;
+	char *socket_path = NULL;
+	static struct option opts[] = {
+		{"socket-path",		required_argument,	0,	1003 },
+		{"help",		no_argument,		0,	'h'},
+		{0,			0,			0,	0 }
+	};
+
+	while (1) {
+		int c;
+
+		c = getopt_long(argc, argv, "f:t:o:h", opts, NULL);
+		if (c == -1)
+			break;
+
+		switch (c) {
+			case 1003:
+				socket_path = optarg;
+				break;
+			case 'h':
+				help(argv[0]);
+				return 0;
+			case '?':
+				help(argv[0]);
+				return 1;
+		}
+	}
+
+	if (!socket_path) {
+		printf("Socket path wasn't provided\n");
+		help(argv[0]);
+		return 1;
+	}
+
+	if (optind >= argc) {
+		printf("Expected argument after options\n");
+		help(argv[0]);
+		return 1;
+	}
+
+	payload = argv[optind];
+
+	printf("sending: '%s'\n", payload);
+
+	return send_packet(socket_path, payload, strlen(payload) + 1);
+}
+
 static int execude_mode_cmd(int argc, char **argv)
 {
 	char *mode = NULL;
 	char *socket_path = NULL;
 	char *path_to_send = NULL;
 	static struct option opts[] = {
-		{"mode",		required_argument,	0,	1 },
-		{"path_to_send",	required_argument,	0,	2 },
-		{"socket_path",		required_argument,	0,	3 },
+		{"mode",		required_argument,	0,	1001 },
+		{"path_to_send",	required_argument,	0,	1002 },
+		{"socket-path",		required_argument,	0,	1003 },
 		{"help",		no_argument,		0,	'h'},
 		{0,			0,			0,	0 }
 	};
 	spfs_mode_t m;
 
 	while (1) {
-		char c;
+		int c;
 
 		c = getopt_long(argc, argv, "h", opts, NULL);
 		if (c == -1)
 			break;
 
 		switch (c) {
-			case 1:
+			case 1001:
 				mode = optarg;
 				break;
-			case 2:
+			case 1002:
 				path_to_send = optarg;
 				break;
-			case 3:
+			case 1003:
 				socket_path = optarg;
 				break;
 			case 'h':
@@ -215,9 +265,11 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	if (!strcmp(argv[1], "mode"))
-		err = execude_mode_cmd(argc, argv);
+		err = execude_mode_cmd(argc-1, argv+1);
 	else if (!strcmp(argv[1], "mount"))
-		err = execude_mount_cmd(argc, argv);
+		err = execude_mount_cmd(argc-1, argv+1);
+	else if (!strcmp(argv[1], "manage"))
+		err = execude_manage_cmd(argc-1, argv+1);
 	else {
 		printf("Unknown command: %s\n", argv[1]);
 		help(argv[0]);
