@@ -29,11 +29,6 @@ static struct spfs_manager_context_s spfs_manager_context = {
 	.spfs_root = "",
 };
 
-static int join_cgroups(char *cgroups)
-{
-	return 0;
-}
-
 static int join_one_namespace(int pid, const char *ns, int ns_type)
 {
 	int ns_fd;
@@ -230,12 +225,6 @@ static int configure(struct spfs_manager_context_s *ctx)
 	if (ctx->sock < 0)
 		return ctx->sock;
 
-	if (ctx->cgroups) {
-		err = join_cgroups(ctx->cgroups);
-		if (err)
-			return err;
-	}
-
 	if (ctx->process_id) {
 		pr_debug("Join process %s context\n", ctx->process_id);
 
@@ -281,7 +270,6 @@ static void help(const char *program)
 	printf("\t-s   --socket-path     interface socket path\n");
 	printf("\t-p   --pid             pid of the process to join\n");
 	printf("\t     --namespaces      list of namespaces to join\n");
-	printf("\t     --cgroups         list of cgroups to join\n");
 	printf("\t     --spfs-mode       spfs start mode\n");
 	printf("\t     --spfs-proxy      path for spfs in proxy mode\n");
 	printf("\t     --spfs-dir        spfs working directory\n");
@@ -297,7 +285,7 @@ static void help(const char *program)
 static int parse_options(int argc, char **argv, char **start_mode, char **spfs_dir,
 			 char **work_dir, char **log, char **socket_path,
 			 int *verbosity, bool *daemonize, char **pid, char **spfs_root,
-			 char **namespaces, char **cgroups, char **proxy_dir,
+			 char **namespaces, char **proxy_dir,
 			 char **mountpoint, bool *exit_with_spfs)
 {
 	static struct option opts[] = {
@@ -307,7 +295,6 @@ static int parse_options(int argc, char **argv, char **start_mode, char **spfs_d
 		{"daemon",		required_argument,      0, 'd'},
 		{"pid",			required_argument,      0, 'p'},
 		{"namespaces",		required_argument,      0, 1000},
-		{"cgroups",		required_argument,      0, 1001},
 		{"spfs-proxy",		required_argument,      0, 1002},
 		{"spfs-root",		required_argument,      0, 1003},
 		{"spfs-mode",		required_argument,      0, 1004},
@@ -345,9 +332,6 @@ static int parse_options(int argc, char **argv, char **start_mode, char **spfs_d
 				break;
 			case 1000:
 				*namespaces = optarg;
-				break;
-			case 1001:
-				*cgroups = optarg;
 				break;
 			case 1002:
 				*proxy_dir = optarg;
@@ -412,7 +396,7 @@ struct spfs_manager_context_s *create_context(int argc, char **argv)
 
 	if (parse_options(argc, argv, &ctx->start_mode, &ctx->spfs_dir, &ctx->work_dir, &ctx->log_file,
 			  &ctx->socket_path, &ctx->verbosity, &ctx->daemonize,
-			  &ctx->process_id, &ctx->spfs_root, &ctx->namespaces, &ctx->cgroups,
+			  &ctx->process_id, &ctx->spfs_root, &ctx->namespaces,
 			  &ctx->proxy_dir, &ctx->mountpoint, &ctx->exit_with_spfs)) {
 		pr_err("failed to parse options\n");
 		return NULL;

@@ -22,7 +22,6 @@ struct spfs_manager_context_s {
 	bool	daemonize;
 	char	*process_id;
 	char	*namespaces;
-	char	*cgroups;
 	char	*proxy_dir;
 	char	*mountpoint;
 	bool	exit_with_spfs;
