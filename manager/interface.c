@@ -51,6 +51,7 @@ struct spfs_manager_cmd_handler_s {
 struct opt_array_s {
 	char *name;
 	char *value;
+	bool no_value;
 };
 
 static int parse_cmd_options(struct opt_array_s *array, char *options)
@@ -65,6 +66,12 @@ static int parse_cmd_options(struct opt_array_s *array, char *options)
 		while (o->name) {
 			if (!strncmp(opt, o->name, strlen(o->name))) {
 				found = true;
+
+				if (o->no_value) {
+					o->value = (void *)1;
+					break;
+				}
+
 				if (o->value) {
 					pr_err("duplicated %s option\n", o->name);
 					return -EINVAL;
@@ -393,6 +400,30 @@ del_spfs_info:
 	return err;
 }
 
+static int change_spfs_mode(struct spfs_manager_context_s *ctx,
+			    const struct spfs_info_s *info,
+			    spfs_mode_t mode, const char *proxy_dir)
+{
+	int err;
+
+	if (info)
+		return spfs_send_mode(info->sock, mode, proxy_dir);
+
+	err = lock_shared_list(ctx->spfs_mounts);
+	if (err)
+		return err;
+
+	list_for_each_entry(info, &ctx->spfs_mounts->list, list) {
+		err = spfs_send_mode(info->sock, mode, proxy_dir);
+		if (err)
+			break;
+	}
+
+	unlock_shared_list(ctx->spfs_mounts);
+
+	return err;
+}
+
 static int process_mode_cmd(int sock, struct spfs_manager_context_s *ctx,
 			    char *options, size_t size)
 {
@@ -400,9 +431,10 @@ static int process_mode_cmd(int sock, struct spfs_manager_context_s *ctx,
 		[0] = { "id=", NULL },
 		[1] = { "mode=", NULL },
 		[2] = { "proxy_dir=", NULL },
+		[3] = { "all", NULL, true },
 		{ NULL, NULL },
 	};
-	const struct spfs_info_s *info;
+	const struct spfs_info_s *info = NULL;
 	spfs_mode_t mode;
 	int err;
 
@@ -412,7 +444,7 @@ static int process_mode_cmd(int sock, struct spfs_manager_context_s *ctx,
 		return -EINVAL;
 	}
 
-	if (opt_array[0].value == NULL) {
+	if ((opt_array[0].value == NULL) && (opt_array[3].value == NULL)) {
 		pr_err("mount id wasn't provided\n");
 		return -EINVAL;
 	}
@@ -427,17 +459,19 @@ static int process_mode_cmd(int sock, struct spfs_manager_context_s *ctx,
 		return -EINVAL;
 	}
 
-	info = find_spfs_by_id(ctx->spfs_mounts, opt_array[0].value);
-	if (!info) {
-		pr_err("failed to find spfs info with id %s\n", opt_array[0].value);
-		return -EINVAL;
+	if (opt_array[0].value) {
+		info = find_spfs_by_id(ctx->spfs_mounts, opt_array[0].value);
+		if (!info) {
+			pr_err("failed to find spfs info with id %s\n", opt_array[0].value);
+			return -EINVAL;
+		}
 	}
 
 	mode = spfs_mode(opt_array[1].value, opt_array[2].value);
 	if (mode < 0)
 		return mode;
 
-	return spfs_send_mode(info->sock, mode, opt_array[2].value);
+	return change_spfs_mode(ctx, info, mode, opt_array[2].value);
 }
 
 int set_freeze_cgroup(struct spfs_manager_context_s *ctx, struct spfs_info_s *info, const char *path)
