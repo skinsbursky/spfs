@@ -14,7 +14,8 @@
 #define ERESTARTSYS		512
 
 typedef enum {
-	SPFS_PROXY_MODE,
+	SPFS_INVALID_MODE = -1,
+	SPFS_PROXY_MODE = 0,
 	SPFS_STUB_MODE,
 	SPFS_MAX_MODE,
 } spfs_mode_t;
@@ -76,15 +77,15 @@ static inline spfs_mode_t spfs_mode(const char *mode, const char *path)
 	if (!strcmp(mode, "proxy")) {
 		if (!path) {
 			printf("Proxy directory path wasn't provided\n");
-			return -EINVAL;
+			return SPFS_INVALID_MODE;
 		}
 		if (!strlen(path)) {
 			printf("Proxy directory path is empty\n");
-			return -EINVAL;
+			return SPFS_INVALID_MODE;
 		}
 		return SPFS_PROXY_MODE;
 	}
 	printf("Unknown mode: %s\n", mode);
-	return -EINVAL;
+	return SPFS_INVALID_MODE;
 }
 #endif

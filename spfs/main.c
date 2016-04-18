@@ -156,7 +156,7 @@ int parse_options(int *orig_argc, char ***orig_argv,
 	}
 
 	*mode = spfs_mode(mode_str, *proxy_dir);
-	if (*mode < 0)
+	if (*mode == SPFS_INVALID_MODE)
 		goto inval_args;
 
 	if (ready_fd_str) {
