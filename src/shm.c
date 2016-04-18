@@ -5,6 +5,7 @@
 #include <sys/mman.h>
 
 #include "include/log.h"
+#include "include/shm.h"
 
 #define __round_mask(x, y)      ((__typeof__(x))((y) - 1))
 #define round_up(x, y)          ((((x) - 1) | __round_mask(x, y)) + 1)
@@ -17,7 +18,6 @@ size_t shm_alloc_size;
 size_t shm_used_size;
 sem_t *shm_pool_sem;
 
-/* TODO: some semaphore is required ((( */
 int shm_init_pool(void)
 {
 	size_t size = PAGE_SIZE << 4;
@@ -82,4 +82,41 @@ unlock:
 		pr_perror("failed to unlock spfs semaphore");
 
 	return ptr;
+}
+
+struct shared_list *create_shared_list(void)
+{
+	struct shared_list *sl;
+
+	sl = shm_alloc(sizeof(*sl));
+	if (!sl) {
+		pr_err("failed to allocate shared list\n");
+		return NULL;
+	}
+
+	if (sem_init(&sl->sem, 1, 1)) {
+		pr_perror("failed to initialize spfs info semaphore");
+		return NULL;
+	}
+
+	INIT_LIST_HEAD(&sl->list);
+	return sl;
+}
+
+int lock_shared_list(struct shared_list *sl)
+{
+	if (sem_wait(&sl->sem)) {
+		pr_perror("failed to lock shared list semaphore");
+		return -errno;
+	}
+	return 0;
+}
+
+int unlock_shared_list(struct shared_list *sl)
+{
+	if (sem_post(&sl->sem)) {
+		pr_perror("failed to unlock shared list semaphore");
+		return -errno;
+	}
+	return 0;
 }
