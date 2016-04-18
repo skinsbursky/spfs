@@ -109,31 +109,39 @@ int spfs_send_mode(int sock, spfs_mode_t mode, const char *path_to_send)
 }
 
 static int exec_spfs(int pipe, const struct spfs_info_s *info, char *mode,
-		     char *proxy_dir, char *log_path)
+		     char *proxy_dir, char *socket_path, char *log_path,
+		     char *mountpoint)
 {
 	const char *spfs = FS_NAME;
 	char wpipe[16];
-	char *options[15] = { };
-
-	options[0] = "spfs";
-	options[1] = "-vvvv";
-	options[2] = "-f";
-	options[3] = "--single-user";
-	options[4] = info->mountpoint;
-	options[5] = "--mode"; options[6] = mode;
-	options[7] = "--socket-path"; options[8] = info->socket_path;
-	options[9] = "--ready-fd"; options[10] = wpipe;
-	options[11] = "--log"; options[12] = log_path;
-	if (strlen(info->root))
-		options[13] = "--root"; options[14] = info->root;
+	char **options;
+	int err = -ENOMEM;
 
 	sprintf(wpipe, "%d", pipe);
 
+	options = exec_options(0, "spfs", "-vvvv", "-f", "--single-user",
+				"--mode", mode,
+				"--socket-path", socket_path,
+				"--ready-fd", wpipe,
+				"--log", log_path,
+				mountpoint, NULL);
+	if (options && strlen(info->root))
+		options = add_exec_options(options, "--root", info->root, NULL);
+	if (options && proxy_dir)
+		options = add_exec_options(options, "--proxy-dir", proxy_dir, NULL);
+
+	if (!options)
+		return -ENOMEM;
+
 	if (info->ns_pid)
 		if (join_namespaces(info->ns_pid, info->ns_list))
-			return -1;
-	execvp_print(spfs, options);
-	return -1;
+			goto free_options;
+
+	err = execvp_print(spfs, options);
+
+free_options:
+	free(options);
+	return err;
 }
 
 static int mount_spfs(struct spfs_manager_context_s *ctx,
@@ -163,7 +171,8 @@ static int mount_spfs(struct spfs_manager_context_s *ctx,
 		case 0:
 			close(initpipe[0]);
 			_exit(exec_spfs(initpipe[1], info, (char *)mode,
-					(char *)proxy_dir, log_path));
+					(char *)proxy_dir, info->socket_path,
+					log_path, info->mountpoint));
 	}
 
 	/* First, close write end of the pipe */
