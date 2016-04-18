@@ -84,16 +84,21 @@ char *xsprintf(const char *fmt, ...)
 	return str;
 }
 
-int save_fd(int fd)
+int save_fd(int fd, unsigned flags)
 {
+
 	if (fd <= STDERR_FILENO) {
 		int new_fd;
+		unsigned cmd = F_DUPFD;
+
+		if (flags & O_CLOEXEC)
+			cmd = F_DUPFD_CLOEXEC;
 
 		pr_info("Duplicating decriptor %d to region above standart "
 			"descriptors\n", fd);
 		/* We need to move log fd away from first 3 descriptors,
 		 * because they will be closed. */
-		new_fd = fcntl(fd, F_DUPFD, STDERR_FILENO + 1);
+		new_fd = fcntl(fd, cmd, STDERR_FILENO + 1);
 		close(fd);
 		if (new_fd < 0) {
 			pr_perror("duplication of fd %d failed", fd);
@@ -105,7 +110,7 @@ int save_fd(int fd)
 	return fd;
 }
 
-void execvp_print(const char *file, char *const argv[])
+int execvp_print(const char *file, char *const argv[])
 {
 	const char **tmp = (const char **)argv;
 
@@ -119,6 +124,8 @@ void execvp_print(const char *file, char *const argv[])
 	execvp(file, argv);
 
 	pr_perror("exec failed");
+
+	return -errno;
 }
 
 int xatol(const char *string, long *number)

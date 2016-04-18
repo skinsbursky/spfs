@@ -8,9 +8,9 @@ extern char *xsprintf(const char *fmt, ...);
 
 extern int xatol(const char *string, long *number);
 
-int save_fd(int fd);
+int save_fd(int fd, unsigned flags);
 
-void execvp_print(const char *file, char *const argv[]);
+int execvp_print(const char *file, char *const argv[]);
 
 int create_dir(const char *fmt, ...);
 

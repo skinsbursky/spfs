@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <fcntl.h>
 
 #include "include/util.h"
 #include "include/log.h"
@@ -153,7 +154,7 @@ int seqpacket_sock(const char *path, bool move_fd, bool start_listen,
 	}
 
 	if (move_fd) {
-		sock = save_fd(sock);
+		sock = save_fd(sock, O_CLOEXEC);
 		if (sock < 0) {
 			pr_crit("failed to save sock fd\n");
 			return sock;

@@ -53,7 +53,7 @@ int setup_log(const char *log_file, int verbosity)
 		pr_perror("%s: failed to open log file", __func__);
 		return -errno;
 	}
-	fd = save_fd(fd);
+	fd = save_fd(fd, O_CLOEXEC);
 	if (fd < 0) {
 		pr_crit("Failed to save log fd\n");
 		return fd;
