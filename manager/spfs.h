@@ -35,4 +35,7 @@ struct spfs_info_s *find_spfs_by_pid(struct shared_list *mounts, pid_t pid);
 int add_spfs_info(struct shared_list *mounts, struct spfs_info_s *info);
 void del_spfs_info(struct shared_list *mounts, struct spfs_info_s *info);
 
+
+int enter_spfs_context(const struct spfs_info_s *info);
+
 #endif

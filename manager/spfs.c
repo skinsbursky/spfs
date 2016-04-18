@@ -2,8 +2,10 @@
 
 #include "include/log.h"
 #include "include/shm.h"
+#include "include/util.h"
 
 #include "spfs.h"
+#include "context.h"
 
 static struct spfs_info_s *__find_spfs_by_id(struct shared_list *mounts, const char *id)
 {
@@ -85,3 +87,36 @@ void del_spfs_info(struct shared_list *mounts, struct spfs_info_s *info)
 	}
 }
 
+int enter_spfs_context(const struct spfs_info_s *info)
+{
+	int err;
+	struct stat st;
+
+	if (info->ns_pid) {
+		err = join_namespaces(info->ns_pid, info->ns_list);
+		if (err)
+			return err;
+	}
+
+	if (!strlen(info->root))
+		return 0;
+
+	/* Pivot root can change root of the mount namespace to the desired one.
+	 * This is how CRIU works.
+	 * Let's first check, whether current root is already the one we need.
+	 */
+	if (stat("/", &st)) {
+		pr_perror("failed to stat /");
+		return -errno;
+	}
+
+	if ((st.st_dev == info->root_stat.st_dev) ||
+	    (st.st_ino == info->root_stat.st_ino)) {
+		pr_debug("root is already %s\n", info->root);
+		return 0;
+	}
+
+	/* Ok, let's try to change root. And, probably, we shouldn't care
+	 * either it ours or not. */
+	return secure_chroot(info->root);
+}
