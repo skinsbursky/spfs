@@ -15,97 +15,12 @@
 #include "context.h"
 #include "interface.h"
 #include "mount.h"
-
-static int send_mode(const char *socket_path, spfs_mode_t mode, const char *path_to_send)
-{
-	size_t len;
-	struct external_cmd *package;
-	int err;
-
-	pr_debug("changind mode to %d (path: %s)\n", mode, path_to_send ? : "none");
-	len = mode_packet_size(path_to_send);
-
-	package = malloc(len);
-	if (!package) {
-		pr_err("failed to allocate package\n");
-		return -ENOMEM;
-	}
-	fill_mode_packet(package, mode, path_to_send);
-
-	err = send_packet(socket_path, package, len);
-
-	free(package);
-	return err;
-}
-
-static int parse_mount_data(struct mount_fs_package_s *p,
-			    char **source, char **fstype, char **options)
-{
-	char *token, *str;
-	int err = -ENOMEM, nr = 0;
-	char *tokens[] = {
-		NULL, NULL, NULL
-	}, **ptr;
-
-	pr_debug("mountdata: %s\n", p->mountdata);
-
-	str = strdup(p->mountdata);
-	if (!str) {
-		pr_err("failed to allocate\n");
-		return -ENOMEM;
-	}
-
-	while ((token = strsep(&str, ";")) != NULL) {
-		if (nr >= sizeof(tokens)/sizeof(char *)) {
-			pr_err("invalid token: %s (>3)\n", token);
-			goto free_tokens;
-		}
-		pr_debug("token: %s\n", token);
-		tokens[nr] = strdup(token);
-		if (!tokens[nr]) {
-			pr_err("failed to duplicate token\n");
-			goto free_tokens;
-		}
-		nr++;
-	}
-
-	*source = tokens[0];
-	*fstype = tokens[1];
-	*options = tokens[2];
-
-	err = -EINVAL;
-
-	if (!*source) {
-		pr_err("source wasn't provided\n");
-		goto free_tokens;
-	}
-
-	if (!*fstype) {
-		pr_err("file system type wasn't provided\n");
-		goto free_tokens;
-	}
-
-	if (!*options) {
-		pr_err("mount options weren't provided\n");
-		goto free_tokens;
-	}
-
-	err = 0;
-
-free_string:
-	free(str);
-	return err;
-
-free_tokens:
-	ptr = &tokens[0];
-	while (*ptr)
-		free(*ptr++);
-	goto free_string;
-}
+#include "spfs.h"
+#include "freeze.h"
 
 static int do_mount(const char *source, const char *mnt,
-			const char *fstype, unsigned long mountflags,
-			const char *options)
+		    const char *fstype, unsigned long mountflags,
+		    const void *options)
 {
 	int err;
 
@@ -123,10 +38,9 @@ static int do_mount(const char *source, const char *mnt,
 	return -errno;
 }
 
-static int mount_loop(struct spfs_manager_context_s *ctx,
-			const char *source, const char *mnt,
-			const char *fstype, unsigned long mountflags,
-			const char *options)
+static int mount_loop(const char *source, const char *mnt,
+		      const char *fstype, unsigned long mountflags,
+		      const void *options)
 {
 	int err = 0;
 	int timeout = 1;
@@ -144,8 +58,7 @@ static int mount_loop(struct spfs_manager_context_s *ctx,
 	}
 
 	if (err) {
-		pr_perror("failed to mount %s to %s: %s", fstype, mnt,
-					strerror(errno));
+		pr_perror("failed to mount %s to %s", fstype, mnt);
 		goto rmdir_mnt;
 	}
 
@@ -166,7 +79,7 @@ static int do_replace_mount(const struct spfs_info_s *info, const char *source,
 	int pid, status;
 	int err;
 
-	err = lock_cgroup_and_freeze(NULL, freezer_cgroup);
+	err = lock_cgroup_and_freeze(info->fg);
 	if (err)
 		return err;
 
@@ -177,26 +90,24 @@ static int do_replace_mount(const struct spfs_info_s *info, const char *source,
 			err = -errno;
 			goto thaw_cgroup;
 		case 0:
-			if (ctx->ns_pid) {
-				if (join_namespaces(ctx->ns_pid, ctx->namespaces))
-					_exit(EXIT_FAILURE);
-			}
+			if (enter_spfs_context(info))
+				_exit(EXIT_FAILURE);
 
-			err = umount2(target, MNT_DETACH);
+			err = umount2(info->mountpoint, MNT_DETACH);
 			if (err) {
-				pr_perror("failed to umount %s", target);
+				pr_perror("failed to umount %s", info->mountpoint);
 				_exit(EXIT_FAILURE);
 			}
 
-			pr_debug("mountpoint %s was lazily umounted\n", target);
+			pr_debug("mountpoint %s was lazily umounted\n", info->mountpoint);
 
-			err = mount(source, target, NULL, MS_BIND, NULL);
+			err = mount(source, info->mountpoint, NULL, MS_BIND, NULL);
 			if (err) {
-				pr_perror("failed to bind-mount %s to %s", source, target);
+				pr_perror("failed to bind-mount %s to %s", source, info->mountpoint);
 				_exit(EXIT_FAILURE);
 			}
 
-			pr_debug("mountpoint %s was bind-mounted to %s\n", source, target);
+			pr_debug("mountpoint %s was bind-mounted to %s\n", source, info->mountpoint);
 			_exit(EXIT_SUCCESS);
 	}
 
@@ -205,14 +116,12 @@ static int do_replace_mount(const struct spfs_info_s *info, const char *source,
 		err = status;
 
 thaw_cgroup:
-
-	if (thaw_cgroup_and_unlock(NULL, freezer_cgroup))
+	if (thaw_cgroup_and_unlock(info->fg))
 		return -1;
-
 	return err ? err : status;
 }
 
-static int umount_target(struct spfs_manager_context_s *ctx, const char *mnt)
+static int umount_target(const struct spfs_info_s *info, const char *mnt)
 {
 	int pid, err, status;
 
@@ -222,13 +131,8 @@ static int umount_target(struct spfs_manager_context_s *ctx, const char *mnt)
 			pr_perror("failed to fork");
 			return -errno;
 		case 0:
-			if (ctx->ns_pid) {
-				if (join_namespaces(ctx->ns_pid, ctx->namespaces))
-					_exit(EXIT_FAILURE);
-			}
-
-//			if (secure_chroot(ctx->spfs_root))
-//				_exit(EXIT_FAILURE);
+			if (enter_spfs_context(info))
+				_exit(EXIT_FAILURE);
 
 			if (umount2(mnt, MNT_DETACH)) {
 				pr_perror("failed to umount %s");
@@ -242,9 +146,9 @@ static int umount_target(struct spfs_manager_context_s *ctx, const char *mnt)
 	return err ? err : status;
 }
 
-static int mount_target(int sock, struct spfs_manager_context_s *ctx,
+static int mount_target(int sock, const struct spfs_info_s *info,
 			const char *source, const char *mnt, const char *fstype,
-			long mountflags, const char *options)
+			long mountflags, const void *options)
 {
 	int pid, err, status;
 
@@ -254,18 +158,12 @@ static int mount_target(int sock, struct spfs_manager_context_s *ctx,
 			pr_perror("failed to fork");
 			return -errno;
 		case 0:
-			if (ctx->ns_pid) {
-				if (join_namespaces(ctx->ns_pid, ctx->namespaces))
-					_exit(EXIT_FAILURE);
-			}
-
-			if (secure_chroot(ctx->spfs_root))
+			if (enter_spfs_context(info))
 				_exit(EXIT_FAILURE);
 
-			if (send_status(sock, 0))
-				_exit(EXIT_FAILURE);
+			(void) send_status(sock, 0);
 
-			_exit(mount_loop(ctx, source, mnt, fstype, mountflags, options));
+			_exit(mount_loop(source, mnt, fstype, mountflags, options));
 	}
 
 	err = collect_child(pid, &status, 0);
@@ -278,46 +176,33 @@ int replace_mount(int sock, const struct spfs_info_s *info,
 		  const char *mountflags, const char *freeze_cgroup,
 		  const void *options)
 {
-	return -EPERM;
-}
-
-int mount_fs(int sock, struct spfs_manager_context_s *ctx, void *package, size_t psize)
-{
-	struct mount_fs_package_s *p = package;
 	char *mnt;
-	int err = -1;
-	char *source = NULL, *fstype = NULL, *options = NULL;
-	int mode = SPFS_PROXY_MODE;
+	int err = -1, mode = SPFS_PROXY_MODE;
+	long mflags;
+	int spfs_ref;
 
-	if (parse_mount_data(p, &source, &fstype, &options)) {
-		pr_err("failed to parse mount data\n");
-		return -EINVAL;
-	}
+	err = xatol(mountflags, &mflags);
+	if (err)
+		return err;
 
-	if (strlen(source) == 0) {
-		source = xstrcat(source, "%s", ctx->progname);
-		if (!source)
-			goto free_mount_data;
-	}
-
-	mnt = xsprintf("%s/%s", ctx->spfs_dir, fstype);
+	mnt = xsprintf("%s/%s", info->work_dir, fstype);
 	if (!mnt) {
 		pr_err("failed to allocate\n");
-		goto free_mount_data;
+		return -ENOMEM;
 	}
 
-	if (create_dir("%s%s", ctx->spfs_root, mnt)) {
-		pr_perror("failed to create mountpoint %s", mnt);
+	if (create_dir("%s%s", info->root, mnt)) {
+		pr_err("failed to create mountpoint %s\n", mnt);
 		goto free_mnt;
 	}
 
-	err = mount_target(sock, ctx, source, mnt, fstype, p->mountflags, options);
+	err = mount_target(sock, info, source, mnt, fstype, mflags, options);
 	if (err)
 		goto free_mnt;
 
 	pr_debug("successfully mounted %s to %s\n", fstype, mnt);
 
-	err = send_mode(ctx->spfs_socket, mode, mnt);
+	err = spfs_send_mode(info->sock, mode, mnt);
 	if (err) {
 		pr_err("failed to switch spfs to proxy mode to %s: %d\n", mnt,
 				err);
@@ -326,30 +211,37 @@ int mount_fs(int sock, struct spfs_manager_context_s *ctx, void *package, size_t
 
 	pr_debug("spfs mode was changed to %d (path: %s)\n", mode, mnt);
 
-	err = replace_mounts(ctx, mnt, ctx->mountpoint, NULL);
-	if (err) {
-		pr_err("failed to repalce mounts\n");
+	spfs_ref = open(info->mountpoint, O_RDONLY | O_DIRECTORY);
+	if (spfs_ref < 0) {
+		pr_perror("failed to open %s", info->mountpoint);
 		goto free_mnt;
 	}
 
-	pr_debug("mountpoint %s replaced %s\n", mnt, ctx->mountpoint);
-
-	err = send_mode(ctx->spfs_socket, mode, ctx->mountpoint);
+	err = do_replace_mount(info, mnt, freeze_cgroup);
 	if (err) {
-		pr_err("failed to switch spfs to proxy mode to %s: %d\n", mnt,
-				err);
-		goto free_mnt;
+		pr_err("failed to replace mounts\n");
+		goto close_spfs_ref;
 	}
 
-	pr_debug("spfs mode was changed to %d (path: %s)\n", mode, ctx->mountpoint);
+	pr_debug("mountpoint %s replaced %s\n", mnt, info->mountpoint);
 
-	(void) umount_target(ctx, mnt);
+	err = spfs_send_mode(info->sock, mode, info->mountpoint);
+	if (err) {
+		pr_err("failed to switch spfs to proxy mode to %s: %d\n",
+					info->mountpoint, err);
+		goto close_spfs_ref;
+	}
 
+	pr_debug("spfs mode was changed to %d (path: %s)\n", mode,
+				info->mountpoint);
+
+	pr_debug("Unmounting %s\n", mnt);
+
+	(void) umount_target(info, mnt);
+
+close_spfs_ref:
+	close(spfs_ref);
 free_mnt:
 	free(mnt);
-free_mount_data:
-	free(source);
-	free(fstype);
-	free(options);
 	return err;
 }
