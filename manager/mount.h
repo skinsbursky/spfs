@@ -4,7 +4,12 @@
 #include <stddef.h>
 
 struct spfs_manager_context_s;
+struct spfs_info_s;
 
 int mount_fs(int sock, struct spfs_manager_context_s *ctx, void *package, size_t psize);
+int replace_mount(int sock, const struct spfs_info_s *info,
+		  const char *source, const char *fstype,
+		  const char *mountflags, const char *freeze_cgroup,
+		  const void *options);
 
 #endif

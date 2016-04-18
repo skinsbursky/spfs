@@ -273,6 +273,14 @@ static int mount_target(int sock, struct spfs_manager_context_s *ctx,
 	return err ? err : status;
 }
 
+int replace_mount(int sock, const struct spfs_info_s *info,
+		  const char *source, const char *fstype,
+		  const char *mountflags, const char *freeze_cgroup,
+		  const void *options)
+{
+	return -EPERM;
+}
+
 int mount_fs(int sock, struct spfs_manager_context_s *ctx, void *package, size_t psize)
 {
 	struct mount_fs_package_s *p = package;
