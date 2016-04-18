@@ -78,7 +78,7 @@ static int parse_cmd_options(struct opt_array_s *array, char *options)
 			}
 			o++;
 		}
-		if (!found) {
+		if (!found && strlen(opt)) {
 			pr_err("unsupported option: %s\n", opt);
 			return -EINVAL;
 		}
