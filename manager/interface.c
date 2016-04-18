@@ -368,12 +368,12 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 	if (err)
 		return err;
 
-	info->socket_path = shm_alloc(strlen(info->id) + strlen("/spfs.sock")+ 1);
+	info->socket_path = shm_alloc(strlen(info->id) + strlen("spfs-.sock")+ 1);
 	if (!info->socket_path) {
 		pr_perror("failed to allocate string\n");
 		return -ENOMEM;
 	}
-	sprintf(info->socket_path, "%s/spfs.sock", info->work_dir);
+	sprintf(info->socket_path, "spfs-%s.sock", info->id);
 
 	INIT_LIST_HEAD(&info->list);
 

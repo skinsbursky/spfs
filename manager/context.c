@@ -180,15 +180,23 @@ static int setup_signal_handlers(struct spfs_manager_context_s *ctx)
 static int configure(struct spfs_manager_context_s *ctx)
 {
 	if (!ctx->work_dir) {
-		pr_err("work directory wasn't provided\n");
-		return -EINVAL;
+		ctx->work_dir = xsprintf("/run/%s-%d", ctx->progname, getpid());
+		if (!ctx->work_dir) {
+			pr_err("failed to allocate string\n");
+			return -ENOMEM;
+		}
 	}
 
 	if (create_dir(ctx->work_dir))
 		return -1;
 
+	if (chdir(ctx->work_dir)) {
+		pr_perror("failed to chdir into %s", ctx->work_dir);
+		return -EINVAL;
+	}
+
 	if (!ctx->socket_path) {
-		ctx->socket_path = xsprintf("%s/%s.sock", ctx->work_dir, ctx->progname);
+		ctx->socket_path = xsprintf("%s.sock", ctx->progname);
 		if (!ctx->socket_path) {
 			pr_err("failed to allocate\n");
 			return -ENOMEM;
@@ -202,7 +210,7 @@ static int configure(struct spfs_manager_context_s *ctx)
 	}
 
 	if (!ctx->log_file) {
-		ctx->log_file = xsprintf("%s/%s.log", ctx->work_dir, ctx->progname);
+		ctx->log_file = xsprintf("%s.log", ctx->progname);
 		if (!ctx->log_file) {
 			pr_err("failed to allocate\n");
 			return -ENOMEM;
