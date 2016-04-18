@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (ctx->daemonize) {
-		if (daemon(1, 0)) {
+		if (daemon(1, 1)) {
 			pr_perror("failed to daemonize");
 			return -errno;
 		}
