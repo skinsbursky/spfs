@@ -258,8 +258,8 @@ int main(int argc, char *argv[])
 		pr_debug("%s: proxy_dir   : %s\n", __func__, proxy_dir);
 	pr_debug("%s: log         : %s\n", __func__, log_file);
 	pr_debug("%s: socket path : %s\n", __func__, socket_path);
-	pr_debug("%s: mountpoint  : %d\n", __func__, mountpoint);
-	pr_debug("%s: root        : %d\n", __func__, root);
+	pr_debug("%s: mountpoint  : %s\n", __func__, mountpoint);
+	pr_debug("%s: root        : %s\n", __func__, root);
 	pr_debug("%s: verbosity   : +%d\n", __func__, verbosity);
 
 	fuse = setup_fuse(&args, &gateway_operations,
