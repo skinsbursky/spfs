@@ -155,7 +155,7 @@ static int mount_spfs(struct spfs_manager_context_s *ctx,
 		      struct spfs_info_s *info, char *mode,
 		      char *proxy_dir)
 {
-	char *log_path;
+	char *cwd, *socket_path, *log_path, *mountpoint;
 	int status = -ENOMEM, initpipe[2], timeout_ms = 5000;
 	struct pollfd pfd;
 	pid_t pid;
@@ -165,9 +165,27 @@ static int mount_spfs(struct spfs_manager_context_s *ctx,
 		return -errno;
 	}
 
-	log_path = xsprintf("%s/spfs.log", info->work_dir);
-	if (!log_path)
+	cwd = get_current_dir_name();
+	if (!cwd) {
+		pr_perror("failed to get cwd");
 		goto close_pipe;
+	}
+
+	mountpoint = xsprintf("%s%s", info->root, info->mountpoint);
+	if (!mountpoint)
+		goto free_cwd;
+
+	socket_path = xsprintf("%s/%s", cwd, info->socket_path);
+	if (!socket_path)
+		goto free_mountpoint;
+
+	log_path = xsprintf("%s/spfs-%s.log", cwd, info->id);
+	if (!log_path)
+		goto free_socket_path;
+
+	status = create_dir("%s%s", info->root, proxy_dir);
+	if (status)
+		goto free_log_path;
 
 	pid = fork();
 	switch (pid) {
@@ -177,9 +195,9 @@ static int mount_spfs(struct spfs_manager_context_s *ctx,
 			goto free_log_path;
 		case 0:
 			close(initpipe[0]);
-			_exit(exec_spfs(initpipe[1], info, (char *)mode,
-					(char *)proxy_dir, info->socket_path,
-					log_path, info->mountpoint));
+			_exit(exec_spfs(initpipe[1], info, mode,
+					proxy_dir, socket_path, log_path,
+					mountpoint));
 	}
 
 	/* First, close write end of the pipe */
@@ -234,6 +252,12 @@ repeat:
 
 free_log_path:
 	free(log_path);
+free_socket_path:
+	free(socket_path);
+free_mountpoint:
+	free(mountpoint);
+free_cwd:
+	free(cwd);
 close_pipe:
 	if (initpipe[1] >= 0)
 		close(initpipe[1]);
