@@ -22,4 +22,7 @@ int check_capabilities(unsigned long cap_set, pid_t pid);
 
 int secure_chroot(const char *root);
 
+char **exec_options(int dummy, ...);
+char **add_exec_options(char **options, ...);
+
 #endif

@@ -270,3 +270,62 @@ int secure_chroot(const char *root)
 	}
 	return 0;
 }
+
+static char **add_exec_options_varg(char **options, va_list args)
+{
+	va_list tmp;
+	int nr_opt = 0, nr_new;
+	char **new_opt;
+
+	if (options) {
+		while(options[nr_opt])
+			nr_opt++;
+	}
+
+	nr_new = nr_opt;
+
+	va_copy(tmp, args);
+	while (va_arg(tmp, char *) != NULL)
+		nr_new++;
+	va_end(tmp);
+
+	new_opt = realloc(options, sizeof(char*) * nr_new + 1);
+	if (new_opt) {
+		char *arg;
+
+		while ((arg = va_arg(args, char *)) != NULL)
+			new_opt[nr_opt++] = arg;
+		new_opt[nr_opt] = NULL;
+	}
+
+	return new_opt;
+}
+
+char **add_exec_options(char **options, ...)
+{
+	va_list args;
+	char **new;
+
+	va_start(args, options);
+
+	new = add_exec_options_varg(options, args);
+
+	va_end(args);
+
+	return new;
+}
+
+char **exec_options(int dummy, ...)
+{
+	va_list args;
+	char **new;
+
+	va_start(args, dummy);
+
+	new = add_exec_options_varg(NULL, args);
+
+	va_end(args);
+
+	return new;
+}
+
