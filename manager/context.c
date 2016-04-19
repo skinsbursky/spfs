@@ -108,6 +108,30 @@ free_ns_list:
 	return err;
 }
 
+static bool empty_spfs_mounts(struct spfs_manager_context_s *ctx, int pid)
+{
+	bool no_spfs = false;
+
+	if (!lock_shared_list(ctx->spfs_mounts)) {
+		struct spfs_info_s *info;
+
+		if (!list_empty(&ctx->spfs_mounts->list)) {
+			info = __find_spfs_by_pid(ctx->spfs_mounts, pid);
+			if (info) {
+				pr_debug("removing info %s from the list\n", info->id);
+				info->dead = true;
+				list_del(&info->list);
+			}
+
+			if (list_empty(&ctx->spfs_mounts->list))
+				no_spfs = true;
+		}
+
+		(void) unlock_shared_list(ctx->spfs_mounts);
+	}
+	return no_spfs;
+}
+
 static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)
 {
 	struct spfs_manager_context_s *ctx = &spfs_manager_context;
@@ -120,28 +144,9 @@ static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)
 		else
 			pr_err("%d killed by signal %d (%s)\n", pid, WTERMSIG(status), strsignal(WTERMSIG(status)));
 
-		if (!lock_shared_list(ctx->spfs_mounts)) {
-			struct spfs_info_s *info;
-			bool no_spfs = false;
-
-			if (!list_empty(&ctx->spfs_mounts->list)) {
-				info = __find_spfs_by_pid(ctx->spfs_mounts, pid);
-				if (info) {
-					pr_debug("removing info %s from the list\n", info->id);
-					info->dead = true;
-					list_del(&info->list);
-				}
-
-				if (list_empty(&ctx->spfs_mounts->list))
-					no_spfs = true;
-			}
-
-			(void) unlock_shared_list(ctx->spfs_mounts);
-
-			if (no_spfs && ctx->exit_with_spfs) {
-				pr_info("spfs list is empty. Exiting.\n");
-				exit(0);
-			}
+		if (empty_spfs_mounts(ctx, pid) && ctx->exit_with_spfs) {
+			pr_info("spfs list is empty. Exiting.\n");
+			exit(0);
 		}
 	}
 
