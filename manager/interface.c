@@ -609,6 +609,11 @@ const struct spfs_manager_cmd_handler_s *get_cmd_handler(const char *cmd)
 	return NULL;
 }
 
+static int spfs_manager_handle_packet(cmd_handler_t handler, int sock, void *data, void *package, size_t psize)
+{
+	return send_status(sock, handler(sock, data, package, psize));
+}
+
 int spfs_manager_packet_handler(int sock, void *data, void *package, size_t psize)
 {
 	int err;
@@ -631,12 +636,12 @@ int spfs_manager_packet_handler(int sock, void *data, void *package, size_t psiz
 				pr_perror("failed to fork");
 				return -errno;
 			case 0:
-				_exit(handler->handle(sock, data, options, psize - (options - cmd)));
+				_exit(spfs_manager_handle_packet(handler->handle, sock, data, options, psize - (options - cmd)));
 			default:
 				pr_info("forked child\n");
 				return 0;
 		}
 	}
 
-	return handler->handle(sock, data, options, psize - (options - cmd));
+	return spfs_manager_handle_packet(handler->handle, sock, data, options, psize - (options - cmd));
 }

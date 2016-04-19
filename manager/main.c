@@ -86,5 +86,5 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	return reliable_socket_loop(ctx->sock, ctx, false, spfs_manager_packet_handler);
+	return unreliable_socket_loop(ctx->sock, ctx, false, spfs_manager_packet_handler);
 }
