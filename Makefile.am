@@ -42,11 +42,13 @@ bin_spfs_manager_SOURCES =	manager/main.c			\
 				manager/interface.c		\
 				manager/mount.c			\
 				manager/spfs.c			\
+				manager/freeze.c		\
 								\
 				manager/context.h		\
 				manager/interface.h		\
 				manager/mount.h			\
 				manager/spfs.h			\
+				manager/freeze.h		\
 								\
 				src/util.c			\
 				src/socket.c			\
