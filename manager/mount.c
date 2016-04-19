@@ -24,6 +24,12 @@ static int do_mount(const char *source, const char *mnt,
 {
 	int err;
 
+	err = create_dir(mnt);
+	if (err) {
+		pr_err("failed to create mountpoint %s\n", mnt);
+		return err;
+	}
+
 	err = mount(source, mnt, fstype, mountflags, options);
 	if (!err)
 		return 0;
@@ -45,6 +51,8 @@ static int mount_loop(const char *source, const char *mnt,
 	int err = 0;
 	int timeout = 1;
 
+	pr_debug("trying to mount %s, source %s, flags %ld, options '%s' to %s\n",
+			fstype, source, mountflags, options, mnt);
 	while (1) {
 		err = do_mount(source, mnt, fstype, mountflags, options);
 		if (err != -EAGAIN)
@@ -135,7 +143,7 @@ static int umount_target(const struct spfs_info_s *info, const char *mnt)
 				_exit(EXIT_FAILURE);
 
 			if (umount2(mnt, MNT_DETACH)) {
-				pr_perror("failed to umount %s");
+				pr_perror("failed to umount %s", mnt);
 				_exit(EXIT_FAILURE);
 			}
 			_exit(EXIT_SUCCESS);
@@ -189,11 +197,6 @@ int replace_mount(int sock, const struct spfs_info_s *info,
 	if (!mnt) {
 		pr_err("failed to allocate\n");
 		return -ENOMEM;
-	}
-
-	if (create_dir("%s%s", info->root, mnt)) {
-		pr_err("failed to create mountpoint %s\n", mnt);
-		goto free_mnt;
 	}
 
 	err = mount_target(sock, info, source, mnt, fstype, mflags, options);
