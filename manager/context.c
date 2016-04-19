@@ -113,6 +113,7 @@ static void cleanup_spfs_mount(struct spfs_info_s *info)
 	pr_debug("removing info %s from the list\n", info->id);
 	info->dead = true;
 	list_del(&info->list);
+	unlink(info->socket_path);
 }
 
 static bool empty_spfs_mounts(struct spfs_manager_context_s *ctx, int pid)
