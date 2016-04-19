@@ -108,6 +108,13 @@ free_ns_list:
 	return err;
 }
 
+static void cleanup_spfs_mount(struct spfs_info_s *info)
+{
+	pr_debug("removing info %s from the list\n", info->id);
+	info->dead = true;
+	list_del(&info->list);
+}
+
 static bool empty_spfs_mounts(struct spfs_manager_context_s *ctx, int pid)
 {
 	bool no_spfs = false;
@@ -117,11 +124,8 @@ static bool empty_spfs_mounts(struct spfs_manager_context_s *ctx, int pid)
 
 		if (!list_empty(&ctx->spfs_mounts->list)) {
 			info = __find_spfs_by_pid(ctx->spfs_mounts, pid);
-			if (info) {
-				pr_debug("removing info %s from the list\n", info->id);
-				info->dead = true;
-				list_del(&info->list);
-			}
+			if (info)
+				cleanup_spfs_mount(info);
 
 			if (list_empty(&ctx->spfs_mounts->list))
 				no_spfs = true;
