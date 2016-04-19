@@ -11,8 +11,8 @@ int send_packet(const char *socket_path, void *package, size_t psize);
 
 int reliable_conn_handler(int sock, void *data,
 			  int (*packet_handler)(int sock, void *data, void *packet, size_t psize));
-int reliable_socket_loop(int psock, void *data, bool async,
-			 int (*packet_handler)(int sock, void *data, void *packet, size_t psize));
+int unreliable_socket_loop(int psock, void *data, bool async,
+			   int (*packet_handler)(int sock, void *data, void *packet, size_t psize));
 int socket_loop(int psock, void *data, int (*handler)(int sock, void *data));
 
 int send_status(int sock, int res);

@@ -62,8 +62,8 @@ int send_status(int sock, int res)
 	return 0;
 }
 
-int reliable_conn_handler(int sock, void *data,
-			  int (*packet_handler)(int sock, void *data, void *packet, size_t psize))
+int unreliable_conn_handler(int sock, void *data,
+			    int (*packet_handler)(int sock, void *data, void *packet, size_t psize))
 {
 	char page[4096];
 	ssize_t bytes;
@@ -80,16 +80,22 @@ int reliable_conn_handler(int sock, void *data,
 
 	pr_debug("received %ld bytes\n", bytes);
 
-	return send_status(sock, packet_handler(sock, data, page, bytes));
+	return packet_handler(sock, data, page, bytes);
 }
 
-int reliable_socket_loop(int psock, void *data, bool async,
-			 int (*packet_handler)(int sock, void *data, void *packet, size_t psize))
+int reliable_conn_handler(int sock, void *data,
+			  int (*packet_handler)(int sock, void *data, void *packet, size_t psize))
+{
+	return send_status(sock, unreliable_conn_handler(sock, data, packet_handler));
+}
+
+int unreliable_socket_loop(int psock, void *data, bool async,
+			   int (*packet_handler)(int sock, void *data, void *packet, size_t psize))
 {
 	pr_info("%s: socket loop started\n", __func__);
 
 	while(1) {
-		int sock;
+		int sock, err;
 
 		sock = accept(psock, NULL, NULL);
 		if (sock < 0) {
@@ -99,20 +105,9 @@ int reliable_socket_loop(int psock, void *data, bool async,
 
 		pr_debug("%s: accepted new socket\n", __func__);
 
-		if (async) {
-			int pid;
-
-			pid = fork();
-			switch (pid) {
-				case -1:
-					pr_err("failed to fork\n");
-					break;
-				case 0:
-					close(psock);
-					_exit(reliable_conn_handler(sock, data, packet_handler));
-			}
-		} else
-			(void) reliable_conn_handler(sock, data, packet_handler);
+		do {
+			err = unreliable_conn_handler(sock, data, packet_handler);
+		} while (!err && !async);
 
 		close(sock);
 	}
