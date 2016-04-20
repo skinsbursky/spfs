@@ -535,6 +535,7 @@ static int process_replace_cmd(int sock, struct spfs_manager_context_s *ctx,
 		[2] = { "type=", NULL },
 		[3] = { "flags=", NULL },
 		[4] = { "freeze_cgroup=", NULL },
+		[5] = { "bindmounts=", NULL },
 		{ NULL, NULL },
 	};
 	struct spfs_info_s *info;
@@ -594,6 +595,12 @@ static int process_replace_cmd(int sock, struct spfs_manager_context_s *ctx,
 
 		(void) unlock_shared_list(ctx->spfs_mounts);
 
+		if (err)
+			return err;
+	}
+
+	if (opt_array[5].value) {
+		err = spfs_add_mount_paths(info, opt_array[5].value);
 		if (err)
 			return err;
 	}
