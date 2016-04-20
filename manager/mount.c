@@ -9,6 +9,7 @@
 #include "include/util.h"
 #include "include/log.h"
 #include "include/socket.h"
+#include "include/shm.h"
 
 #include "spfs/context.h"
 
@@ -81,6 +82,28 @@ rmdir_mnt:
 
 }
 
+static int do_replace_one_spfs(const char *source, const char *target)
+{
+	int err;
+
+	err = umount2(target, MNT_DETACH);
+	if (err) {
+		pr_perror("failed to umount %s", target);
+		return err;
+	}
+
+	pr_debug("mountpoint %s was lazily umounted\n", target);
+
+	err = mount(source, target, NULL, MS_BIND, NULL);
+	if (err) {
+		pr_perror("failed to bind-mount %s to %s", source, target);
+		return err;
+	}
+
+	pr_debug("mountpoint %s was bind-mounted to %s\n", source, target);
+	return 0;
+}
+
 static int do_replace_spfs(const struct spfs_info_s *info, const char *source,
 			   const char *freeze_cgroup)
 {
@@ -101,21 +124,9 @@ static int do_replace_spfs(const struct spfs_info_s *info, const char *source,
 			if (enter_spfs_context(info))
 				_exit(EXIT_FAILURE);
 
-			err = umount2(info->mountpoint, MNT_DETACH);
-			if (err) {
-				pr_perror("failed to umount %s", info->mountpoint);
+			if (do_replace_one_spfs(source, info->mountpoint))
 				_exit(EXIT_FAILURE);
-			}
 
-			pr_debug("mountpoint %s was lazily umounted\n", info->mountpoint);
-
-			err = mount(source, info->mountpoint, NULL, MS_BIND, NULL);
-			if (err) {
-				pr_perror("failed to bind-mount %s to %s", source, info->mountpoint);
-				_exit(EXIT_FAILURE);
-			}
-
-			pr_debug("mountpoint %s was bind-mounted to %s\n", source, info->mountpoint);
 			_exit(EXIT_SUCCESS);
 	}
 
