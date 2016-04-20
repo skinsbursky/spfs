@@ -84,6 +84,17 @@ unlock:
 	return ptr;
 }
 
+int init_shared_list(struct shared_list *sl)
+{
+	if (sem_init(&sl->sem, 1, 1)) {
+		pr_perror("failed to initialize spfs info semaphore");
+		return -errno;
+	}
+
+	INIT_LIST_HEAD(&sl->list);
+	return 0;
+}
+
 struct shared_list *create_shared_list(void)
 {
 	struct shared_list *sl;
@@ -94,12 +105,9 @@ struct shared_list *create_shared_list(void)
 		return NULL;
 	}
 
-	if (sem_init(&sl->sem, 1, 1)) {
-		pr_perror("failed to initialize spfs info semaphore");
+	if (init_shared_list(sl))
 		return NULL;
-	}
 
-	INIT_LIST_HEAD(&sl->list);
 	return sl;
 }
 

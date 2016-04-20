@@ -10,6 +10,7 @@ struct shared_list {
 	sem_t			sem;
 };
 
+int init_shared_list(struct shared_list *sl);
 struct shared_list *create_shared_list(void);
 int lock_shared_list(struct shared_list *sl);
 int unlock_shared_list(struct shared_list *sl);
