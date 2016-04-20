@@ -22,6 +22,7 @@ bin_spfs_SOURCES =		spfs/main.c			\
 								\
 				include/log.h			\
 				include/socket.h		\
+				include/list.h			\
 				include/util.h
 
 bin_spfs_client_SOURCES =	client/main.c			\
@@ -62,6 +63,8 @@ bin_spfs_manager_SOURCES =	manager/main.c			\
 				include/log.h			\
 				include/ipc.h			\
 				include/socket.h		\
+				include/list.h			\
+				include/shm.h			\
 				include/util.h
 
 tags: ctags
