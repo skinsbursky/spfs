@@ -116,15 +116,15 @@ inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 	 * The reason for this is that cur fh pointer is stored in libfuse
 	 * internals, so we can't simply replace the pointer itself (original
 	 * one will be returned to us on next call).
-	 * And we also want to:
-	 * 1) close current file descriptor (cur_fh->fh)
-	 * 2) and release memory, used by new_fh.
 	 */
 	tmp_fh = *new_fh;
 	*new_fh = *cur_fh;
 	*cur_fh = tmp_fh;
 
-	/* Releasing new fh with contents of _original_ one */
+	/* Releasing new fh with contents of _original_ one:
+	 * 1) close previous file descriptor (tmp_fi->fh->fh)
+	 * 2) and release memory, used by old file handle (tmp_fi->cur_fh).
+	 */
 	err = release(path, &tmp_fi);
 	if (err) {
 		pr_err("%s: failed to release old file handler for %s\n",
