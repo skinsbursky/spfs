@@ -81,8 +81,8 @@ rmdir_mnt:
 
 }
 
-static int do_replace_mount(const struct spfs_info_s *info, const char *source,
-			    const char *freeze_cgroup)
+static int do_replace_spfs(const struct spfs_info_s *info, const char *source,
+			   const char *freeze_cgroup)
 {
 	int pid, status;
 	int err;
@@ -220,7 +220,7 @@ int replace_mount(int sock, const struct spfs_info_s *info,
 		goto free_mnt;
 	}
 
-	err = do_replace_mount(info, mnt, freeze_cgroup);
+	err = do_replace_spfs(info, mnt, freeze_cgroup);
 	if (err) {
 		pr_err("failed to replace mounts\n");
 		goto close_spfs_ref;
