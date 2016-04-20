@@ -1,4 +1,5 @@
 #include "errno.h"
+#include <stdlib.h>
 
 #include "include/log.h"
 #include "include/shm.h"
@@ -119,4 +120,68 @@ int enter_spfs_context(const struct spfs_info_s *info)
 	/* Ok, let's try to change root. And, probably, we shouldn't care
 	 * either it ours or not. */
 	return secure_chroot(info->root);
+}
+
+static int __spfs_add_one_mountpath(struct spfs_info_s *info, char *path)
+{
+	struct spfs_bindmount *bm;
+
+	list_for_each_entry(bm, &info->mountpaths.list, list) {
+		if (!strcmp(bm->path, path)) {
+			pr_err("info %s already has bind mount with path %s\n",
+					info->id, path);
+			return -EEXIST;
+		}
+	}
+
+	bm = shm_alloc(sizeof(*bm));
+	if (!bm) {
+		pr_err("failed to allocate bindmount structure\n");
+		return -ENOMEM;
+	}
+	bm->path = shm_alloc(strlen(path) + 1);
+	if (!bm->path) {
+		pr_err("failed to allocate bindmount path\n");
+		return -ENOMEM;
+	}
+	strcpy(bm->path, path);
+	list_add_tail(&bm->list, &info->mountpaths.list);
+	pr_debug("added bind-mount path %s to spfs info %s\n", bm->path, info->id);
+	return 0;
+}
+
+int spfs_add_mount_paths(struct spfs_info_s *info, const char *bind_mounts)
+{
+	int err;
+	char *bm_array, *bm;
+
+	bm_array = strdup(bind_mounts);
+	if (!bm_array) {
+		pr_err("failed to allocate\n");
+		return -ENOMEM;
+	}
+
+	err = lock_shared_list(&info->mountpaths);
+	if (err) {
+		pr_err("failed to lock info %s bind mounts list\n", info->id);
+		goto free_bm_array;
+	}
+
+        while ((bm = strsep(&bm_array, ",")) != NULL) {
+		if (!strlen(bm))
+			continue;
+		err = __spfs_add_one_mountpath(info, bm);
+		if (err && (err != -EEXIST)) {
+			pr_err("failed to add bind-mount %s to info %s\n",
+					bm, info->id);
+			break;
+		}
+		err = 0;
+	}
+
+	(void) unlock_shared_list(&info->mountpaths);
+
+free_bm_array:
+	free(bm_array);
+	return err;
 }

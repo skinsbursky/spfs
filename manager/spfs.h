@@ -8,9 +8,14 @@
 #include <sys/stat.h>
 
 #include "include/list.h"
+#include "include/shm.h"
 
 struct freeze_cgroup_s;
-struct shared_list;
+
+struct spfs_bindmount {
+	struct list_head	list;
+	char			*path;
+};
 
 struct spfs_info_s {
 	struct list_head	list;
@@ -27,6 +32,7 @@ struct spfs_info_s {
 	struct stat		root_stat;
 	struct freeze_cgroup_s	*fg;
 	bool			dead;
+	struct shared_list	mountpaths;
 };
 
 struct spfs_info_s *find_spfs_by_id(struct shared_list *mounts, const char *id);
@@ -35,6 +41,7 @@ struct spfs_info_s *find_spfs_by_pid(struct shared_list *mounts, pid_t pid);
 int add_spfs_info(struct shared_list *mounts, struct spfs_info_s *info);
 void del_spfs_info(struct shared_list *mounts, struct spfs_info_s *info);
 
+int spfs_add_mount_paths(struct spfs_info_s *info, const char *bind_mounts);
 
 int enter_spfs_context(const struct spfs_info_s *info);
 

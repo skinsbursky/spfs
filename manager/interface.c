@@ -406,6 +406,10 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 	}
 	sprintf(info->socket_path, "spfs-%s.sock", info->id);
 
+	err = init_shared_list(&info->mountpaths);
+	if (err)
+		return err;
+
 	INIT_LIST_HEAD(&info->list);
 
 	/* TODO: should we add mounpoint _after_ mount? */
