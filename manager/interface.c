@@ -344,9 +344,7 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 			pr_err("failed to convert pid: %s\n", opt_array[1].value);
 			return err;
 		}
-	}
 
-	if (opt_array[2].value) {
 		info->ns_list = shm_alloc(strlen(opt_array[2].value) + 1);
 		if (!info->ns_list) {
 			pr_perror("failed to allocate string\n");
@@ -384,7 +382,7 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 	strcpy(info->mountpoint, opt_array[6].value);
 
 	info->work_dir = shm_alloc(strlen("/run/spfs/") + strlen(info->id) + 1);
-	if (!info->mountpoint) {
+	if (!info->work_dir) {
 		pr_perror("failed to allocate string\n");
 		return -ENOMEM;
 	}
