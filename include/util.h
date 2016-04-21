@@ -2,7 +2,9 @@
 #define __SPFS_UTIL_H_
 
 #include <unistd.h>
+#include <stdarg.h>
 
+char *xvstrcat(char *str, const char *fmt, va_list args);
 extern char *xstrcat(char *str, const char *fmt, ...);
 extern char *xsprintf(const char *fmt, ...);
 

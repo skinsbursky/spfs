@@ -22,7 +22,7 @@
  *  2) Passed pointer can' be reused. It's either freed in case of error or can
  *     be changed.
  */
-static char *xvstrcat(char *str, const char *fmt, va_list args)
+char *xvstrcat(char *str, const char *fmt, va_list args)
 {
 	size_t offset = 0, delta;
 	int ret;
