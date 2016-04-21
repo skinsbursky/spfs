@@ -1,11 +1,14 @@
 #include <semaphore.h>
 #include <errno.h>
+#include <stdarg.h>
+#include <stdlib.h>
 
 #include <sys/user.h>
 #include <sys/mman.h>
 
 #include "include/log.h"
 #include "include/shm.h"
+#include "include/util.h"
 
 #define __round_mask(x, y)      ((__typeof__(x))((y) - 1))
 #define round_up(x, y)          ((((x) - 1) | __round_mask(x, y)) + 1)
@@ -81,6 +84,29 @@ unlock:
 	if (sem_post(shm_pool_sem))
 		pr_perror("failed to unlock spfs semaphore");
 
+	return ptr;
+}
+
+void *shm_xsprintf(const char *fmt, ...)
+{
+	void *ptr;
+	char *string;
+	va_list args;
+
+	va_start(args, fmt);
+	string = xvstrcat(NULL, fmt, args);
+	va_end(args);
+	if (!string) {
+		pr_err("failed to allocate string\n");
+		return NULL;
+	}
+
+	ptr = shm_alloc(strlen(string) + 1);
+	if (ptr)
+		strcpy(ptr, string);
+	else
+		pr_err("failed to allocate shated string\n");
+	free(string);
 	return ptr;
 }
 

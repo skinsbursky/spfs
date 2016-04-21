@@ -17,5 +17,6 @@ int unlock_shared_list(struct shared_list *sl);
 
 int shm_init_pool(void);
 void *shm_alloc(size_t size);
+void *shm_xsprintf(const char *fmt, ...);
 
 #endif
