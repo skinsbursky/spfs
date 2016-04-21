@@ -128,7 +128,7 @@ static int __spfs_add_one_mountpath(struct spfs_info_s *info, char *path)
 
 	list_for_each_entry(bm, &info->mountpaths.list, list) {
 		if (!strcmp(bm->path, path)) {
-			pr_err("info %s already has bind mount with path %s\n",
+			pr_warn("info %s already has bind mount with path %s\n",
 					info->id, path);
 			return -EEXIST;
 		}

@@ -166,8 +166,6 @@ static int do_replace_mount(int sock, struct spfs_info_s *info,
 	if (err)
 		goto free_mnt;
 
-	pr_debug("successfully mounted %s to %s\n", fstype, mnt);
-
 	err = spfs_send_mode(info->sock, mode, mnt);
 	if (err) {
 		pr_err("failed to switch spfs to proxy mode to %s: %d\n", mnt,
@@ -188,8 +186,6 @@ static int do_replace_mount(int sock, struct spfs_info_s *info,
 		pr_err("failed to replace mounts\n");
 		goto close_spfs_ref;
 	}
-
-	pr_debug("mountpoint %s replaced %s\n", mnt, info->mountpoint);
 
 	err = spfs_send_mode(info->sock, mode, info->mountpoint);
 	if (err) {

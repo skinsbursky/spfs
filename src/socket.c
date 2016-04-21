@@ -51,8 +51,10 @@ int send_status(int sock, int res)
 
 	bytes = send(sock, &res, sizeof(res), MSG_NOSIGNAL | MSG_DONTWAIT | MSG_EOR);
 	if (bytes < 0) {
-		pr_perror("%s: send failed via fd %d", __func__, sock);
-		return -errno;
+		bytes = -errno;
+		pr_warn("%s: send failed via fd %d: %s\n", __func__, sock,
+				strerror(errno));
+		return bytes;
 	}
 
 	if (bytes == 0) {
