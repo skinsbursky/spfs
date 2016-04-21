@@ -31,7 +31,7 @@ struct freeze_cgroup_s *create_freeze_cgroup(const char *path)
 		return NULL;
 	}
 
-	fg->path = shm_alloc(strlen(path) + 1);
+	fg->path = shm_xsprintf(path);
 	if (!fg->path) {
 		pr_err("failed to allocate string\n");
 		return NULL;
@@ -41,8 +41,6 @@ struct freeze_cgroup_s *create_freeze_cgroup(const char *path)
 		pr_perror("failed to initialize freeze cgroup semaphore");
 		return NULL;
 	}
-
-	strcpy(fg->path, path);
 
 	return fg;
 }

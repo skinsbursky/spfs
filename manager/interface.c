@@ -331,12 +331,11 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 		return -ENOMEM;
 	}
 
-	info->id = shm_alloc(strlen(opt_array[0].value) + 1);
+	info->id = shm_xsprintf(opt_array[0].value);
 	if (!info->id) {
 		pr_perror("failed to allocate string\n");
 		return -ENOMEM;
 	}
-	strcpy(info->id, opt_array[0].value);
 
 	if (opt_array[1].value) {
 		err = xatol(opt_array[1].value, &info->ns_pid);
@@ -345,21 +344,19 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 			return err;
 		}
 
-		info->ns_list = shm_alloc(strlen(opt_array[2].value) + 1);
+		info->ns_list = shm_xsprintf(opt_array[2].value);
 		if (!info->ns_list) {
 			pr_perror("failed to allocate string\n");
 			return -ENOMEM;
 		}
-		strcpy(info->ns_list, opt_array[2].value);
 	}
 
 	if (opt_array[3].value) {
-		info->root = shm_alloc(strlen(opt_array[3].value) + 1);
+		info->root = shm_xsprintf(opt_array[3].value);
 		if (!info->root) {
 			pr_perror("failed to allocate string\n");
 			return -ENOMEM;
 		}
-		strcpy(info->root, opt_array[3].value);
 
 		if (stat(info->root, &info->root_stat)) {
 			pr_perror("failed to stat %s", info->root);
@@ -374,30 +371,27 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 		info->root[0] = '\0';
 	}
 
-	info->mountpoint = shm_alloc(strlen(opt_array[6].value) + 1);
+	info->mountpoint = shm_xsprintf(opt_array[6].value);
 	if (!info->mountpoint) {
 		pr_perror("failed to allocate string\n");
 		return -ENOMEM;
 	}
-	strcpy(info->mountpoint, opt_array[6].value);
 
-	info->work_dir = shm_alloc(strlen("/run/spfs/") + strlen(info->id) + 1);
+	info->work_dir = shm_xsprintf("/run/spfs/%s", info->id);
 	if (!info->work_dir) {
 		pr_perror("failed to allocate string\n");
 		return -ENOMEM;
 	}
-	sprintf(info->work_dir, "/run/spfs/%s", info->id);
 
 	err = create_dir("%s%s", info->root, info->work_dir);
 	if (err)
 		return err;
 
-	info->socket_path = shm_alloc(strlen(info->id) + strlen("spfs-.sock")+ 1);
+	info->socket_path = shm_xsprintf("spfs-%s.sock", info->id);
 	if (!info->socket_path) {
 		pr_perror("failed to allocate string\n");
 		return -ENOMEM;
 	}
-	sprintf(info->socket_path, "spfs-%s.sock", info->id);
 
 	err = init_shared_list(&info->mountpaths);
 	if (err)
