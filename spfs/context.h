@@ -43,7 +43,7 @@ struct spfs_context_s {
 int context_init(const char *proxy_dir, spfs_mode_t mode, const char *log_file,
 		 const char *socket_path, int verbosity, const char *mountpoint,
 		 bool single_user);
-int context_store_mnt_stat(const char *mountpoint);
+int get_stat(const char *mountpoint, struct stat *st);
 int start_socket_thread(void);
 
 void context_fini(void);

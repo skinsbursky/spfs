@@ -244,19 +244,18 @@ static int setup_context(struct spfs_context_s *ctx, const char *proxy_dir,
 	return 0;
 }
 
-int context_store_mnt_stat(const char *mountpoint)
+int get_stat(const char *mountpoint, struct stat *st)
 {
-	struct spfs_context_s *ctx = get_context();
 	int err;
 
 	if (!mountpoint) {
-		pr_crit("%s: mountpoint wasn't specified\n", __func__);
+		pr_err("%s: mountpoint wasn't specified\n", __func__);
 		return -EINVAL;
 	}
 
-	err = stat(mountpoint, &ctx->stub_root_stat);
+	err = stat(mountpoint, st);
 	if (err < 0) {
-		pr_crit("%s: failed to stat %s\n", __func__, ctx->wm->proxy_dir);
+		pr_perror("%s: failed to stat %s", __func__, mountpoint);
 		return err;
 	}
 	return 0;
@@ -330,7 +329,7 @@ int context_init(const char *proxy_dir, spfs_mode_t mode, const char *log_file,
 		return err;
 	}
 
-	if (context_store_mnt_stat(mountpoint))
+	if (get_stat(mountpoint, &ctx->stub_root_stat))
 		return -1;
 
 	ctx->packet_socket = seqpacket_sock(socket_path, true, true,
