@@ -107,7 +107,6 @@ static int do_replace_one_spfs(const char *source, const char *target)
 static int do_replace_spfs(struct spfs_info_s *info, const char *source,
 			   const char *freeze_cgroup)
 {
-	int pid, status;
 	int err;
 	struct spfs_bindmount *bm;
 
@@ -115,94 +114,38 @@ static int do_replace_spfs(struct spfs_info_s *info, const char *source,
 	if (err)
 		return err;
 
-	pid = fork();
-	switch (pid) {
-		case -1:
-			pr_perror("failed to fork");
-			err = -errno;
-			goto thaw_cgroup;
-		case 0:
-			if (enter_spfs_context(info))
-				_exit(EXIT_FAILURE);
-
-			if (lock_shared_list(&info->mountpaths)) {
-				pr_err("failed to lock info %s mount paths list\n", info->id);
-				_exit(EXIT_FAILURE);
-			}
-			list_for_each_entry(bm, &info->mountpaths.list, list) {
-				if (do_replace_one_spfs(source, bm->path)) {
-					pr_err("failed to replace %s by %s\n", bm->path, source);
-				}
-			}
-			(void) unlock_shared_list(&info->mountpaths);
-
-			_exit(EXIT_SUCCESS);
+	err = lock_shared_list(&info->mountpaths);
+	if (err) {
+		pr_err("failed to lock info %s mount paths list\n", info->id);
+		goto thaw_cgroup;
 	}
 
-	err = collect_child(pid, &status, 0);
-	if (!err)
-		err = status;
+	list_for_each_entry(bm, &info->mountpaths.list, list) {
+		if (do_replace_one_spfs(source, bm->path)) {
+			pr_err("failed to replace %s by %s\n", bm->path, source);
+		}
+	}
+	(void) unlock_shared_list(&info->mountpaths);
 
 thaw_cgroup:
 	if (thaw_cgroup_and_unlock(info->fg))
 		return -1;
-	return err ? err : status;
+	return err;
 }
 
 static int umount_target(const struct spfs_info_s *info, const char *mnt)
 {
-	int pid, err, status;
-
-	pid = fork();
-	switch (pid) {
-		case -1:
-			pr_perror("failed to fork");
-			return -errno;
-		case 0:
-			if (enter_spfs_context(info))
-				_exit(EXIT_FAILURE);
-
-			if (umount2(mnt, MNT_DETACH)) {
-				pr_perror("failed to umount %s", mnt);
-				_exit(EXIT_FAILURE);
-			}
-			_exit(EXIT_SUCCESS);
+	if (umount2(mnt, MNT_DETACH)) {
+		pr_perror("failed to umount %s", mnt);
+		return -1;
 	}
-
-	err = collect_child(pid, &status, 0);
-
-	return err ? err : status;
+	return 0;
 }
 
-static int mount_target(int sock, const struct spfs_info_s *info,
-			const char *source, const char *mnt, const char *fstype,
-			long mountflags, const void *options)
-{
-	int pid, err, status;
-
-	pid = fork();
-	switch (pid) {
-		case -1:
-			pr_perror("failed to fork");
-			return -errno;
-		case 0:
-			if (enter_spfs_context(info))
-				_exit(EXIT_FAILURE);
-
-			(void) send_status(sock, 0);
-
-			_exit(mount_loop(source, mnt, fstype, mountflags, options));
-	}
-
-	err = collect_child(pid, &status, 0);
-
-	return err ? err : status;
-}
-
-int replace_mount(int sock, struct spfs_info_s *info,
-		  const char *source, const char *fstype,
-		  const char *mountflags, const char *freeze_cgroup,
-		  const void *options)
+static int do_replace_mount(int sock, struct spfs_info_s *info,
+		const char *source, const char *fstype,
+		const char *mountflags, const char *freeze_cgroup,
+		const void *options)
 {
 	char *mnt;
 	int err = -1, mode = SPFS_PROXY_MODE;
@@ -219,7 +162,7 @@ int replace_mount(int sock, struct spfs_info_s *info,
 		return -ENOMEM;
 	}
 
-	err = mount_target(sock, info, source, mnt, fstype, mflags, options);
+	err = mount_loop(source, mnt, fstype, mflags, options);
 	if (err)
 		goto free_mnt;
 
@@ -268,3 +211,32 @@ free_mnt:
 	free(mnt);
 	return err;
 }
+
+int replace_mount(int sock, struct spfs_info_s *info,
+		  const char *source, const char *fstype,
+		  const char *mountflags, const char *freeze_cgroup,
+		  const void *options)
+{
+	int pid, err, status;
+
+	pid = fork();
+	switch (pid) {
+		case -1:
+			pr_perror("failed to fork");
+			return -errno;
+		case 0:
+			if (enter_spfs_context(info))
+				_exit(EXIT_FAILURE);
+
+			(void) send_status(sock, 0);
+
+			_exit(do_replace_mount(sock, info, source, fstype,
+						mountflags, freeze_cgroup,
+						options));
+	}
+
+	err = collect_child(pid, &status, 0);
+
+	return err ? err : status;
+}
+
