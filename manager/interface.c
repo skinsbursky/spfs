@@ -681,7 +681,6 @@ int spfs_manager_packet_handler(int sock, void *data, void *package, size_t psiz
 			case 0:
 				_exit(spfs_manager_handle_packet(handler->handle, sock, data, options, psize - (options - cmd)));
 			default:
-				pr_info("forked child\n");
 				return 0;
 		}
 	}

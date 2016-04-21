@@ -128,7 +128,7 @@ static int __spfs_add_one_mountpath(struct spfs_info_s *info, char *path)
 
 	list_for_each_entry(bm, &info->mountpaths.list, list) {
 		if (!strcmp(bm->path, path)) {
-			pr_warn("info %s already has bind mount with path %s\n",
+			pr_warn("spfs %s already has bind mount with path %s\n",
 					info->id, path);
 			return -EEXIST;
 		}
@@ -146,7 +146,7 @@ static int __spfs_add_one_mountpath(struct spfs_info_s *info, char *path)
 	}
 	strcpy(bm->path, path);
 	list_add_tail(&bm->list, &info->mountpaths.list);
-	pr_debug("added bind-mount path %s to spfs info %s\n", bm->path, info->id);
+	pr_debug("added mount path %s to spfs info %s\n", bm->path, info->id);
 	return 0;
 }
 
