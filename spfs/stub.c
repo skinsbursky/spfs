@@ -13,7 +13,7 @@ static int stub_getattr(const char *path, struct stat *stbuf)
 		 * In some cases (say "ls -l /") stat will be called on fuse
 		 * root. It doens't make sense to put the caller to sleep.
 		 * Let's return some directory stat instead. */
-		*stbuf = get_context()->root.stat;
+		*stbuf = get_context()->stub_root_stat;
 		return 0;
 	}
 	return wait_mode_change(SPFS_STUB_MODE);

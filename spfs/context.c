@@ -24,7 +24,6 @@ struct spfs_context_s fs_context = {
 		[SPFS_PROXY_MODE]	= &proxy_operations,
 		[SPFS_STUB_MODE]	= &stub_operations,
 	},
-	.root_lock		= PTHREAD_MUTEX_INITIALIZER,
 	.wm_lock		= PTHREAD_MUTEX_INITIALIZER,
 	.packet_socket		= -1,
 };
@@ -232,13 +231,7 @@ int change_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode, const char *p
 static int setup_context(struct spfs_context_s *ctx, const char *proxy_dir,
 			 spfs_mode_t mode, bool single_user)
 {
-	int err = -ENOMEM;
-
-	ctx->root.name = strdup("/");
-	if (!ctx->root.name) {
-		pr_err("%s: failed to duplicate string\n", __func__);
-		return -ENOMEM;
-	}
+	int err;
 
 	err = set_work_mode(ctx, mode, proxy_dir);
 	if (err) {
@@ -246,9 +239,6 @@ static int setup_context(struct spfs_context_s *ctx, const char *proxy_dir,
 		return err;
 	}
 
-	INIT_LIST_HEAD(&ctx->root.children);
-	INIT_LIST_HEAD(&ctx->root.siblings);
-	ctx->root.parent = &ctx->root;
 	ctx->single_user = single_user;
 
 	return 0;
@@ -264,7 +254,7 @@ int context_store_mnt_stat(const char *mountpoint)
 		return -EINVAL;
 	}
 
-	err = stat(mountpoint, &get_context()->root.stat);
+	err = stat(mountpoint, &ctx->stub_root_stat);
 	if (err < 0) {
 		pr_crit("%s: failed to stat %s\n", __func__, ctx->wm->proxy_dir);
 		return err;

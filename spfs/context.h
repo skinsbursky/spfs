@@ -20,14 +20,6 @@ typedef enum {
 	SPFS_MAX_MODE,
 } spfs_mode_t;
 
-struct dentry_info_s {
-	char   *name;
-	struct stat	 stat;
-	struct dentry_info_s *parent;
-	struct list_head children;
-	struct list_head siblings;
-};
-
 struct work_mode_s {
 	spfs_mode_t		mode;
 	char                    *proxy_dir;
@@ -40,8 +32,7 @@ struct spfs_context_s {
 
 	struct fuse_operations	*operations[SPFS_MAX_MODE];
 
-	struct dentry_info_s	root;
-	pthread_mutex_t		root_lock;
+	struct stat		stub_root_stat;
 
 	int			packet_socket;
 	struct sockaddr_un	sock_addr;
