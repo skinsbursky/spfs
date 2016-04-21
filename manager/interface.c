@@ -313,11 +313,6 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 		return -EINVAL;
 	}
 
-	if (opt_array[6].value == NULL) {
-		pr_err("mode wasn't provided\n");
-		return -EINVAL;
-	}
-
 	if (!strcmp(opt_array[4].value, "proxy") && (opt_array[5].value == NULL)) {
 		pr_err("no proxy directory was provided\n");
 		return -EINVAL;
