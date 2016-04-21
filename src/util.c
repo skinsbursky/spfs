@@ -229,10 +229,10 @@ int collect_child(int pid, int *status, int options)
 		return ECHILD;
 
 	if (WIFSIGNALED(*status)) {
-		pr_err("child %d was killed by %d\n", pid, WTERMSIG(status));
+		pr_err("child %d was killed by %d\n", pid, WTERMSIG(*status));
 		return -EINTR;
 	} else if (WEXITSTATUS(*status)) {
-		pr_err("child %d exited with error %d\n", pid, WEXITSTATUS(status));
+		pr_err("child %d exited with error %d\n", pid, WEXITSTATUS(*status));
 		return WEXITSTATUS(*status);
 	}
 	pr_debug("child %d exited successfully\n", pid);
