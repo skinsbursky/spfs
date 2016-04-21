@@ -14,33 +14,36 @@
 #define round_up(x, y)          ((((x) - 1) | __round_mask(x, y)) + 1)
 
 #define shm_align(x)		(round_up(x, sizeof(long)))
-#define shm_fit(x)		(shm_used_size + x <= shm_alloc_size)
 
-void *shm_pool;
-size_t shm_alloc_size;
-size_t shm_used_size;
-sem_t *shm_pool_sem;
+static struct shared_memory_pool {
+	void	*data;
+	size_t	alloc_size;
+	size_t	used_size;
+	sem_t	sem;
+} *pool;
+
+#define shm_fit(x)		(pool->used_size + x <= pool->alloc_size)
 
 int shm_init_pool(void)
 {
 	size_t size = PAGE_SIZE << 4;
 
-	shm_pool = mmap(NULL, size, PROT_READ | PROT_WRITE,
+	pool = mmap(NULL, size, PROT_READ | PROT_WRITE,
 			 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	if (shm_pool == MAP_FAILED) {
+	if (pool == MAP_FAILED) {
 		pr_perror("failed to allocate shared memory pool");
 		return -errno;
 	}
-	shm_alloc_size = size;
 
-	shm_pool_sem = shm_pool;
-	if (sem_init(shm_pool_sem, 1, 1)) {
+	if (sem_init(&pool->sem, 1, 1)) {
 		pr_perror("failed to init shared memory semaphore");
-		munmap(shm_pool, size);
+		munmap(pool, size);
 		return -errno;
 	}
 
-	shm_used_size += shm_align(sizeof(*shm_pool_sem));
+	pool->data = pool + sizeof(*pool);
+	pool->alloc_size = size;
+	pool->used_size = shm_align(sizeof(*pool));
 
 	return 0;
 }
@@ -51,12 +54,12 @@ static int shm_grow_pool(size_t size)
 
 	grow_size = round_up(size, PAGE_SIZE);
 
-	if (mremap(shm_pool, shm_alloc_size, shm_alloc_size + grow_size, 0) == MAP_FAILED) {
+	if (mremap(pool, pool->alloc_size, pool->alloc_size + grow_size, 0) == MAP_FAILED) {
 		pr_perror("failed to grow shared memory pool");
 		return -errno;
 	}
 
-	shm_alloc_size += grow_size;
+	pool->alloc_size += grow_size;
 	return 0;
 }
 
@@ -67,7 +70,7 @@ void *shm_alloc(size_t size)
 
 	alloc_size = round_up(size, sizeof(long));
 
-	if (sem_wait(shm_pool_sem)) {
+	if (sem_wait(&pool->sem)) {
 		pr_perror("failed to lock shared memory semaphore");
 		return NULL;
 	}
@@ -77,11 +80,12 @@ void *shm_alloc(size_t size)
 			goto unlock;
 	}
 
-	ptr = shm_pool + shm_used_size;
-	shm_used_size += alloc_size;
+	ptr = pool->data + pool->used_size;
+	pool->used_size += alloc_size;
 
+	pr_debug("%s: allocated %ld, return 0x%lx\n", __func__, alloc_size, ptr);
 unlock:
-	if (sem_post(shm_pool_sem))
+	if (sem_post(&pool->sem))
 		pr_perror("failed to unlock spfs semaphore");
 
 	return ptr;
