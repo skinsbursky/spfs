@@ -414,10 +414,6 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 	if (err)
 		return err;
 
-	err = spfs_add_mount_paths(info, info->mountpoint);
-	if (err)
-		return err;
-
 	INIT_LIST_HEAD(&info->list);
 
 	/* TODO: should we add mounpoint _after_ mount? */
