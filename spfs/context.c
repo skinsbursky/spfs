@@ -304,6 +304,21 @@ static void *sock_routine(void *ptr)
 	return NULL;
 }
 
+int start_socket_thread(void)
+{
+	struct spfs_context_s *ctx = get_context();
+	int err;
+
+	err = pthread_create(&ctx->sock_pthread, NULL, sock_routine, ctx);
+	if (err) {
+		pr_perror("%s: failed to create socket pthread", __func__);
+		return -errno;
+	}
+
+	pr_debug("%s: created pthread with ID %ld\n", __func__, ctx->sock_pthread);
+	return 0;
+}
+
 int context_init(const char *proxy_dir, spfs_mode_t mode, const char *log_file,
 		 const char *socket_path, int verbosity, const char *mountpoint,
 		 bool single_user)
@@ -335,13 +350,6 @@ int context_init(const char *proxy_dir, spfs_mode_t mode, const char *log_file,
 		return ctx->packet_socket;
 	}
 
-	err = pthread_create(&ctx->sock_pthread, NULL, sock_routine, ctx);
-	if (err) {
-		pr_perror("%s: failed to create socket pthread", __func__);
-		return -errno;
-	}
-
-	pr_debug("%s: created pthread with ID %ld\n", __func__, ctx->sock_pthread);
 	return 0;
 }
 

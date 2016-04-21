@@ -274,6 +274,9 @@ int main(int argc, char *argv[])
 	}
 
 	err = -1;
+	if (start_socket_thread())
+		goto teardown;
+
 	if (secure_chroot(root))
 		goto teardown;
 

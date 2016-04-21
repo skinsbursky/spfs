@@ -53,6 +53,7 @@ int context_init(const char *proxy_dir, spfs_mode_t mode, const char *log_file,
 		 const char *socket_path, int verbosity, const char *mountpoint,
 		 bool single_user);
 int context_store_mnt_stat(const char *mountpoint);
+int start_socket_thread(void);
 
 void context_fini(void);
 
