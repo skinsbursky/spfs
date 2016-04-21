@@ -111,7 +111,7 @@ int enter_spfs_context(const struct spfs_info_s *info)
 		return -errno;
 	}
 
-	if ((st.st_dev == info->root_stat.st_dev) ||
+	if ((st.st_dev == info->root_stat.st_dev) &&
 	    (st.st_ino == info->root_stat.st_ino)) {
 		pr_debug("root is already %s\n", info->root);
 		return 0;
