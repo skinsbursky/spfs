@@ -19,6 +19,31 @@
 #include "spfs.h"
 #include "freeze.h"
 
+#define ct_run(func, info, ...)							\
+({										\
+	int _pid, _err, _status;						\
+										\
+	_pid = fork();								\
+	switch (_pid) {								\
+		case -1:							\
+			pr_perror("failed to fork");				\
+			_err = -errno;						\
+		case 0:								\
+			_err = enter_spfs_context(info);			\
+			if (_err)						\
+				_exit(-_err);					\
+										\
+			_exit(func(info, ##__VA_ARGS__));			\
+		default:							\
+			_err = 0;						\
+	}									\
+										\
+	if (_pid > 0)								\
+		_err = collect_child(_pid, &_status, 0);			\
+										\
+	_err ? _err : _status;							\
+})
+
 static int do_mount(const char *source, const char *mnt,
 		    const char *fstype, unsigned long mountflags,
 		    const void *options)
