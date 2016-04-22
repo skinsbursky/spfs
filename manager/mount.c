@@ -155,8 +155,6 @@ static int do_replace_spfs_frozen(struct spfs_info_s *info, const char *source)
 
 	(void) unlock_shared_list(&info->mountpaths);
 
-	err = spfs_send_mode(info, SPFS_PROXY_MODE, info->mountpoint);
-
 close_spfs_ref:
 	close(spfs_ref);
 	return err;
@@ -175,7 +173,7 @@ static int do_replace_spfs(struct spfs_info_s *info, const char *source)
 	if (spfs_thaw_ct(info))
 		return -1;
 
-	return err;
+	return spfs_send_mode(info, SPFS_PROXY_MODE, info->mountpoint);
 }
 
 static int umount_target(const struct spfs_info_s *info, const char *mnt)
@@ -232,7 +230,6 @@ static int do_replace_mount(struct spfs_info_s *info, int sock,
 			fstype, mountflags, options);
 	if (err)
 		goto free_mnt;
-
 
 	err = do_replace_spfs(info, mnt);
 	if (err)
