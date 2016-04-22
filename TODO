@@ -1,7 +1,4 @@
 TODO list:
 1) Locks support.
 2) RPM
-3) Do multiple SPFS mounts via command. This (with semaphore synchronisation
-via shm) will allow to order cgroup freezing among multiple NFS remounters.
-4) Do something with "--exit-with-spfs" option, when there are a lot of them.
-5) Mount tmpfs on spfs working directory. Ans umount and unlink this directory on exit.
+3) Clean somehow spfs manager work dir in case of restore failure
