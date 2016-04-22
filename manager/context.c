@@ -23,6 +23,7 @@
 
 #include "context.h"
 #include "spfs.h"
+#include "mount.h"
 
 static struct spfs_manager_context_s spfs_manager_context;
 
@@ -113,6 +114,7 @@ static void cleanup_spfs_mount(struct spfs_info_s *info)
 	info->dead = true;
 	list_del(&info->list);
 	unlink(info->socket_path);
+	cleanup_mount_env(info);
 }
 
 static bool empty_spfs_mounts(struct spfs_manager_context_s *ctx, int pid)
