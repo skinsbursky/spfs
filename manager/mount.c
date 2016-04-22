@@ -17,7 +17,6 @@
 #include "interface.h"
 #include "mount.h"
 #include "spfs.h"
-#include "freeze.h"
 
 #define ct_run(func, info, ...)							\
 ({										\
@@ -167,13 +166,13 @@ static int do_replace_spfs(struct spfs_info_s *info, const char *source)
 {
 	int err;
 
-	err = lock_cgroup_and_freeze(info->fg);
+	err = spfs_freeze_ct(info);
 	if (err)
 		return err;
 
 	err = ct_run(do_replace_spfs_frozen, info, source);
 
-	if (thaw_cgroup_and_unlock(info->fg))
+	if (spfs_thaw_ct(info))
 		return -1;
 
 	return err;
