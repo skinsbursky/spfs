@@ -134,11 +134,18 @@ static int do_replace_spfs_frozen(struct spfs_info_s *info, const char *source)
 {
 	int err;
 	struct spfs_bindmount *bm;
+	int spfs_ref;
+
+	spfs_ref = open(info->mountpoint, O_RDONLY | O_DIRECTORY);
+	if (spfs_ref < 0) {
+		pr_perror("failed to open %s", info->mountpoint);
+		return spfs_ref;
+	}
 
 	err = lock_shared_list(&info->mountpaths);
 	if (err) {
 		pr_err("failed to lock info %s mount paths list\n", info->id);
-		return err;
+		goto close_spfs_ref;
 	}
 
 	list_for_each_entry(bm, &info->mountpaths.list, list) {
@@ -148,7 +155,12 @@ static int do_replace_spfs_frozen(struct spfs_info_s *info, const char *source)
 	}
 
 	(void) unlock_shared_list(&info->mountpaths);
-	return 0;
+
+	err = spfs_send_mode(info, SPFS_PROXY_MODE, info->mountpoint);
+
+close_spfs_ref:
+	close(spfs_ref);
+	return err;
 }
 
 static int do_replace_spfs(struct spfs_info_s *info, const char *source)
@@ -207,8 +219,7 @@ static int do_replace_mount(struct spfs_info_s *info, int sock,
 		const char *mountflags, const void *options)
 {
 	char *mnt;
-	int err = -1, mode = SPFS_PROXY_MODE;
-	int spfs_ref;
+	int err;
 
 	(void) send_status(sock, 0);
 
@@ -223,27 +234,13 @@ static int do_replace_mount(struct spfs_info_s *info, int sock,
 	if (err)
 		goto free_mnt;
 
-	/*TODO: how to hold the fs  ? */
-	spfs_ref = open(info->mountpoint, O_RDONLY | O_DIRECTORY);
-	if (spfs_ref < 0) {
-		pr_perror("failed to open %s", info->mountpoint);
-		goto free_mnt;
-	}
 
 	err = do_replace_spfs(info, mnt);
-	if (err) {
-		pr_err("failed to replace mounts\n");
-		goto close_spfs_ref;
-	}
-
-	err = spfs_send_mode(info, mode, info->mountpoint);
 	if (err)
-		goto close_spfs_ref;
+		goto free_mnt;
 
 	(void) ct_run(umount_target, info, mnt);
 
-close_spfs_ref:
-	close(spfs_ref);
 free_mnt:
 	free(mnt);
 	return err;
