@@ -165,12 +165,16 @@ static int mount_spfs(struct spfs_manager_context_s *ctx,
 	if (status)
 		goto free_log_path;
 
+	status = prepare_mount_env(info);
+	if (status)
+		goto free_log_path;
+
 	pid = fork();
 	switch (pid) {
 		case -1:
 			pr_perror("failed to fork");
 			status = -errno;
-			goto free_log_path;
+			goto cleanup_env;
 		case 0:
 			close(initpipe[0]);
 			_exit(exec_spfs(initpipe[1], info, mode,
@@ -246,6 +250,8 @@ kill_spfs:
 	kill_child_and_collect(pid);
 umount_spfs:
 	umount(info->mountpoint);
+cleanup_env:
+	cleanup_mount_env(info);
 	goto free_log_path;
 }
 
@@ -366,10 +372,6 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 		pr_perror("failed to allocate string\n");
 		return -ENOMEM;
 	}
-
-	err = create_dir("%s%s", info->root, info->work_dir);
-	if (err)
-		return err;
 
 	info->socket_path = shm_xsprintf("spfs-%s.sock", info->id);
 	if (!info->socket_path) {
