@@ -169,6 +169,8 @@ static int do_replace_spfs(struct spfs_info_s *info, const char *source)
 
 static int umount_target(const struct spfs_info_s *info, const char *mnt)
 {
+	pr_debug("Unmounting %s\n", mnt);
+
 	if (umount2(mnt, MNT_DETACH)) {
 		pr_perror("failed to umount %s", mnt);
 		return -1;
@@ -237,8 +239,6 @@ static int do_replace_mount(struct spfs_info_s *info, int sock,
 	err = spfs_send_mode(info, mode, info->mountpoint);
 	if (err)
 		goto close_spfs_ref;
-
-	pr_debug("Unmounting %s\n", mnt);
 
 	(void) ct_run(umount_target, info, mnt);
 
