@@ -104,20 +104,16 @@ static int do_replace_one_spfs(const char *source, const char *target)
 	return 0;
 }
 
-static int do_replace_spfs(struct spfs_info_s *info, const char *source,
+static int do_replace_spfs_frozen(struct spfs_info_s *info, const char *source,
 			   const char *freeze_cgroup)
 {
 	int err;
 	struct spfs_bindmount *bm;
 
-	err = lock_cgroup_and_freeze(info->fg);
-	if (err)
-		return err;
-
 	err = lock_shared_list(&info->mountpaths);
 	if (err) {
 		pr_err("failed to lock info %s mount paths list\n", info->id);
-		goto thaw_cgroup;
+		return err;
 	}
 
 	list_for_each_entry(bm, &info->mountpaths.list, list) {
@@ -125,11 +121,25 @@ static int do_replace_spfs(struct spfs_info_s *info, const char *source,
 			pr_err("failed to replace %s by %s\n", bm->path, source);
 		}
 	}
-	(void) unlock_shared_list(&info->mountpaths);
 
-thaw_cgroup:
+	(void) unlock_shared_list(&info->mountpaths);
+	return 0;
+}
+
+static int do_replace_spfs(struct spfs_info_s *info, const char *source,
+			   const char *freeze_cgroup)
+{
+	int err;
+
+	err = lock_cgroup_and_freeze(info->fg);
+	if (err)
+		return err;
+
+	err = do_replace_spfs_frozen(info, source, freeze_cgroup);
+
 	if (thaw_cgroup_and_unlock(info->fg))
 		return -1;
+
 	return err;
 }
 
