@@ -191,15 +191,11 @@ static int do_mount_target(struct spfs_info_s *info,
 	if (err)
 		return err;
 
-	err = spfs_send_mode(info->sock, mode, target);
-	if (err) {
-		pr_err("failed to switch spfs to proxy mode to %s: %d\n",
-				target, err);
-		/*TODO: should umount target ? */
+	err = spfs_send_mode(info, mode, target);
+	if (err)
+		/*TODO: should umount the target ? */
 		return err;
-	}
 
-	pr_debug("spfs mode was changed to %d (path: %s)\n", mode, target);
 	return 0;
 }
 
@@ -238,15 +234,9 @@ static int do_replace_mount(struct spfs_info_s *info, int sock,
 		goto close_spfs_ref;
 	}
 
-	err = spfs_send_mode(info->sock, mode, info->mountpoint);
-	if (err) {
-		pr_err("failed to switch spfs to proxy mode to %s: %d\n",
-					info->mountpoint, err);
+	err = spfs_send_mode(info, mode, info->mountpoint);
+	if (err)
 		goto close_spfs_ref;
-	}
-
-	pr_debug("spfs mode was changed to %d (path: %s)\n", mode,
-				info->mountpoint);
 
 	pr_debug("Unmounting %s\n", mnt);
 

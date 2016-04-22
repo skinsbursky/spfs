@@ -32,6 +32,4 @@ static inline void fill_mount_packet(struct external_cmd *package,
 	sprintf(dp->mountdata, "%s;%s;%s", source, type, options);
 }
 
-int spfs_send_mode(int sock, spfs_mode_t mode, const char *path_to_send);
-
 #endif

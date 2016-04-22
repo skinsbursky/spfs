@@ -93,28 +93,6 @@ static int parse_cmd_options(struct opt_array_s *array, char *options)
 	return 0;
 }
 
-int spfs_send_mode(int sock, spfs_mode_t mode, const char *path_to_send)
-{
-	size_t psize;
-	struct external_cmd *package;
-	int err;
-
-	pr_debug("changing mode to %d (path: %s)\n", mode, path_to_send ? : "none");
-	psize = mode_packet_size(path_to_send);
-
-	package = malloc(psize);
-	if (!package) {
-		pr_err("failed to allocate package\n");
-		return -ENOMEM;
-	}
-	fill_mode_packet(package, mode, path_to_send);
-
-	err = seqpacket_sock_send(sock, package, psize);
-
-	free(package);
-	return err;
-}
-
 static int exec_spfs(int pipe, const struct spfs_info_s *info, char *mode,
 		     char *proxy_dir, char *socket_path, char *log_path,
 		     char *mountpoint)
@@ -426,14 +404,14 @@ static int change_spfs_mode(struct spfs_manager_context_s *ctx,
 	int err;
 
 	if (info)
-		return spfs_send_mode(info->sock, mode, proxy_dir);
+		return spfs_send_mode(info, mode, proxy_dir);
 
 	err = lock_shared_list(ctx->spfs_mounts);
 	if (err)
 		return err;
 
 	list_for_each_entry(info, &ctx->spfs_mounts->list, list) {
-		err = spfs_send_mode(info->sock, mode, proxy_dir);
+		err = spfs_send_mode(info, mode, proxy_dir);
 		if (err)
 			break;
 	}

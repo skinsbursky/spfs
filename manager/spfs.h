@@ -10,6 +10,9 @@
 #include "include/list.h"
 #include "include/shm.h"
 
+#include "spfs/context.h"
+#include "spfs/interface.h"
+
 struct freeze_cgroup_s;
 
 struct spfs_bindmount {
@@ -45,4 +48,6 @@ int spfs_add_mount_paths(struct spfs_info_s *info, const char *bind_mounts);
 
 int enter_spfs_context(const struct spfs_info_s *info);
 
+int spfs_send_mode(const struct spfs_info_s *info,
+		   spfs_mode_t mode, const char *proxy_dir);
 #endif

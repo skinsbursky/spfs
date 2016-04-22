@@ -4,6 +4,7 @@
 #include "include/log.h"
 #include "include/shm.h"
 #include "include/util.h"
+#include "include/socket.h"
 
 #include "spfs.h"
 #include "context.h"
@@ -182,5 +183,36 @@ int spfs_add_mount_paths(struct spfs_info_s *info, const char *bind_mounts)
 
 free_bm_array:
 	free(bm_array);
+	return err;
+}
+
+int spfs_send_mode(const struct spfs_info_s *info,
+		   spfs_mode_t mode, const char *proxy_dir)
+{
+	size_t psize;
+	struct external_cmd *package;
+	int err;
+
+	pr_debug("changing spfs %s mode to %d (path: %s)\n", info->id, mode,
+			proxy_dir ? : "none");
+
+	psize = mode_packet_size(proxy_dir);
+
+	package = malloc(psize);
+	if (!package) {
+		pr_err("failed to allocate package\n");
+		return -ENOMEM;
+	}
+	fill_mode_packet(package, mode, proxy_dir);
+
+	err = seqpacket_sock_send(info->sock, package, psize);
+	if (err)
+		pr_err("failed to switch spfs %s to proxy mode to %s: %d\n",
+				info->id, proxy_dir, err);
+	else
+		pr_debug("spfs %s mode was changed to %d (path: %s)\n",
+				info->id, mode, proxy_dir);
+
+	free(package);
 	return err;
 }
