@@ -490,6 +490,8 @@ int set_freeze_cgroup(struct spfs_manager_context_s *ctx, struct spfs_info_s *in
 		} else
 			err = -ENOMEM;
 	}
+	if (fg)
+		info->fg = fg;
 
 	(void) unlock_shared_list(list);
 	return err;
