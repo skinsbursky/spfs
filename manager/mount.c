@@ -70,7 +70,8 @@ static int do_mount(const char *source, const char *mnt,
 	return -errno;
 }
 
-static int mount_loop(const char *source, const char *mnt,
+static int mount_loop(struct spfs_info_s *info,
+		      const char *source, const char *mnt,
 		      const char *fstype, unsigned long mountflags,
 		      const void *options)
 {
@@ -177,7 +178,7 @@ static int umount_target(const struct spfs_info_s *info, const char *mnt)
 	return 0;
 }
 
-static int do_mount_target(int sock, struct spfs_info_s *info,
+static int do_mount_target(struct spfs_info_s *info,
 		const char *source, const char *target, const char *fstype,
 		const char *mountflags, const void *options)
 {
@@ -188,7 +189,7 @@ static int do_mount_target(int sock, struct spfs_info_s *info,
 	if (err)
 		return err;
 
-	err = mount_loop(source, target, fstype, mflags, options);
+	err = mount_loop(info, source, target, fstype, mflags, options);
 	if (err)
 		return err;
 
@@ -205,7 +206,7 @@ static int do_mount_target(int sock, struct spfs_info_s *info,
 }
 
 
-static int do_replace_mount(int sock, struct spfs_info_s *info,
+static int do_replace_mount(struct spfs_info_s *info, int sock,
 		const char *source, const char *fstype,
 		const char *mountflags, const char *freeze_cgroup,
 		const void *options)
@@ -214,13 +215,15 @@ static int do_replace_mount(int sock, struct spfs_info_s *info,
 	int err = -1, mode = SPFS_PROXY_MODE;
 	int spfs_ref;
 
+	(void) send_status(sock, 0);
+
 	mnt = xsprintf("%s/%s", info->work_dir, fstype);
 	if (!mnt) {
 		pr_err("failed to allocate\n");
 		return -ENOMEM;
 	}
 
-	err = do_mount_target(sock, info, source, mnt,
+	err = do_mount_target(info, source, mnt,
 				fstype, mountflags, options);
 	if (err)
 		goto free_mnt;
@@ -275,9 +278,7 @@ int replace_mount(int sock, struct spfs_info_s *info,
 			if (enter_spfs_context(info))
 				_exit(EXIT_FAILURE);
 
-			(void) send_status(sock, 0);
-
-			_exit(do_replace_mount(sock, info, source, fstype,
+			_exit(do_replace_mount(info, sock, source, fstype,
 						mountflags, freeze_cgroup,
 						options));
 	}
