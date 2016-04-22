@@ -43,6 +43,40 @@
 	_err ? _err : _status;							\
 })
 
+static int prepare_mount_env_ct(struct spfs_info_s *info)
+{
+	int err;
+
+	err = create_dir("%s", info->work_dir);
+	if (err)
+		return err;
+
+	return mount("spfs-manager", info->work_dir, "tmpfs", 0, "size=1m");
+}
+
+int prepare_mount_env(struct spfs_info_s *info)
+{
+	return ct_run(prepare_mount_env_ct, info);
+}
+
+static int cleanup_mount_env_ct(struct spfs_info_s *info)
+{
+	if (umount(info->work_dir)) {
+		pr_perror("failed to umount %s", info->work_dir);
+		return -errno;
+	}
+	if (rmdir(info->work_dir)) {
+		pr_perror("failed to remove directory %s", info->work_dir);
+		return -errno;
+	}
+	return 0;
+}
+
+int cleanup_mount_env(struct spfs_info_s *info)
+{
+	return ct_run(cleanup_mount_env_ct, info);
+}
+
 static int do_mount(const char *source, const char *mnt,
 		    const char *fstype, unsigned long mountflags,
 		    const void *options)

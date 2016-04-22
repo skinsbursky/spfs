@@ -6,6 +6,9 @@
 struct spfs_manager_context_s;
 struct spfs_info_s;
 
+int prepare_mount_env(struct spfs_info_s *info);
+int cleanup_mount_env(struct spfs_info_s *info);
+
 int replace_mount(int sock, struct spfs_info_s *info,
 		  const char *source, const char *fstype,
 		  const char *mountflags, const void *options);
