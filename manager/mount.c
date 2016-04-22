@@ -152,6 +152,34 @@ static int umount_target(const struct spfs_info_s *info, const char *mnt)
 	return 0;
 }
 
+static int do_mount_target(int sock, struct spfs_info_s *info,
+		const char *source, const char *target, const char *fstype,
+		const char *mountflags, const void *options)
+{
+	int err, mode = SPFS_PROXY_MODE;
+	long mflags;
+
+	err = xatol(mountflags, &mflags);
+	if (err)
+		return err;
+
+	err = mount_loop(source, target, fstype, mflags, options);
+	if (err)
+		return err;
+
+	err = spfs_send_mode(info->sock, mode, target);
+	if (err) {
+		pr_err("failed to switch spfs to proxy mode to %s: %d\n",
+				target, err);
+		/*TODO: should umount target ? */
+		return err;
+	}
+
+	pr_debug("spfs mode was changed to %d (path: %s)\n", mode, target);
+	return 0;
+}
+
+
 static int do_replace_mount(int sock, struct spfs_info_s *info,
 		const char *source, const char *fstype,
 		const char *mountflags, const char *freeze_cgroup,
@@ -159,12 +187,7 @@ static int do_replace_mount(int sock, struct spfs_info_s *info,
 {
 	char *mnt;
 	int err = -1, mode = SPFS_PROXY_MODE;
-	long mflags;
 	int spfs_ref;
-
-	err = xatol(mountflags, &mflags);
-	if (err)
-		return err;
 
 	mnt = xsprintf("%s/%s", info->work_dir, fstype);
 	if (!mnt) {
@@ -172,19 +195,12 @@ static int do_replace_mount(int sock, struct spfs_info_s *info,
 		return -ENOMEM;
 	}
 
-	err = mount_loop(source, mnt, fstype, mflags, options);
+	err = do_mount_target(sock, info, source, mnt,
+				fstype, mountflags, options);
 	if (err)
 		goto free_mnt;
 
-	err = spfs_send_mode(info->sock, mode, mnt);
-	if (err) {
-		pr_err("failed to switch spfs to proxy mode to %s: %d\n", mnt,
-				err);
-		goto free_mnt;
-	}
-
-	pr_debug("spfs mode was changed to %d (path: %s)\n", mode, mnt);
-
+	/*TODO: how to hold the fs  ? */
 	spfs_ref = open(info->mountpoint, O_RDONLY | O_DIRECTORY);
 	if (spfs_ref < 0) {
 		pr_perror("failed to open %s", info->mountpoint);
