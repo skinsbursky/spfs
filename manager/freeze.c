@@ -138,7 +138,7 @@ int lock_cgroup_and_freeze(struct freeze_cgroup_s *fg)
 		return err;
 	}
 
-	pr_debug("cgroup %s was freezed\n", fg->path);
+	pr_debug("cgroup %s was frozen\n", fg->path);
 
 	return 0;
 }
