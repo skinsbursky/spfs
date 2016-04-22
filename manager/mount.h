@@ -8,7 +8,6 @@ struct spfs_info_s;
 
 int replace_mount(int sock, struct spfs_info_s *info,
 		  const char *source, const char *fstype,
-		  const char *mountflags, const char *freeze_cgroup,
-		  const void *options);
+		  const char *mountflags, const void *options);
 
 #endif

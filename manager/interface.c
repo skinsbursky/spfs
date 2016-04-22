@@ -597,7 +597,7 @@ static int process_replace_cmd(int sock, struct spfs_manager_context_s *ctx,
 	}
 
 	return replace_mount(sock, info, opt_array[1].value, opt_array[2].value,
-			     opt_array[3].value, opt_array[4].value, opts);
+			     opt_array[3].value, opts);
 }
 
 const struct spfs_manager_cmd_handler_s handlers[] = {

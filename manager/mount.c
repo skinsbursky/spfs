@@ -130,8 +130,7 @@ static int do_replace_one_spfs(const char *source, const char *target)
 	return 0;
 }
 
-static int do_replace_spfs_frozen(struct spfs_info_s *info, const char *source,
-			   const char *freeze_cgroup)
+static int do_replace_spfs_frozen(struct spfs_info_s *info, const char *source)
 {
 	int err;
 	struct spfs_bindmount *bm;
@@ -152,8 +151,7 @@ static int do_replace_spfs_frozen(struct spfs_info_s *info, const char *source,
 	return 0;
 }
 
-static int do_replace_spfs(struct spfs_info_s *info, const char *source,
-			   const char *freeze_cgroup)
+static int do_replace_spfs(struct spfs_info_s *info, const char *source)
 {
 	int err;
 
@@ -161,7 +159,7 @@ static int do_replace_spfs(struct spfs_info_s *info, const char *source,
 	if (err)
 		return err;
 
-	err = do_replace_spfs_frozen(info, source, freeze_cgroup);
+	err = do_replace_spfs_frozen(info, source);
 
 	if (thaw_cgroup_and_unlock(info->fg))
 		return -1;
@@ -208,8 +206,7 @@ static int do_mount_target(struct spfs_info_s *info,
 
 static int do_replace_mount(struct spfs_info_s *info, int sock,
 		const char *source, const char *fstype,
-		const char *mountflags, const char *freeze_cgroup,
-		const void *options)
+		const char *mountflags, const void *options)
 {
 	char *mnt;
 	int err = -1, mode = SPFS_PROXY_MODE;
@@ -235,7 +232,7 @@ static int do_replace_mount(struct spfs_info_s *info, int sock,
 		goto free_mnt;
 	}
 
-	err = do_replace_spfs(info, mnt, freeze_cgroup);
+	err = do_replace_spfs(info, mnt);
 	if (err) {
 		pr_err("failed to replace mounts\n");
 		goto close_spfs_ref;
@@ -264,10 +261,8 @@ free_mnt:
 
 int replace_mount(int sock, struct spfs_info_s *info,
 		  const char *source, const char *fstype,
-		  const char *mountflags, const char *freeze_cgroup,
-		  const void *options)
+		  const char *mountflags, const void *options)
 {
 	return ct_run(do_replace_mount, info,
-			sock, source, fstype, mountflags, freeze_cgroup,
-			options);
+			sock, source, fstype, mountflags, options);
 }
