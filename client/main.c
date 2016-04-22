@@ -17,14 +17,14 @@ static int send_mount(const char *socket_path, const char *source, const char *t
 	struct external_cmd *package;
 	int err;
 
-	printf("mounting %s with flags %ld and options '%s'\n", type,
+	fprintf(stdout, "mounting %s with flags %ld and options '%s'\n", type,
 			mountflags, options);
 
 	len = mount_packet_size(source, type, options);
 
 	package = malloc(len);
 	if (!package) {
-		printf("failed to allocate package\n");
+		fprintf(stderr, "failed to allocate package\n");
 		return -ENOMEM;
 	}
 	fill_mount_packet(package, source, type, options, mountflags);
@@ -41,12 +41,12 @@ static int send_mode(const char *socket_path, spfs_mode_t mode, const char *path
 	struct external_cmd *package;
 	int err;
 
-	printf("changing mode to %d (path: %s)\n", mode, path_to_send ? : "none");
+	fprintf(stdout, "changing mode to %d (path: %s)\n", mode, path_to_send ? : "none");
 	len = mode_packet_size(path_to_send);
 
 	package = malloc(len);
 	if (!package) {
-		printf("failed to allocate package\n");
+		fprintf(stderr, "failed to allocate package\n");
 		return -ENOMEM;
 	}
 	fill_mode_packet(package, mode, path_to_send);
@@ -59,26 +59,26 @@ static int send_mode(const char *socket_path, spfs_mode_t mode, const char *path
 
 static void help(char *program)
 {
-	printf("usage: %s command [options|payload]\n", program);
-	printf("\n");
-	printf("commands:\n");
-	printf("\tmode                   allows to change mode work mode.\n");
-	printf("\treplace                allows to request for spfs replacement.\n");
-	printf("\tmanage                 send request to spfs manager\n");
-	printf("\n");
-	printf("general options:\n");
-	printf("\t-s   --socket-path     control socket bind path\n");
-	printf("\t-h   --help            print help (for double option will print fuse help)\n");
-	printf("\n");
-	printf("Mode options:\n");
-	printf("\t--mode                 mode string (\"proxy\", \"stub\", or \"golem\")\n");
-	printf("\t--path_to_send         proxy directory path to send to spfs\n");
-	printf("\n");
-	printf("Mount options:\n");
-	printf("\t--source               file system fype source (default: \"none\")\n");
-	printf("\t--fstype               file system fype (string)\n");
-	printf("\t--mountflags           file system mount flags (default: 0)\n");
-	printf("\t--options              file system mount options (default: empty)\n");
+	fprintf(stdout, "usage: %s command [options|payload]\n", program);
+	fprintf(stdout, "\n");
+	fprintf(stdout, "commands:\n");
+	fprintf(stdout, "\tmode                   allows to change mode work mode.\n");
+	fprintf(stdout, "\treplace                allows to request for spfs replacement.\n");
+	fprintf(stdout, "\tmanage                 send request to spfs manager\n");
+	fprintf(stdout, "\n");
+	fprintf(stdout, "general options:\n");
+	fprintf(stdout, "\t-s   --socket-path     control socket bind path\n");
+	fprintf(stdout, "\t-h   --help            print help (for double option will print fuse help)\n");
+	fprintf(stdout, "\n");
+	fprintf(stdout, "Mode options:\n");
+	fprintf(stdout, "\t--mode                 mode string (\"proxy\", \"stub\", or \"golem\")\n");
+	fprintf(stdout, "\t--path_to_send         proxy directory path to send to spfs\n");
+	fprintf(stdout, "\n");
+	fprintf(stdout, "Mount options:\n");
+	fprintf(stdout, "\t--source               file system fype source (default: \"none\")\n");
+	fprintf(stdout, "\t--fstype               file system fype (string)\n");
+	fprintf(stdout, "\t--mountflags           file system mount flags (default: 0)\n");
+	fprintf(stdout, "\t--options              file system mount options (default: empty)\n");
 }
 
 static int execude_mount_cmd(int argc, char **argv)
@@ -108,7 +108,7 @@ static int execude_mount_cmd(int argc, char **argv)
 		switch (c) {
 			case 'f':
 				if (xatol(optarg, &mountflags))
-					printf("mountflags is not a number: %s\n", optarg);
+					fprintf(stderr, "mountflags is not a number: %s\n", optarg);
 				break;
 			case 't':
 				type = optarg;
@@ -126,19 +126,20 @@ static int execude_mount_cmd(int argc, char **argv)
 				help(argv[0]);
 				return 0;
 			case '?':
+				fprintf(stderr, "unknown option: %s\n", argv[optind]);
 				help(argv[0]);
 				return 1;
 		}
 	}
 
 	if (!type) {
-		printf("File system type wasn't provided\n");
+		fprintf(stderr, "File system type wasn't provided\n");
 		help(argv[0]);
 		return 1;
 	}
 
 	if (!socket_path) {
-		printf("Socket path wasn't provided\n");
+		fprintf(stderr, "Socket path wasn't provided\n");
 		help(argv[0]);
 		return 1;
 	}
@@ -171,26 +172,27 @@ static int execude_manage_cmd(int argc, char **argv)
 				help(argv[0]);
 				return 0;
 			case '?':
+				fprintf(stderr, "unknown option: %s\n", argv[optind]);
 				help(argv[0]);
 				return 1;
 		}
 	}
 
 	if (!socket_path) {
-		printf("Socket path wasn't provided\n");
+		fprintf(stderr, "Socket path wasn't provided\n");
 		help(argv[0]);
 		return 1;
 	}
 
 	if (optind >= argc) {
-		printf("Expected argument after options\n");
+		fprintf(stderr, "Expected argument after options\n");
 		help(argv[0]);
 		return 1;
 	}
 
 	payload = argv[optind];
 
-	printf("sending: '%s'\n", payload);
+	fprintf(stdout, "sending: '%s'\n", payload);
 
 	return send_packet(socket_path, payload, strlen(payload) + 1);
 }
@@ -230,20 +232,20 @@ static int execude_mode_cmd(int argc, char **argv)
 				help(argv[0]);
 				return 0;
 			case '?':
-				printf("unknown option: %s\n", argv[optind]);
+				fprintf(stderr, "unknown option: %s\n", argv[optind]);
 				help(argv[0]);
 				return 1;
 		}
 	}
 
 	if (!mode) {
-		printf("Mode wasn't provided\n");
+		fprintf(stderr, "Mode wasn't provided\n");
 		help(argv[0]);
 		return 1;
 	}
 
 	if (!socket_path) {
-		printf("Socket path wasn't provided\n");
+		fprintf(stderr, "Socket path wasn't provided\n");
 		help(argv[0]);
 		return 1;
 	}
@@ -271,11 +273,11 @@ int main(int argc, char **argv)
 	else if (!strcmp(argv[1], "manage"))
 		err = execude_manage_cmd(argc-1, argv+1);
 	else {
-		printf("Unknown command: %s\n", argv[1]);
+		fprintf(stderr, "Unknown command: %s\n", argv[1]);
 		help(argv[0]);
 		return 1;
 	}
 	if (err)
-		printf("failed with error %d\n", err);
+		fprintf(stderr, "failed with error %d\n", err);
 	return err;
 }
