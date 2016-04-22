@@ -267,24 +267,7 @@ int replace_mount(int sock, struct spfs_info_s *info,
 		  const char *mountflags, const char *freeze_cgroup,
 		  const void *options)
 {
-	int pid, err, status;
-
-	pid = fork();
-	switch (pid) {
-		case -1:
-			pr_perror("failed to fork");
-			return -errno;
-		case 0:
-			if (enter_spfs_context(info))
-				_exit(EXIT_FAILURE);
-
-			_exit(do_replace_mount(info, sock, source, fstype,
-						mountflags, freeze_cgroup,
-						options));
-	}
-
-	err = collect_child(pid, &status, 0);
-
-	return err ? err : status;
+	return ct_run(do_replace_mount, info,
+			sock, source, fstype, mountflags, freeze_cgroup,
+			options);
 }
-
