@@ -355,7 +355,13 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 		return -ENOMEM;
 	}
 
-	info->work_dir = shm_xsprintf("/run/spfs/%s", info->id);
+	/*
+	 * SPFS work dir is placed to the root mount.
+	 * Would be nice to have it somewhere in /run/..., but in case of CRIU,
+	 * /run can not be mounted yet. Thus, our directory can be overmounted
+	 * after creation.
+	 */
+	info->work_dir = shm_xsprintf("/.spfs-%s", info->id);
 	if (!info->work_dir) {
 		pr_perror("failed to allocate string\n");
 		return -ENOMEM;

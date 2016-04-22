@@ -49,12 +49,6 @@ static int do_mount(const char *source, const char *mnt,
 {
 	int err;
 
-	err = create_dir(mnt);
-	if (err) {
-		pr_err("failed to create mountpoint %s\n", mnt);
-		return err;
-	}
-
 	err = mount(source, mnt, fstype, mountflags, options);
 	if (!err)
 		return 0;
@@ -74,11 +68,18 @@ static int mount_loop(struct spfs_info_s *info,
 		      const char *fstype, unsigned long mountflags,
 		      const void *options)
 {
-	int err = 0;
+	int err;
 	int timeout = 1;
 
 	pr_debug("trying to mount %s, source %s, flags %ld, options '%s' to %s\n",
 			fstype, source, mountflags, options, mnt);
+
+	err = create_dir(mnt);
+	if (err) {
+		pr_err("failed to create mountpoint %s\n", mnt);
+		return err;
+	}
+
 	while (1) {
 		err = do_mount(source, mnt, fstype, mountflags, options);
 		if (err != -EAGAIN)
