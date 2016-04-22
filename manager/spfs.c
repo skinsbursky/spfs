@@ -8,6 +8,7 @@
 
 #include "spfs.h"
 #include "context.h"
+#include "freeze.h"
 
 static struct spfs_info_s *__find_spfs_by_id(struct shared_list *mounts, const char *id)
 {
@@ -215,4 +216,16 @@ int spfs_send_mode(const struct spfs_info_s *info,
 
 	free(package);
 	return err;
+}
+
+int spfs_freeze_ct(struct spfs_info_s *info)
+{
+	pr_debug("Freeze %s in favor of spfs %s\n", info->fg->path, info->id);
+	return lock_cgroup_and_freeze(info->fg);
+}
+
+int spfs_thaw_ct(struct spfs_info_s *info)
+{
+	pr_debug("Thaw %s in favor of spfs %s\n", info->fg->path, info->id);
+	return thaw_cgroup_and_unlock(info->fg);
 }
