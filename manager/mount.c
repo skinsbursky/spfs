@@ -159,7 +159,7 @@ static int do_replace_spfs(struct spfs_info_s *info, const char *source)
 	if (err)
 		return err;
 
-	err = do_replace_spfs_frozen(info, source);
+	err = ct_run(do_replace_spfs_frozen, info, source);
 
 	if (thaw_cgroup_and_unlock(info->fg))
 		return -1;
@@ -187,7 +187,7 @@ static int do_mount_target(struct spfs_info_s *info,
 	if (err)
 		return err;
 
-	err = mount_loop(info, source, target, fstype, mflags, options);
+	err = ct_run(mount_loop, info, source, target, fstype, mflags, options);
 	if (err)
 		return err;
 
@@ -217,7 +217,7 @@ static int do_replace_mount(struct spfs_info_s *info, int sock,
 	}
 
 	err = do_mount_target(info, source, mnt,
-				fstype, mountflags, options);
+			fstype, mountflags, options);
 	if (err)
 		goto free_mnt;
 
@@ -240,7 +240,7 @@ static int do_replace_mount(struct spfs_info_s *info, int sock,
 
 	pr_debug("Unmounting %s\n", mnt);
 
-	(void) umount_target(info, mnt);
+	(void) ct_run(umount_target, info, mnt);
 
 close_spfs_ref:
 	close(spfs_ref);
@@ -253,6 +253,5 @@ int replace_mount(int sock, struct spfs_info_s *info,
 		  const char *source, const char *fstype,
 		  const char *mountflags, const void *options)
 {
-	return ct_run(do_replace_mount, info,
-			sock, source, fstype, mountflags, options);
+	return do_replace_mount(info, sock, source, fstype, mountflags, options);
 }
