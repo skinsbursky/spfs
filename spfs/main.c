@@ -243,7 +243,7 @@ int main(int argc, char *argv[])
 		return -1;
 
 	if (access("/dev/fuse", R_OK | W_OK)) {
-		pr_crit("/dev/fuse is not accessible\n");
+		pr_perror("/dev/fuse is not accessible");
 		return -1;
 	}
 
