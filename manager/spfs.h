@@ -32,6 +32,7 @@ struct spfs_info_s {
 	char			*socket_path;
 	int			sock;
 	pid_t			pid;
+	struct stat		spfs_stat;
 	struct stat		root_stat;
 	struct freeze_cgroup_s	*fg;
 	bool			dead;

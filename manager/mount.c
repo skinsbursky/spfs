@@ -170,6 +170,11 @@ static int do_replace_spfs_frozen(struct spfs_info_s *info, const char *source)
 	struct spfs_bindmount *bm;
 	int spfs_ref;
 
+	if (stat(info->mountpoint, &info->spfs_stat)) {
+		pr_perror("failed to stat %s", info->mountpoint);
+		return -errno;
+	}
+
 	spfs_ref = open(info->mountpoint, O_RDONLY | O_DIRECTORY);
 	if (spfs_ref < 0) {
 		pr_perror("failed to open %s", info->mountpoint);
