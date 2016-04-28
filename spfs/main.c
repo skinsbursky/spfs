@@ -270,6 +270,11 @@ int main(int argc, char *argv[])
 		err = check_capabilities(1 << CAP_SYS_ADMIN, getpid());
 		if (err == 0)
 			pr_info("CAP_SYS_ADMIN is not set.\n");
+
+		if (access("/sys/module/fuse", F_OK)) {
+			pr_perror("failed to access /sys/module/fuse");
+			pr_err("FUSE module not loaded?");
+		}
 		return -1;
 	}
 
