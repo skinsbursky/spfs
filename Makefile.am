@@ -44,18 +44,21 @@ bin_spfs_manager_SOURCES =	manager/main.c			\
 				manager/mount.c			\
 				manager/spfs.c			\
 				manager/freeze.c		\
+				manager/swapfd.c		\
 								\
 				manager/context.h		\
 				manager/interface.h		\
 				manager/mount.h			\
 				manager/spfs.h			\
 				manager/freeze.h		\
+				manager/swapfd.h		\
 								\
 				src/util.c			\
 				src/socket.c			\
 				src/ipc.c			\
 				src/log.c			\
 				src/shm.c			\
+				src/ptrace.c			\
 								\
 				spfs/interface.h		\
 				spfs/context.h			\
@@ -65,6 +68,7 @@ bin_spfs_manager_SOURCES =	manager/main.c			\
 				include/socket.h		\
 				include/list.h			\
 				include/shm.h			\
+				include/ptrace.h		\
 				include/util.h
 
 tags: ctags
