@@ -83,7 +83,6 @@ void *shm_alloc(size_t size)
 	ptr = pool->data + pool->used_size;
 	pool->used_size += alloc_size;
 
-	pr_debug("%s: allocated %ld, return 0x%lx\n", __func__, alloc_size, ptr);
 unlock:
 	if (sem_post(&pool->sem))
 		pr_perror("failed to unlock spfs semaphore");
