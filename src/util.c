@@ -113,13 +113,15 @@ int save_fd(int fd, unsigned flags)
 int execvp_print(const char *file, char *const argv[])
 {
 	const char **tmp = (const char **)argv;
+	char *options = NULL;
 
-	pr_info("Executing %s with options: ", file);
-	while (*tmp) {
-		print_on_level(LOG_INFO, "%s ", *tmp);
-		tmp++;
-	}
-	print_on_level(LOG_INFO, "\n");
+	while (*tmp)
+		options = xstrcat(options, "%s ", *tmp++);
+
+	pr_info("Executing %s with options: %s\n", file,
+			options ? options : "none");
+
+	free(options);
 
 	execvp(file, argv);
 
