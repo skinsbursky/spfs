@@ -227,8 +227,8 @@ repeat:
 	}
 
 	status = 0;
-	pr_info("%s: spfs on %s started successfully\n", __func__,
-			info->mountpoint);
+	pr_info("%s: spfs on %s with pid %d started successfully\n", __func__,
+			info->mountpoint, pid);
 
 	info->pid = pid;
 
