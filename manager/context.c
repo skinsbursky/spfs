@@ -27,11 +27,34 @@
 
 static struct spfs_manager_context_s spfs_manager_context;
 
-static int join_one_namespace(int pid, const char *ns, int ns_type)
+static int get_namespace_type(const char *ns)
+{
+	if (!strcmp(ns, "user"))
+		return CLONE_NEWUSER;
+	if (!strcmp(ns, "mnt"))
+		return CLONE_NEWNS;
+	if (!strcmp(ns, "net"))
+		return CLONE_NEWNET;
+	if (!strcmp(ns, "pid"))
+		return CLONE_NEWPID;
+	if (!strcmp(ns, "uts"))
+		return CLONE_NEWPID;
+	if (!strcmp(ns, "ipc"))
+		return CLONE_NEWIPC;
+
+	pr_err("unknown namespace: %s\n", ns);
+	return -EINVAL;
+}
+
+int join_one_namespace(int pid, const char *ns)
 {
 	int ns_fd;
 	char *path;
-	int err = 0;
+	int err = 0, ns_type;
+
+	ns_type = get_namespace_type(ns);
+	if (ns_type < 0)
+		return ns_type;
 
 	path = xsprintf("/proc/%d/ns/%s", pid, ns);
 	if (!path)
@@ -55,25 +78,6 @@ free_path:
 	return err;
 }
 
-static int get_namespace_type(const char *ns)
-{
-	if (!strcmp(ns, "user"))
-		return CLONE_NEWUSER;
-	if (!strcmp(ns, "mnt"))
-		return CLONE_NEWNS;
-	if (!strcmp(ns, "net"))
-		return CLONE_NEWNET;
-	if (!strcmp(ns, "pid"))
-		return CLONE_NEWPID;
-	if (!strcmp(ns, "uts"))
-		return CLONE_NEWPID;
-	if (!strcmp(ns, "ipc"))
-		return CLONE_NEWIPC;
-
-	pr_err("unknown namespace: %s\n", ns);
-	return -EINVAL;
-}
-
 int join_namespaces(int pid, const char *namespaces)
 {
 	char *ns, *ns_list;
@@ -88,15 +92,7 @@ int join_namespaces(int pid, const char *namespaces)
 	}
 
 	while ((ns = strsep(&ns_list, ",")) != NULL) {
-		int ns_type, err;
-
-		ns_type = get_namespace_type(ns);
-		if (ns_type < 0) {
-			err = ns_type;
-			goto free_ns_list;
-		}
-
-		err = join_one_namespace(pid, ns, ns_type);
+		err = join_one_namespace(pid, ns);
 		if (err)
 			goto free_ns_list;
 
