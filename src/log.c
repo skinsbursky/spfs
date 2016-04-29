@@ -3,6 +3,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <time.h>
+#include <sys/time.h>
+
 
 #include "include/log.h"
 #include "include/util.h"
@@ -10,15 +13,41 @@
 static int log_level = LOG_DEBUG;
 FILE *stream;
 
+static char *print_time(char *buf, size_t size)
+{
+	struct timeval tv;
+	struct tm *tm;
+
+	if (gettimeofday(&tv, NULL))
+		return NULL;
+
+	tm = localtime(&tv.tv_sec);
+	if (!tm)
+		return NULL;
+
+	if (!strftime(buf, size, "%a %b %e %Y %H:%M:%S", tm))
+		return NULL;
+
+	sprintf(buf + strlen(buf), ".%06ld", tv.tv_usec);
+
+	return buf;
+}
+
 int print_on_level_va(unsigned int level, const char *format, va_list args)
 {
 	int saved_errno = errno, res;
 	FILE *out = (stream) ? stream : stdout;
+	char buffer[4096];
+	char time[64];
 
 	if (level > log_level)
 		return 0;
 
-	res = vfprintf(out, format, args);
+	snprintf(buffer, sizeof(buffer), "%s  %s",
+			print_time(time, sizeof(time)) ? time : "(none)",
+			format);
+
+	res = vfprintf(out, buffer, args);
 
 	errno -= saved_errno;
 	return res;
