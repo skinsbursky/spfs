@@ -39,9 +39,12 @@
 			_err = 0;						\
 	}									\
 										\
-	if (_pid > 0)								\
-		_err = collect_child(_pid, &_status, 0);			\
 										\
+	if (_pid > 0) {								\
+		pr_debug("Created child %d in spfs %s context\n",		\
+				_pid, info->id);				\
+		_err = collect_child(_pid, &_status, 0);			\
+	}									\
 	_err ? _err : _status;							\
 })
 
