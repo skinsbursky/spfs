@@ -48,7 +48,7 @@
 	_err ? _err : _status;							\
 })
 
-static int prepare_mount_env_ct(struct spfs_info_s *info)
+static int prepare_mount_env_ct(struct spfs_info_s *info, const char *proxy_dir)
 {
 	int err;
 
@@ -56,12 +56,34 @@ static int prepare_mount_env_ct(struct spfs_info_s *info)
 	if (err)
 		return err;
 
-	return mount("spfs-manager", info->work_dir, "tmpfs", 0, "size=1m");
+	if (mount("spfs-manager", info->work_dir, "tmpfs", 0, "size=1m")) {
+		pr_err("failed to mount tmpfs to %s", info->work_dir);
+		err = -errno;
+		goto rm_info_dir;
+	}
+
+	if (proxy_dir) {
+		err = create_dir(proxy_dir);
+		if (err) {
+			pr_err("failed to create %s directory\n", proxy_dir);
+			goto umount_tmpfs;
+		}
+	}
+
+	return 0;
+
+umount_tmpfs:
+	if (umount(info->work_dir))
+		pr_perror("failed to unmount %s", info->work_dir);
+rm_info_dir:
+	if (rmdir(info->work_dir))
+		pr_perror("failed to remove %s", info->work_dir);
+	return err;
 }
 
-int prepare_mount_env(struct spfs_info_s *info)
+int prepare_mount_env(struct spfs_info_s *info, const char *proxy_dir)
 {
-	return ct_run(prepare_mount_env_ct, info);
+	return ct_run(prepare_mount_env_ct, info, proxy_dir);
 }
 
 static int cleanup_mount_env_ct(struct spfs_info_s *info)

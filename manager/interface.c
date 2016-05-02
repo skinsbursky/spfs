@@ -161,11 +161,7 @@ static int mount_spfs(struct spfs_manager_context_s *ctx,
 	if (!log_path)
 		goto free_socket_path;
 
-	status = create_dir("%s%s", info->root, proxy_dir);
-	if (status)
-		goto free_log_path;
-
-	status = prepare_mount_env(info);
+	status = prepare_mount_env(info, proxy_dir);
 	if (status)
 		goto free_log_path;
 
