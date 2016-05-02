@@ -137,6 +137,7 @@ static int mount_spfs(struct spfs_manager_context_s *ctx,
 	int status = -ENOMEM, initpipe[2], timeout_ms = 5000;
 	struct pollfd pfd;
 	pid_t pid;
+	bool restore = !strcmp(mode, "restore");
 
 	if (pipe(initpipe)) {
 		pr_err("failed to create pipe\n");
@@ -161,9 +162,18 @@ static int mount_spfs(struct spfs_manager_context_s *ctx,
 	if (!log_path)
 		goto free_socket_path;
 
+	if (restore) {
+		mode = "proxy";
+		proxy_dir = xsprintf("%s/restore", info->work_dir);
+		if (!proxy_dir) {
+			pr_perror("failed to allocate\n");
+			goto free_log_path;
+		}
+	}
+
 	status = prepare_mount_env(info, proxy_dir);
 	if (status)
-		goto free_log_path;
+		goto free_proxy_dir;
 
 	pid = fork();
 	switch (pid) {
@@ -228,6 +238,9 @@ repeat:
 
 	info->pid = pid;
 
+free_proxy_dir:
+	if (restore)
+		free(proxy_dir);
 free_log_path:
 	free(log_path);
 free_socket_path:
@@ -248,7 +261,7 @@ umount_spfs:
 	umount(info->mountpoint);
 cleanup_env:
 	cleanup_mount_env(info);
-	goto free_log_path;
+	goto free_proxy_dir;
 }
 
 static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
