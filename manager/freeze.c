@@ -63,10 +63,11 @@ int unlock_freeze_cgroup(struct freeze_cgroup_s *fg)
 	return 0;
 }
 
-static int freezer_set_state(const char *freezer_cgroup, const char state[])
+static int freezer_set_state(const char *freezer_cgroup, const char *state)
 {
 	int fd;
 	char path[PATH_MAX];
+	size_t len = strlen(state);
 
 	snprintf(path, sizeof(path), "%s/freezer.state", freezer_cgroup);
 	fd = open(path, O_RDWR);
@@ -75,7 +76,7 @@ static int freezer_set_state(const char *freezer_cgroup, const char state[])
 		return -1;
 	}
 
-	if (write(fd, state, sizeof(state)) != sizeof(state)) {
+	if (write(fd, state, len) != len) {
 		pr_perror("Unable to set %s state to %s", freezer_cgroup, state);
 		close(fd);
 		return -1;
