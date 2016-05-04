@@ -409,10 +409,32 @@ static int changefd(struct parasite_ctl *ctl, pid_t pid, int src_fd, const char 
 	}
 
 	if (exit_code == 0) {
-		ret = syscall_seized(ctl, __NR_lseek, &sret, src_fd, f_pos, SEEK_SET, 0, 0, 0);
-		if (ret < 0 || ((int)(long)sret) < 0) {
-			pr_err("Can't lseek in %s, pid=%d\n", dst_path, pid);
+		struct stat st;
+
+		if (stat(dst_path, &st)) {
+			pr_perror("failed to stat %s", dst_path);
 			exit_code = -1;
+			goto out;
+		}
+
+		switch (st.st_mode & S_IFMT) {
+			case S_IFLNK:
+			case S_IFREG:
+			case S_IFBLK:
+			case S_IFDIR:
+			case S_IFCHR:
+				ret = syscall_seized(ctl, __NR_lseek, &sret, src_fd, f_pos, SEEK_SET, 0, 0, 0);
+				if (ret < 0 || ((int)(long)sret) < 0) {
+					pr_err("Can't lseek in %s, pid=%d\n", dst_path, pid);
+					exit_code = -1;
+				}
+				break;
+			case S_IFIFO:
+			case S_IFSOCK:
+				break;
+			default:
+				pr_err("unknows file mode: 0%o\n", st.st_mode & S_IFMT);
+				exit_code = -1;
 		}
 	}
 out:
