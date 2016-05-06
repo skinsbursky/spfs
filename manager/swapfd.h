@@ -1,10 +1,9 @@
-#ifndef __SPFS_MANAGER_SWAPFD_H
-#define __SPFS_MANAGER_SWAPFD_H
+#ifndef __SPFS_MANAGER_SWAPFD_H__
+#define __SPFS_MANAGER_SWAPFD_H__
 
-#include <sys/types.h>
-#include <unistd.h>
-#include <stdbool.h>
+pid_t attach_to_task(pid_t pid);
+int detach_from_task(pid_t pid);
+int wait_task_seized(pid_t pid);
+int swapfd_tracee(pid_t pid, int src_fd[], int dst_fd[], int num);
 
-int swapfd(pid_t pid, bool (*match_fn) (pid_t pid, int fd, char *path, void *data),
-	   void (*dst_name_fn) (pid_t pid, char *name, void *data), void *data);
 #endif

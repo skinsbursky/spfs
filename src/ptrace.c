@@ -15,8 +15,8 @@
 #include <elf.h>
 
 #include "include/ptrace.h"
-#include "include/log.h"
 
+#define pr_perror	printf
 /*
  * Injected syscall instruction
  */
@@ -97,12 +97,12 @@ static inline int ptrace_set_regs(int pid, user_regs_struct_t *regs)
 int get_thread_ctx(int pid, struct thread_ctx *ctx)
 {
 	if (ptrace(PTRACE_GETSIGMASK, pid, sizeof(k_rtsigset_t), &ctx->sigmask)) {
-		pr_err("can't get signal blocking mask for %d", pid);
+		printf("can't get signal blocking mask for %d", pid);
 		return -1;
 	}
 
 	if (ptrace_get_regs(pid, &ctx->regs)) {
-		pr_err("Can't obtain registers (pid: %d)", pid);
+		printf("Can't obtain registers (pid: %d)", pid);
 		return -1;
 	}
 
@@ -199,12 +199,12 @@ static int parasite_trap(struct parasite_ctl *ctl, pid_t pid,
 	}
 
 	if (!WIFSTOPPED(status)) {
-		pr_err("Task is still running (pid: %d)\n", pid);
+		printf("Task is still running (pid: %d)\n", pid);
 		goto err;
 	}
 
 	if (ptrace(PTRACE_GETSIGINFO, pid, NULL, &siginfo)) {
-		pr_err("Can't get siginfo (pid: %d)", pid);
+		printf("Can't get siginfo (pid: %d)", pid);
 		goto err;
 	}
 
@@ -214,10 +214,10 @@ static int parasite_trap(struct parasite_ctl *ctl, pid_t pid,
 	}
 
 	if (WSTOPSIG(status) != SIGTRAP || siginfo.si_code != ARCH_SI_TRAP) {
-		pr_debug("** delivering signal %d si_code=%d\n",
+		printf("** delivering signal %d si_code=%d\n",
 			 siginfo.si_signo, siginfo.si_code);
 
-		pr_err("Unexpected %d task interruption, aborting\n", pid);
+		printf("Unexpected %d task interruption, aborting\n", pid);
 		goto err;
 	}
 
@@ -247,7 +247,7 @@ static int __parasite_execute_syscall(struct parasite_ctl *ctl,
 	memcpy(code_orig, code_syscall, sizeof(code_orig));
 	if (ptrace_swap_area(pid, (void *)ctl->syscall_ip,
 			     (void *)code_orig, sizeof(code_orig))) {
-		pr_err("Can't inject syscall blob (pid: %d)\n", pid);
+		printf("Can't inject syscall blob (pid: %d)\n", pid);
 		return -1;
 	}
 
@@ -257,7 +257,7 @@ static int __parasite_execute_syscall(struct parasite_ctl *ctl,
 
 	if (ptrace_poke_area(pid, (void *)code_orig,
 			     (void *)ctl->syscall_ip, sizeof(code_orig))) {
-		pr_err("Can't restore syscall blob (pid: %d)\n", ctl->pid);
+		printf("Can't restore syscall blob (pid: %d)\n", ctl->pid);
 		err = -1;
 	}
 
@@ -303,7 +303,7 @@ void *mmap_seized(struct parasite_ctl *ctl,
 
 	if (IS_ERR_VALUE(map)) {
 		if (map == -EACCES && (prot & PROT_WRITE) && (prot & PROT_EXEC))
-			pr_err("mmap(PROT_WRITE | PROT_EXEC) failed for %d, "
+			printf("mmap(PROT_WRITE | PROT_EXEC) failed for %d, "
 			       "check selinux execmem policy\n", ctl->pid);
 		return NULL;
 	}

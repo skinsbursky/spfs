@@ -2,9 +2,12 @@
 #define __SPFS_PTRACE_H__
 
 #include <sys/types.h>
+#include <sys/un.h>
 #include <unistd.h>
+#include <stdint.h>
 
 typedef _Bool bool;
+typedef uint32_t u32;
 enum {
 	false	= 0,
 	true	= 1
@@ -14,18 +17,29 @@ enum {
 
 #define IS_ERR_VALUE(x) ((x) >= (unsigned long)-MAX_ERRNO)
 
+#define min(x, y) ({	\
+	typeof(x) _min1 = (x);		\
+	typeof(y) _min2 = (y);		\
+	(void) (&_min1 == &_min2);	\
+	_min1 < _min2 ? _min1 : _min2; })
+
 #define BUILTIN_SYSCALL_SIZE	8
 
-#ifndef  __NR_memfd_create 
-#define __NR_memfd_create 319 
+#ifndef  __NR_memfd_create
+#define __NR_memfd_create 319
 #endif
 
-#ifndef PTRACE_GETSIGMASK 
+#ifndef PTRACE_GETSIGMASK
 # define PTRACE_GETSIGMASK      0x420a
 # define PTRACE_SETSIGMASK      0x420b
 #endif
 
+#ifndef PTRACE_EVENT_STOP
+#define PTRACE_EVENT_STOP       128
+#endif
+
 #define ARCH_SI_TRAP SI_KERNEL
+#define SI_EVENT(_si_code)	(((_si_code) & 0xFFFF) >> 8)
 
 #define X86_EFLAGS_TF	0x00000100 /* Trap Flag */
 #define X86_EFLAGS_IF	0x00000200 /* Interrupt Flag */
@@ -77,6 +91,10 @@ struct thread_ctx {
 struct parasite_ctl {
 	void			*remote_map;
 	void			*local_map;
+	struct sockaddr_un	addr;
+	socklen_t		addrlen;
+	int			remote_sockfd;
+	int			local_sockfd;
 	unsigned		map_length;
 	pid_t			pid;
 	unsigned long		syscall_ip;
@@ -100,4 +118,5 @@ int syscall_seized(struct parasite_ctl *ctl, int nr, unsigned long *ret,
 void *mmap_seized(struct parasite_ctl *ctl,
 		  void *addr, size_t length, int prot,
 		  int flags, int fd, off_t offset);
+
 #endif

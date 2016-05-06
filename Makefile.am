@@ -61,6 +61,7 @@ bin_spfs_manager_SOURCES =	manager/main.c			\
 				src/log.c			\
 				src/shm.c			\
 				src/ptrace.c			\
+				src/pie-util-fd.c		\
 								\
 				spfs/interface.h		\
 				spfs/context.h			\
@@ -71,6 +72,7 @@ bin_spfs_manager_SOURCES =	manager/main.c			\
 				include/list.h			\
 				include/shm.h			\
 				include/ptrace.h		\
+				include/pie-util-fd.h		\
 				include/util.h
 
 tags: ctags
