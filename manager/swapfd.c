@@ -454,7 +454,7 @@ static int changefd(struct parasite_ctl *ctl, pid_t pid, int src_fd, int dst_fd)
 	long long int f_pos;
 	unsigned long sret;
 	mode_t mode;
-	int new_fd, ret, exit_code = 0;
+	int new_fd, ret = 0, exit_code = 0;
 	struct lock head = {.next = NULL,}, *ptr;
 	bool need_lseek;
 	struct stat st;
