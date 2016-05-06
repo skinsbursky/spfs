@@ -345,8 +345,16 @@ static int do_replace_spfs(struct spfs_info_s *info, const char *source)
 
 	err = ct_run(do_replace_spfs_frozen, info, source);
 
-	if (spfs_thaw_and_unlock(info))
-		return -1;
+	err = spfs_thaw(info);
+	if (err)
+		return err;
+
+	/* Here will be fd replacement, etc
+	 * Freezer cgroup should be kept locked to make sure, that any other
+	 * spfs won't come and freeze the CT again.
+	 */
+
+	(void) spfs_unlock(info);
 
 	return spfs_send_mode(info, SPFS_PROXY_MODE, info->mountpoint);
 }

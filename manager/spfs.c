@@ -236,6 +236,28 @@ int spfs_freeze_and_lock(struct spfs_info_s *info)
 	return 0;
 }
 
+int spfs_thaw(struct spfs_info_s *info)
+{
+	struct freeze_cgroup_s *fg = info->fg;
+
+	if (fg) {
+		pr_debug("Thaw %s in favor of spfs %s\n", fg->path, info->id);
+		return thaw_cgroup(fg);
+	}
+	return 0;
+}
+
+int spfs_unlock(struct spfs_info_s *info)
+{
+	struct freeze_cgroup_s *fg = info->fg;
+
+	if (fg) {
+		pr_debug("Unlock %s in favor of spfs %s\n", fg->path, info->id);
+		return unlock_cgroup(fg);
+	}
+	return 0;
+}
+
 int spfs_thaw_and_unlock(struct spfs_info_s *info)
 {
 	struct freeze_cgroup_s *fg = info->fg;
