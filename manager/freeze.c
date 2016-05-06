@@ -45,21 +45,23 @@ struct freeze_cgroup_s *create_freeze_cgroup(const char *path)
 	return fg;
 }
 
-int lock_freeze_cgroup(struct freeze_cgroup_s *fg)
+int lock_cgroup(struct freeze_cgroup_s *fg)
 {
 	if (sem_wait(&fg->sem)) {
-		pr_perror("failed to lock freeze cgroups semaphore");
+		pr_perror("failed to lock cgroup %s", fg->path);
 		return -errno;
 	}
+	pr_debug("cgroup %s was locked\n", fg->path);
 	return 0;
 }
 
-int unlock_freeze_cgroup(struct freeze_cgroup_s *fg)
+int unlock_cgroup(struct freeze_cgroup_s *fg)
 {
 	if (sem_post(&fg->sem)) {
-		pr_perror("failed to unlock freeze cgroups semaphore");
+		pr_perror("failed to unlock cgroup %s", fg->path);
 		return -errno;
 	}
+	pr_debug("cgroup %s was unlocked\n", fg->path);
 	return 0;
 }
 
@@ -84,14 +86,28 @@ static int freezer_set_state(const char *freezer_cgroup, const char state[])
 	return 0;
 }
 
-static int thaw_cgroup(const char *freezer_cgroup)
+static int thaw_cgroup(const struct freeze_cgroup_s *fg)
 {
-	return freezer_set_state(freezer_cgroup, "THAWED");
+	int err;
+
+	err = freezer_set_state(fg->path, "THAWED");
+	if (err)
+		pr_err("failed to thaw cgroup %s\n", fg->path);
+	else
+		pr_debug("cgroup %s was thawed\n", fg->path);
+	return err;
 }
 
-static int freeze_cgroup(const char *freezer_cgroup)
+static int freeze_cgroup(const struct freeze_cgroup_s *fg)
 {
-	return freezer_set_state(freezer_cgroup, "FROZEN");
+	int err;
+
+	err = freezer_set_state(fg->path, "FROZEN");
+	if (err)
+		pr_err("failed to freeze cgroup %s\n", fg->path);
+	else
+		pr_debug("cgroup %s was frozen\n", fg->path);
+	return err;
 }
 
 int thaw_cgroup_and_unlock(struct freeze_cgroup_s *fg)
@@ -101,19 +117,11 @@ int thaw_cgroup_and_unlock(struct freeze_cgroup_s *fg)
 	if (!fg)
 		return 0;
 
-	err = thaw_cgroup(fg->path);
-	if (err) {
-		pr_err("failed to thaw cgroup %s\n", fg->path);
-		return err;
-	}
+	err = thaw_cgroup(fg);
+	if (!err)
+		(void) unlock_cgroup(fg);
 
-	pr_debug("cgroup %s was thawed\n", fg->path);
-
-	(void) unlock_freeze_cgroup(fg);
-
-	pr_debug("cgroup %s was unlocked\n", fg->path);
-
-	return 0;
+	return err;
 }
 
 int lock_cgroup_and_freeze(struct freeze_cgroup_s *fg)
@@ -123,22 +131,13 @@ int lock_cgroup_and_freeze(struct freeze_cgroup_s *fg)
 	if (!fg)
 		return 0;
 
-	err = lock_freeze_cgroup(fg);
-	if (err) {
-		pr_err("failed to lock freeze cgroup\n");
+	err = lock_cgroup(fg);
+	if (err)
 		return err;
-	}
 
-	pr_debug("cgroup %s was locked\n", fg->path);
+	err = freeze_cgroup(fg);
+	if (err)
+		(void) unlock_cgroup(fg);
 
-	err = freeze_cgroup(fg->path);
-	if (err) {
-		pr_err("failed to freeze cgroup %s\n", fg->path);
-		(void) unlock_freeze_cgroup(fg);
-		return err;
-	}
-
-	pr_debug("cgroup %s was frozen\n", fg->path);
-
-	return 0;
+	return err;
 }
