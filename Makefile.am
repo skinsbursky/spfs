@@ -81,12 +81,14 @@ bin_swapfd_SOURCES =		main.c				\
 								\
 				manager/swapfd.h		\
 								\
+				src/util.c			\
 				src/log.c			\
 				src/ptrace.c			\
 				src/pie-util-fd.c		\
 								\
-				include/pie-util-fd.h		\
 				include/log.h			\
+				include/util.h
+				include/pie-util-fd.h		\
 				include/ptrace.h
 
 tags: ctags
