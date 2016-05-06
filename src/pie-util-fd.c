@@ -9,6 +9,7 @@
 
 #include "include/ptrace.h"
 #include "include/pie-util-fd.h"
+#include "include/log.h"
 
 #define CR_SCM_MSG_SIZE		(1024)
 #define CR_SCM_MAX_FD		(252)
@@ -91,7 +92,7 @@ int send_fds(int sock, struct sockaddr_un *saddr, int len,
 
 				flags = fcntl(fd, F_GETFD, 0);
 				if (flags < 0) {
-					fprintf(stderr, "fcntl(%d, F_GETFD) -> %d\n", fd, flags);
+					pr_perror("fcntl(%d, F_GETFD) -> %d", fd, flags);
 					return -1;
 				}
 
@@ -99,7 +100,7 @@ int send_fds(int sock, struct sockaddr_un *saddr, int len,
 
 				ret = fcntl(fd, F_GETOWN_EX, (long)&owner_ex);
 				if (ret) {
-					fprintf(stderr, "fcntl(%d, F_GETOWN_EX) -> %d\n", fd, ret);
+					pr_perror("fcntl(%d, F_GETOWN_EX) -> %d", fd, ret);
 					return -1;
 				}
 
@@ -113,7 +114,7 @@ int send_fds(int sock, struct sockaddr_un *saddr, int len,
 
 				ret = fcntl(fd, F_GETOWNER_UIDS, (long)&v);
 				if (ret) {
-					fprintf(stderr, "fcntl(%d, F_GETOWNER_UIDS) -> %d\n", fd, ret);
+					pr_perror("fcntl(%d, F_GETOWNER_UIDS) -> %d", fd, ret);
 					return -1;
 				}
 
@@ -150,7 +151,7 @@ int recv_fds(struct parasite_ctl *ctl, int *fds, int nr_fds, struct fd_opts *opt
 				     ctl->remote_sockfd, (unsigned long)&fdset->hdr,
 				     0, 0, 0, 0);
 		if (ret < 0 || (int)(long)sret < 0) {
-			fprintf(stderr, "Can't receive sock\n");
+			pr_err("Can't receive sock\n");
 			return -1;
 		}
 
@@ -171,7 +172,7 @@ int recv_fds(struct parasite_ctl *ctl, int *fds, int nr_fds, struct fd_opts *opt
 		 * sys_write_ helpers. Meawhile opencoded BUG_ON here.
 		 */
 		if (min_fd > CR_SCM_MAX_FD) {
-			fprintf(stderr, "Too big min_fd\n");
+			pr_err("Too big min_fd\n");
 			return -1;
 		}
 

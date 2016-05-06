@@ -23,6 +23,7 @@
 
 #include "include/ptrace.h"
 #include "include/pie-util-fd.h"
+#include "include/log.h"
 
 #include "swapfd.h"
 
@@ -39,7 +40,7 @@ static void *find_mapping(pid_t pid)
 	sprintf(path, "/proc/%d/maps", pid);
 	fp = fopen(path, "r");
 	if (!fp) {
-		printf("Can't open %s\n", path);
+		pr_perror("Can't open %s", path);
 		return result;
 	}
 
@@ -50,14 +51,14 @@ static void *find_mapping(pid_t pid)
 
 		ret = sscanf(line, "%lx%*c%lx %c%c%c", &start, &end, &r, &w, &x);
 		if (ret != 5) {
-			printf("Can't parse line: %s", line);
+			pr_err("Can't parse line: %s", line);
 			continue;
 		}
 
 		if (x != 'x')
 			continue;
 
-		printf("Found: start=%08lx, end=%08lx, r=%c, w=%c, x=%c\n",
+		pr_debug("Found: start=%08lx, end=%08lx, r=%c, w=%c, x=%c\n",
 				start, end, r, w, x);
 		result = (void *)start;
 		break;
@@ -87,7 +88,7 @@ static void destroy_dgram_socket(struct parasite_ctl *ctl)
 	ret = syscall_seized(ctl, __NR_close, &sret,
 			     ctl->remote_sockfd, 0, 0, 0, 0, 0);
 	if (ret || sret)
-		fprintf(stderr, "Can't destroy dgram socket\n");
+		pr_err("Can't destroy dgram socket\n");
 	else
 		ctl->remote_sockfd = -1;
 }
@@ -101,7 +102,7 @@ static int set_dgram_socket(struct parasite_ctl *ctl)
 			     AF_UNIX, SOCK_DGRAM, 0, 0, 0, 0);
 	fd = (int)(long)sret;
 	if (ret < 0 || fd < 0) {
-		fprintf(stderr, "Can't create dgram socket: %d %d", ret, fd);
+		pr_err("Can't create dgram socket: %d %d", ret, fd);
 		return -1;
 	}
 	ctl->remote_sockfd = fd;
@@ -121,24 +122,24 @@ static int set_dgram_socket(struct parasite_ctl *ctl)
 		if (err == -EADDRINUSE)
 			continue;
 		if (ret < 0 || err < 0) {
-			fprintf(stderr, "Can't bind: %d %d\n", ret, err);
+			pr_err("Can't bind: %d %d\n", ret, err);
 			break;
 		}
 
 		ctl->local_sockfd = socket(AF_UNIX, SOCK_DGRAM, 0);
 		if (ctl->local_sockfd < 0) {
-			fprintf(stderr, "Can't create local sock: %d\n", errno);
+			pr_perror("Can't create local sock", errno);
 			break;
 		}
 
 		memcpy(&ctl->addr, addr, sizeof(*addr));
 		ctl->addrlen = len + len2 + sizeof(addr->sun_family);
-		printf("Set socket %s\n", addr->sun_path);
+		pr_debug("Set socket %s\n", addr->sun_path);
 
 		return 0;
 	}
 
-	fprintf(stderr, "Can't set dgram sockets\n");
+	pr_err("Can't set dgram sockets\n");
 	destroy_dgram_socket(ctl);
 	return -1;
 }
@@ -154,13 +155,13 @@ static int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl)
 	int ret, fd, lfd;
 
 	if (addr == MAP_FAILED) {
-		printf("Can't find a useful mapping, pid=%d\n", pid);
+		pr_err("Can't find a useful mapping, pid=%d\n", pid);
 		return -ENOMEM;
 	}
 
 	ctl = malloc(sizeof(*ctl));
 	if (!ctl) {
-		printf("Can't alloc ctl\n");
+		pr_err("Can't alloc ctl\n");
 		return -ENOMEM;
 	}
 	ctl->pid = pid;
@@ -172,7 +173,7 @@ static int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl)
 		goto err_free;
 
 	if (ptrace_swap_area(pid, where, (void *)orig_code, sizeof(orig_code))) {
-		printf("Can't inject memfd args (pid: %d)\n", pid);
+		pr_err("Can't inject memfd args (pid: %d)\n", pid);
 		goto err_free;
 	}
 
@@ -183,7 +184,7 @@ static int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl)
 		fd = (int)(long)sret;
 		if (fd >= 0)
 			syscall_seized(ctl, __NR_close, &sret, fd, 0, 0, 0, 0, 0);
-		printf("Can't restore memfd args (pid: %d)\n", pid);
+		pr_err("Can't restore memfd args (pid: %d)\n", pid);
 		goto err_free;
 	}
 
@@ -198,12 +199,12 @@ static int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl)
 	sprintf(path, "/proc/%d/fd/%d", pid, fd);
 	lfd = open(path, O_RDWR);
 	if (lfd < 0) {
-		printf("Can't open %s\n", path);
+		pr_perror("Can't open %s", path);
 		goto err_cure;
 	}
 
 	if (ftruncate(lfd, ctl->map_length) < 0) {
-		printf("Fail to truncate memfd for parasite\n");
+		pr_perror("Fail to truncate memfd for parasite");
 		goto err_cure;
 	}
 
@@ -211,14 +212,14 @@ static int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl)
 				      PROT_READ | PROT_WRITE | PROT_EXEC,
 				      MAP_FILE | MAP_SHARED, fd, 0);
 	if (!ctl->remote_map) {
-		printf("Can't rmap memfd for parasite blob\n");
+		pr_err("Can't rmap memfd for parasite blob\n");
 		goto err_curef;
 	}
 
 	ctl->local_map = mmap(NULL, MMAP_SIZE, PROT_READ | PROT_WRITE,
 			      MAP_SHARED | MAP_FILE, lfd, 0);
 	if (ctl->local_map == MAP_FAILED) {
-		printf("Can't lmap memfd for parasite blob\n");
+		pr_perror("Can't lmap memfd for parasite blob");
 		goto err_curef;
 	}
 
@@ -231,7 +232,7 @@ static int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl)
 	}
 
 	*ret_ctl = ctl;
-	printf("Set up parasite blob using memfd\n");
+	pr_debug("Set up parasite blob using memfd\n");
 	return 0;
 
 err_curef:
@@ -252,11 +253,11 @@ static void destroy_parasite_ctl(pid_t pid, struct parasite_ctl *ctl)
 
 	ret = syscall_seized(ctl, __NR_munmap, &sret, (unsigned long)ctl->remote_map, ctl->map_length, 0, 0, 0, 0);
 	if (ret || ((int)(long)sret) < 0)
-		printf("Can't munmap remote file\n");
+		pr_err("Can't munmap remote file\n");
 
 	ret = munmap(ctl->local_map, ctl->map_length);
 	if (ret)
-		printf("Can't munmap local map\n");
+		pr_perror("Can't munmap local map");
 }
 
 /* Get pos and flags from just open fdinfo file */
@@ -272,14 +273,14 @@ static int get_fd_mode(FILE *fp, long long int *pos, mode_t *mode)
 		else if (strncmp(line, "flags:\t0", 8) == 0)
 			sscanf(line + 8, "%o", mode);
 		else {
-			printf("Can't parse fdinfo file\n");
+			pr_err("Can't parse fdinfo file\n");
 			ret = -1;
 			break;
 		}
 		if (++i == 2)
 			break;
 	}
-	printf("pos=%lli, mode=0%o\n", *pos, *mode);
+	pr_debug("pos=%lli, mode=0%o\n", *pos, *mode);
 	free(line);
 	return ret;
 }
@@ -334,7 +335,7 @@ static int make_posix_lock(struct parasite_ctl *ctl, int fd, short type, loff_t 
 
 	ret = syscall_seized(ctl, __NR_fcntl, &sret, fd, F_SETLK, (unsigned long)ctl->remote_map, 0, 0, 0);
 	if (ret < 0 || ((int)(long)sret) < 0) {
-		printf("Can't create posix lock, pid=%d, ret=%d, sret=%d\n", ctl->pid, ret, ((int)(long)sret));
+		pr_err("Can't create posix lock, pid=%d, ret=%d, sret=%d\n", ctl->pid, ret, ((int)(long)sret));
 		return -1;
 	}
 
@@ -354,13 +355,13 @@ static int make_flock_lock(struct parasite_ctl *ctl, int fd, short type)
 		type = LOCK_EX;
 		break;
 	default:
-		printf("Wrong flock type\n");
+		pr_err("Wrong flock type\n");
 		return -1;
 	}
 
 	ret = syscall_seized(ctl, __NR_flock, &sret, fd, type, 0, 0, 0, 0);
 	if (ret < 0 || ((int)(long)sret) < 0) {
-		printf("Can't create flock, pid=%d, ret=%d, sret=%d\n", ctl->pid, ret, ((int)(long)sret));
+		pr_err("Can't create flock, pid=%d, ret=%d, sret=%d\n", ctl->pid, ret, ((int)(long)sret));
 		return -1;
 	}
 
@@ -384,7 +385,7 @@ static int get_flocks(struct parasite_ctl *ctl, FILE *fp, struct lock *head)
 		p += 6;
 		p = strchr(p, ':');
 		if (!p) {
-			printf("Can't parse fdinfo file\n");
+			pr_err("Can't parse fdinfo file\n");
 			ret = -1;
 			break;
 		}
@@ -395,7 +396,7 @@ static int get_flocks(struct parasite_ctl *ctl, FILE *fp, struct lock *head)
 		else if (strncmp(p, " FLOCK  ADVISORY  ", 18) == 0)
 			is_posix = false;
 		else {
-			printf("Unknown lock type: %s", line);
+			pr_err("Unknown lock type: %s", line);
 			ret = -1;
 			break;
 		}
@@ -406,7 +407,7 @@ static int get_flocks(struct parasite_ctl *ctl, FILE *fp, struct lock *head)
 		else if (strncmp(p, "WRITE ", 6) == 0)
 			type = F_WRLCK;
 		else {
-			printf("Unknown lock type: %s", line);
+			pr_err("Unknown lock type: %s", line);
 			ret = -1;
 			break;
 		}
@@ -414,7 +415,7 @@ static int get_flocks(struct parasite_ctl *ctl, FILE *fp, struct lock *head)
 
 		p = strrchr(p, ':');
 		if (!p) {
-			printf("Can't parse flock %s", line);
+			pr_err("Can't parse flock %s", line);
 			ret = -1;
 			break;
 		}
@@ -424,11 +425,11 @@ static int get_flocks(struct parasite_ctl *ctl, FILE *fp, struct lock *head)
 			/* end is EOF */
 			end = (loff_t)-1;
 		}
-		printf("type=%u, start=%ld, end=%ld\n", type, start, end);
+		pr_debug("type=%u, start=%ld, end=%ld\n", type, start, end);
 
 		new = malloc(sizeof(*new));
 		if (!new) {
-			printf("Can't do malloc()\n");
+			pr_err("Can't do malloc()\n");
 			ret = -1;
 			break;
 		}
@@ -460,7 +461,7 @@ static int changefd(struct parasite_ctl *ctl, pid_t pid, int src_fd, int dst_fd)
 	struct stat st;
 
 	if (fstat(dst_fd, &st) < 0) {
-		perror("Can't stat on dst_fd");
+		pr_perror("Can't stat on dst_fd");
 		return -1;
 	}
 	need_lseek = (st.st_mode & (S_IFREG | S_IFBLK | S_IFDIR)) != 0;
@@ -468,7 +469,7 @@ static int changefd(struct parasite_ctl *ctl, pid_t pid, int src_fd, int dst_fd)
 	sprintf(fdinfo, "/proc/%d/fdinfo/%d", pid, src_fd);
 	fp = fopen(fdinfo, "r");
 	if (!fp) {
-		printf("Can't open %s\n", fdinfo);
+		pr_perror("Can't open %s", fdinfo);
 		exit_code = -1;
 		goto out;
 	}
@@ -491,20 +492,20 @@ static int changefd(struct parasite_ctl *ctl, pid_t pid, int src_fd, int dst_fd)
 
 	ret = syscall_seized(ctl, __NR_dup2, &sret, new_fd, src_fd, 0, 0, 0, 0);
 	if (ret < 0 || ((int)(long)sret) < 0) {
-		printf("Can't dup2(%d, %d). pid=%d\n", new_fd, src_fd, pid);
+		pr_err("Can't dup2(%d, %d). pid=%d\n", new_fd, src_fd, pid);
 		exit_code = -1;
 	}
 
 	ret = syscall_seized(ctl, __NR_close, &sret, new_fd, 0, 0, 0, 0, 0);
 	if (ret < 0 || sret != 0) {
-		printf("Can't close temporary fd, pid=%d\n", pid);
+		pr_err("Can't close temporary fd, pid=%d\n", pid);
 		exit_code = -1;
 	}
 
 	if (exit_code == 0 && need_lseek) {
 		ret = syscall_seized(ctl, __NR_lseek, &sret, src_fd, f_pos, SEEK_SET, 0, 0, 0);
 		if (ret < 0 || ((int)(long)sret) < 0) {
-			printf("Can't lseek pid=%d, fd=%d\n", pid, src_fd);
+			pr_err("Can't lseek pid=%d, fd=%d\n", pid, src_fd);
 			exit_code = -1;
 		}
 	}
@@ -564,17 +565,17 @@ static int seize_catch_task(pid_t pid)
 	ret = ptrace(PTRACE_SEIZE, pid, NULL, 0);
 	if (ret) {
 		/* Error or task is exiting */
-		fprintf(stderr, "Can't seize task %d", pid);
+		pr_perror("Can't seize task %d", pid);
 		return -1;
 	}
 
 	ret = ptrace(PTRACE_INTERRUPT, pid, NULL, NULL);
 	if (ret < 0) {
 		/* Currently this happens only if task is exiting */
-		fprintf(stderr, "Can't interrupt task %d", pid);
+		pr_perror("Can't interrupt task %d", pid);
 
 		if (ptrace(PTRACE_DETACH, pid, NULL, NULL))
-			perror("Can't detach");
+			pr_perror("Can't detach");
 	}
 
 	return ret;
@@ -600,7 +601,7 @@ pid_t attach_to_task(pid_t pid)
 			return 0;
 
 		/* fails on a zombie */
-		fprintf(stderr, "zombie found while seizing\n");
+		pr_err("zombie found while seizing\n");
 		return (pid_t)-1;
 	}
 
@@ -613,12 +614,12 @@ int detach_from_task(pid_t pid)
 
 	ret = ptrace(PTRACE_DETACH, pid, NULL, NULL);
 	if (ret) {
-		fprintf(stderr, "Can't detach from %d\n", pid);
+		pr_perror("Can't detach from %d", pid);
 		/* A process may be killed by SIGKILL */
 		if (wait4(pid, &status, __WALL, NULL) == pid)
 			ret = 0;
 		else
-			fprintf(stderr, "Unable to wait %d\n", pid);
+			pr_perror("Unable to wait %d", pid);
 	}
 
 	return ret;
@@ -633,23 +634,23 @@ int wait_task_seized(pid_t pid)
 try_again:
 	ret = wait4(pid, &status, __WALL, NULL);
 	if (ret < 0) {
-		fprintf(stderr, "Can't wait %d\n", pid);
+		pr_perror("Can't wait %d", pid);
 		return ret;
 	}
 
 	if (WIFEXITED(status) || WIFSIGNALED(status)) {
-		fprintf(stderr, "Task exited unexpected %d\n", pid);
+		pr_err("Task exited unexpected %d\n", pid);
 		return -1;
 	}
 
 	if (!WIFSTOPPED(status)) {
-		fprintf(stderr, "SEIZE %d: task not stopped after seize\n", pid);
+		pr_err("SEIZE %d: task not stopped after seize\n", pid);
 		return -1;
 	}
 
 	ret = ptrace(PTRACE_GETSIGINFO, pid, NULL, &si);
 	if (ret < 0) {
-		fprintf(stderr, "SEIZE %d: can't read signfo", pid);
+		pr_perror("SEIZE %d: can't read signfo", pid);
 		return -1;
 	}
 
@@ -661,7 +662,7 @@ try_again:
 		 */
 		if (ptrace(PTRACE_CONT, pid, NULL,
 					(void *)(unsigned long)si.si_signo)) {
-			fprintf(stderr, "Can't continue signal handling, aborting, pid=%d, errno=%d", pid, errno);
+			pr_perror("Can't continue signal handling, aborting, pid=%d, errno=%d", pid, errno);
 			return -1;
 		}
 
