@@ -86,7 +86,7 @@ static int freezer_set_state(const char *freezer_cgroup, const char state[])
 	return 0;
 }
 
-static int thaw_cgroup(const struct freeze_cgroup_s *fg)
+int thaw_cgroup(const struct freeze_cgroup_s *fg)
 {
 	int err;
 
@@ -98,7 +98,7 @@ static int thaw_cgroup(const struct freeze_cgroup_s *fg)
 	return err;
 }
 
-static int freeze_cgroup(const struct freeze_cgroup_s *fg)
+int freeze_cgroup(const struct freeze_cgroup_s *fg)
 {
 	int err;
 
@@ -107,37 +107,5 @@ static int freeze_cgroup(const struct freeze_cgroup_s *fg)
 		pr_err("failed to freeze cgroup %s\n", fg->path);
 	else
 		pr_debug("cgroup %s was frozen\n", fg->path);
-	return err;
-}
-
-int thaw_cgroup_and_unlock(struct freeze_cgroup_s *fg)
-{
-	int err;
-
-	if (!fg)
-		return 0;
-
-	err = thaw_cgroup(fg);
-	if (!err)
-		(void) unlock_cgroup(fg);
-
-	return err;
-}
-
-int lock_cgroup_and_freeze(struct freeze_cgroup_s *fg)
-{
-	int err;
-
-	if (!fg)
-		return 0;
-
-	err = lock_cgroup(fg);
-	if (err)
-		return err;
-
-	err = freeze_cgroup(fg);
-	if (err)
-		(void) unlock_cgroup(fg);
-
 	return err;
 }
