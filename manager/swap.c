@@ -11,7 +11,7 @@
 #include "swap.h"
 #include "spfs.h"
 #include "swapfd.h"
-
+#if 0
 struct fifo_data {
 	struct list_head list;
 	char path[PATH_MAX];
@@ -171,7 +171,7 @@ static void fd_path(pid_t pid, char *name, void *data)
 	snprintf(tmp, PATH_MAX, "%s/%s", info->mountpoint, name);
 	strcpy(name, tmp);
 }
-
+#endif
 int do_swap_fds(struct spfs_info_s *info, char *pids_list)
 {
 	char *pid;
@@ -188,10 +188,11 @@ int do_swap_fds(struct spfs_info_s *info, char *pids_list)
 			pr_err("failed to convert pid %s to number\n", pid);
 			break;
 		}
-
+#if 0
 		err = swapfd(p, test_fd, fd_path, info);
 		if (err)
 			pr_err("failed to replace process %d fds: %d\n", p, err);
+#endif
 	}
 
 	return err;
