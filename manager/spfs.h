@@ -52,7 +52,7 @@ int enter_spfs_context(const struct spfs_info_s *info);
 int spfs_send_mode(const struct spfs_info_s *info,
 		   spfs_mode_t mode, const char *proxy_dir);
 
-int spfs_freeze_ct(struct spfs_info_s *info);
-int spfs_thaw_ct(struct spfs_info_s *info);
+int spfs_freeze_and_lock(struct spfs_info_s *info);
+int spfs_thaw_and_unlock(struct spfs_info_s *info);
 
 #endif

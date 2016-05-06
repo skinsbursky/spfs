@@ -218,19 +218,19 @@ int spfs_send_mode(const struct spfs_info_s *info,
 	return err;
 }
 
-int spfs_freeze_ct(struct spfs_info_s *info)
+int spfs_freeze_and_lock(struct spfs_info_s *info)
 {
 	if (info->fg) {
-		pr_debug("Freeze %s in favor of spfs %s\n", info->fg->path, info->id);
+		pr_debug("Freeze %s and lock in favor of spfs %s\n", info->fg->path, info->id);
 		return lock_cgroup_and_freeze(info->fg);
 	}
 	return 0;
 }
 
-int spfs_thaw_ct(struct spfs_info_s *info)
+int spfs_thaw_and_unlock(struct spfs_info_s *info)
 {
 	if (info->fg) {
-		pr_debug("Thaw %s in favor of spfs %s\n", info->fg->path, info->id);
+		pr_debug("Thaw %s and unlock in favor of spfs %s\n", info->fg->path, info->id);
 		return thaw_cgroup_and_unlock(info->fg);
 	}
 	return 0;

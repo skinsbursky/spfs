@@ -339,13 +339,13 @@ static int do_replace_spfs(struct spfs_info_s *info, const char *source)
 {
 	int err;
 
-	err = spfs_freeze_ct(info);
+	err = spfs_freeze_and_lock(info);
 	if (err)
 		return err;
 
 	err = ct_run(do_replace_spfs_frozen, info, source);
 
-	if (spfs_thaw_ct(info))
+	if (spfs_thaw_and_unlock(info))
 		return -1;
 
 	return spfs_send_mode(info, SPFS_PROXY_MODE, info->mountpoint);
