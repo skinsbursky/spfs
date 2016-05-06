@@ -4,7 +4,7 @@ CLEANFILES = `find . -name "*~"`
 AM_CFLAGS = -Wall -Werror -ggdb -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64
 AM_MAKEFLAGS = --no-print-directory
 
-sbin_PROGRAMS = bin/spfs bin/spfs-client bin/spfs-manager
+sbin_PROGRAMS = bin/spfs bin/spfs-client bin/spfs-manager bin/swapfd
 
 bin_spfs_SOURCES =		spfs/main.c			\
 				spfs/gateway.c			\
@@ -74,6 +74,20 @@ bin_spfs_manager_SOURCES =	manager/main.c			\
 				include/ptrace.h		\
 				include/pie-util-fd.h		\
 				include/util.h
+
+bin_swapfd_SOURCES =		main.c				\
+								\
+				manager/swapfd.c		\
+								\
+				manager/swapfd.h		\
+								\
+				src/log.c			\
+				src/ptrace.c			\
+				src/pie-util-fd.c		\
+								\
+				include/pie-util-fd.h		\
+				include/log.h			\
+				include/ptrace.h
 
 tags: ctags
 
