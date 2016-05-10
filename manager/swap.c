@@ -10,7 +10,10 @@
 
 #include "swap.h"
 #include "spfs.h"
+#include "processes.h"
+#include "fd_tree.h"
 #include "swapfd.h"
+
 #if 0
 struct fifo_data {
 	struct list_head list;
@@ -172,29 +175,68 @@ static void fd_path(pid_t pid, char *name, void *data)
 	strcpy(name, tmp);
 }
 #endif
-int do_swap_fds(struct spfs_info_s *info, char *pids_list)
+
+static int do_swap_process_files(struct process_info *p)
 {
-	char *pid;
-	int err = 0;
+	struct process_fd *pfd;
+	int *src_fd, *dst_fd, *s, *d;
+	int i;
 
-	while ((pid = strsep(&pids_list, "\n")) != NULL) {
-		long p;
+	pr_debug("Replacing process %d fds (%d)\n", p->pid, p->fds_nr);
 
-		if (!strlen(pid))
-			continue;
+	src_fd = malloc(sizeof(int) * p->fds_nr);
+	dst_fd = malloc(sizeof(int) * p->fds_nr);
+	if (!src_fd || !dst_fd)
+		return -ENOMEM;
 
-		err = xatol(pid, &p);
-		if (err) {
-			pr_err("failed to convert pid %s to number\n", pid);
-			break;
-		}
-#if 0
-		err = swapfd(p, test_fd, fd_path, info);
-		if (err)
-			pr_err("failed to replace process %d fds: %d\n", p, err);
-#endif
+	s = src_fd;
+	d = dst_fd;
+
+	list_for_each_entry(pfd, &p->fds, list) {
+		pr_debug("/proc/%d/fd/%d --> /proc/%d/fd/%d\n",
+				getpid(), pfd->real_fd, p->pid, pfd->spfs_fd);
+		*s++ = pfd->spfs_fd;
+		*d++ = pfd->real_fd;
 	}
 
-	return err;
+	for (i = 0; i < p->fds_nr; i++) {
+		pr_debug("src_fd[%d]: %d\n", i, src_fd[i]);
+		pr_debug("dst_fd[%d]: %d\n", i, dst_fd[i]);
+	}
+	return swapfd_tracee(p->pid, src_fd, dst_fd, p->fds_nr);
 }
 
+static int do_swap_files(struct spfs_info_s *info)
+{
+	struct process_info *p;
+
+	list_for_each_entry(p, &info->processes, list) {
+		if (do_swap_process_files(p))
+			pr_err("failed to swap fds fot process %d\n", p->pid);
+	}
+	return 0;
+}
+
+static int do_swap_mappings(struct spfs_info_s *info)
+{
+	return 0;
+}
+
+int do_swap_resources(struct spfs_info_s *info)
+{
+	int err;
+
+	err = do_swap_files(info);
+	if (err) {
+		pr_err("failed to swap fds for spfs %s\n", info->id);
+		return err;
+	}
+
+	err = do_swap_mappings(info);
+	if (err) {
+		pr_err("failed to swap mappings for spfs %s\n", info->id);
+		return err;
+	}
+
+	return 0;
+}

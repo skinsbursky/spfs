@@ -19,6 +19,8 @@
 #include "spfs.h"
 #include "freeze.h"
 #include "swap.h"
+#include "swapfd.h"
+#include "processes.h"
 
 #define ct_run(func, info, ...)							\
 ({										\
@@ -48,112 +50,24 @@
 	_err ? _err : _status;							\
 })
 
-static int get_pids_list_ct(const char *tasks_file, char **list)
+static int spfs_pids_list(struct spfs_info_s *info, char **list)
 {
-	char *pids_list, *p;
-	int err = -ENOMEM, fd;
-	char buf[4096] = { };
-	ssize_t bytes;
-
-	fd = open(tasks_file, O_RDONLY);
-	if (fd < 0) {
-		pr_perror("failed to open %s", tasks_file);
-		return -errno;
-	}
-
-	pids_list = NULL;
-	do {
-		bytes = read(fd, buf, sizeof(buf) - 1);
-		if (bytes < 0) {
-			pr_perror("failed to read %s", tasks_file);
-			err = -errno;
-			goto free_pids_list;
-		}
-		buf[bytes] = '\0';
-		if (bytes) {
-			pids_list = xstrcat(pids_list, "%s", buf);
-			if (!pids_list) {
-				pr_err("failed to allocate\n");
-				goto free_pids_list;
-			}
-		}
-	} while (bytes > 0);
-
-	p = shm_xsprintf(pids_list);
-	if (!p) {
-		pr_err("failed to allocate\n");
-		goto free_pids_list;
-	}
-
-	*list = p;
-	err = 0;
-
-	pr_debug("Pids list:\n%s\n", *list);
-
-free_pids_list:
-	free(pids_list);
-	close(fd);
-	return err;
-}
-
-static int get_pids_list(struct spfs_info_s *info, char **list)
-{
-	int pid, err, status;
-	static char **pids_list;
 	char *tasks_file;
-
-	if (pids_list == NULL) {
-		pids_list = shm_alloc(sizeof(pids_list));
-		if (!pids_list) {
-			pr_err("failed to allocate\n");
-			return -ENOMEM;
-		}
-	}
+	int err;
 
 	tasks_file = xsprintf("%s/tasks", info->fg->path);
 	if (!tasks_file)
 		return -ENOMEM;
 
-	err = join_one_namespace(info->ns_pid, "pid");
-	if (err)
-		goto free_task_file;
+	err = get_pids_list(tasks_file, list);
 
-	pid = fork();
-	switch (pid) {
-		case -1:
-			pr_perror("failed to fork");
-			err = -errno;
-		case 0:
-			_exit(get_pids_list_ct(tasks_file, pids_list));
-		default:
-			err = 0;
-	}
-
-	if (pid > 0)
-		err = collect_child(pid, &status, 0);
-
-	*list = *pids_list;
-
-free_task_file:
 	free(tasks_file);
-	return err ? err : status;
+	return err;
 }
 
-static int do_swap_files(struct spfs_info_s *info)
+static int spfs_collect_processes(struct spfs_info_s *info, const char *list)
 {
-	char *pids_list;
-	int err;
-
-	err = get_pids_list(info, &pids_list);
-	if (err)
-		return err;
-
-	return ct_run(do_swap_fds, info, pids_list);
-}
-
-static int do_swap_mappings(struct spfs_info_s *info)
-{
-	return 0;
+	return iterate_pids_list(list, info, collect_one_process);
 }
 
 static int prepare_mount_env_ct(struct spfs_info_s *info, const char *proxy_dir)
@@ -299,7 +213,7 @@ static int do_replace_one_spfs(const char *source, const char *target)
 	return 0;
 }
 
-static int do_replace_spfs_frozen(struct spfs_info_s *info, const char *source)
+static int do_replace_mounts(struct spfs_info_s *info, const char *source)
 {
 	int err;
 	struct spfs_bindmount *bm;
@@ -327,36 +241,101 @@ static int do_replace_spfs_frozen(struct spfs_info_s *info, const char *source)
 			pr_err("failed to replace %s by %s\n", bm->path, source);
 		}
 	}
-
 	(void) unlock_shared_list(&info->mountpaths);
 
 close_spfs_ref:
 	close(spfs_ref);
-	return err;
+	return spfs_send_mode(info, SPFS_PROXY_MODE, info->mountpoint);
+}
+
+static int spfs_replace_resources(struct spfs_info_s *info, int *ns_fds)
+{
+	char *list;
+	int err;
+	int freezer_state_fd;
+
+	freezer_state_fd = open_cgroup_state(info->fg);
+	if (freezer_state_fd < 0)
+		return freezer_state_fd;
+
+	err = spfs_pids_list(info, &list);
+	if (err)
+		return err;
+
+	err = set_namespaces(ns_fds, true);
+	if (err)
+		return err;
+
+	err = spfs_collect_processes(info, list);
+	if (err)
+		return err;
+
+	err = write(freezer_state_fd, "THAWED", sizeof("THAWED"));
+	if (err != sizeof("THAWED")) {
+		pr_perror("Unable to thaw");
+		return err;
+	}
+	close(freezer_state_fd);
+
+	err = spfs_seize_processes(info);
+	if (err)
+		return err;
+
+	err = do_swap_resources(info);
+	if (err)
+		return err;
+
+	return spfs_release_processes(info);
+}
+
+static int do_replace_resources(struct spfs_info_s *info)
+{
+	int err, status, pid;
+	int ct_ns_fds[NS_MAX];
+
+	err = open_namespaces(info->ns_pid, info->ns_list, ct_ns_fds);
+	if (err) {
+		pr_perror("failed to change %d namespaces: %s\n", info->ns_pid,
+				info->ns_list);
+		return err;
+	}
+
+	err = join_one_namespace(info->ns_pid, "pid");
+	if (err)
+		goto close_namespaces;
+
+	pid = fork();
+	switch (pid) {
+		case -1:
+			pr_perror("failed to fork");
+			err = -errno;
+		case 0:
+			_exit(spfs_replace_resources(info, ct_ns_fds));
+	}
+
+	if (pid > 0)
+		err = collect_child(pid, &status, 0);
+
+close_namespaces:
+	close_namespaces(ct_ns_fds);
+	return err ? err : status;
 }
 
 static int do_replace_spfs(struct spfs_info_s *info, const char *source)
 {
-	int err;
+	int err, res;
 
-	err = spfs_freeze_and_lock(info);
-	if (err)
-		return err;
+	res = spfs_freeze_and_lock(info);
+	if (res)
+		return res;
 
-	err = ct_run(do_replace_spfs_frozen, info, source);
+	err = ct_run(do_replace_mounts, info, source);
+	if (!err)
+		err = do_replace_resources(info);
 
-	err = spfs_thaw(info);
-	if (err)
-		return err;
+	res = spfs_thaw_and_unlock(info);
 
-	/* Here will be fd replacement, etc
-	 * Freezer cgroup should be kept locked to make sure, that any other
-	 * spfs won't come and freeze the CT again.
-	 */
-
-	(void) spfs_unlock(info);
-
-	return spfs_send_mode(info, SPFS_PROXY_MODE, info->mountpoint);
+	return err ? err : res;
 }
 
 static int umount_target(const struct spfs_info_s *info, const char *mnt)
@@ -374,7 +353,7 @@ static int do_mount_target(struct spfs_info_s *info,
 		const char *source, const char *target, const char *fstype,
 		const char *mountflags, const void *options)
 {
-	int err, mode = SPFS_PROXY_MODE;
+	int err;
 	long mflags;
 
 	err = xatol(mountflags, &mflags);
@@ -385,7 +364,7 @@ static int do_mount_target(struct spfs_info_s *info,
 	if (err)
 		return err;
 
-	err = spfs_send_mode(info, mode, target);
+	err = spfs_send_mode(info, SPFS_PROXY_MODE, target);
 	if (err)
 		/*TODO: should umount the target ? */
 		return err;
@@ -393,10 +372,9 @@ static int do_mount_target(struct spfs_info_s *info,
 	return 0;
 }
 
-
-static int do_replace_mount(struct spfs_info_s *info, int sock,
-		const char *source, const char *fstype,
-		const char *mountflags, const void *options)
+int replace_spfs(int sock, struct spfs_info_s *info,
+		  const char *source, const char *fstype,
+		  const char *mountflags, const void *options)
 {
 	char *mnt;
 	int err;
@@ -422,31 +400,5 @@ static int do_replace_mount(struct spfs_info_s *info, int sock,
 
 free_mnt:
 	free(mnt);
-	return err;
-}
-
-int replace_spfs(int sock, struct spfs_info_s *info,
-		  const char *source, const char *fstype,
-		  const char *mountflags, const void *options)
-{
-	int err;
-
-	err = do_replace_mount(info, sock, source, fstype, mountflags, options);
-	if (err)
-		return err;
-
-	if (!info->fg)
-		return 0;
-
-	err = do_swap_files(info);
-	if (err) {
-		pr_err("failed to swap fds for spfs %s\n", info->id);
-		return err;
-	}
-
-	err = do_swap_mappings(info);
-	if (err)
-		pr_err("failed to swap mappings for spfs %s\n", info->id);
-
 	return err;
 }

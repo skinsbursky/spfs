@@ -3,6 +3,6 @@
 
 struct spfs_info_s;
 
-int do_swap_fds(struct spfs_info_s *info, char *pids_list);
+int do_swap_resources(struct spfs_info_s *info);
 
 #endif

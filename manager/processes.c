@@ -372,6 +372,8 @@ static void *reg_file_obj(const char *path, unsigned flags, struct replace_fd *r
 
 static int create_file_obj(const char *path, unsigned flags, struct replace_fd *rfd)
 {
+	/* TODO move these actors to tree creation and place them on replace_fd
+	 * structure */
 	switch (rfd->mode & S_IFMT) {
 		case S_IFDIR:
 		case S_IFREG:
