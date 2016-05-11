@@ -65,7 +65,7 @@ int unlock_cgroup(struct freeze_cgroup_s *fg)
 	return 0;
 }
 
-static int freezer_set_state(const char *freezer_cgroup, const char state[])
+static int freezer_open_state(const char *freezer_cgroup)
 {
 	int fd;
 	char path[PATH_MAX];
@@ -76,6 +76,16 @@ static int freezer_set_state(const char *freezer_cgroup, const char state[])
 		pr_perror("Unable to open %s", path);
 		return -1;
 	}
+	return fd;
+}
+
+static int freezer_set_state(const char *freezer_cgroup, const char state[])
+{
+	int fd;
+
+	fd = freezer_open_state(freezer_cgroup);
+	if (fd < 0)
+		return fd;
 
 	if (write(fd, state, sizeof(state)) != sizeof(state)) {
 		pr_perror("Unable to set %s state to %s", freezer_cgroup, state);
@@ -108,4 +118,17 @@ int freeze_cgroup(const struct freeze_cgroup_s *fg)
 	else
 		pr_debug("cgroup %s was frozen\n", fg->path);
 	return err;
+}
+
+int open_cgroup_state(const struct freeze_cgroup_s *fg)
+{
+	int fd;
+
+	fd = freezer_open_state(fg->path);
+	if (fd < 0)
+		pr_err("failed to open cgroup %s state\n", fg->path);
+	else
+		pr_debug("cgroup %s state was opened\n", fg->path);
+	return fd;
+
 }
