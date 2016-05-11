@@ -9,7 +9,7 @@ struct spfs_info_s;
 int prepare_mount_env(struct spfs_info_s *info, const char *proxy_dir);
 int cleanup_mount_env(struct spfs_info_s *info);
 
-int replace_mount(int sock, struct spfs_info_s *info,
+int replace_spfs(int sock, struct spfs_info_s *info,
 		  const char *source, const char *fstype,
 		  const char *mountflags, const void *options);
 

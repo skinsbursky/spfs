@@ -593,7 +593,7 @@ static int process_replace_cmd(int sock, struct spfs_manager_context_s *ctx,
 			return err;
 	}
 
-	return replace_mount(sock, info, opt_array[1].value, opt_array[2].value,
+	return replace_spfs(sock, info, opt_array[1].value, opt_array[2].value,
 			     opt_array[3].value, opts);
 }
 

@@ -425,7 +425,7 @@ free_mnt:
 	return err;
 }
 
-int replace_mount(int sock, struct spfs_info_s *info,
+int replace_spfs(int sock, struct spfs_info_s *info,
 		  const char *source, const char *fstype,
 		  const char *mountflags, const void *options)
 {
