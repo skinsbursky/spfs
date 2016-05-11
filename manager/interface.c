@@ -397,6 +397,7 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 		return err;
 
 	INIT_LIST_HEAD(&info->list);
+	INIT_LIST_HEAD(&info->processes);
 
 	/* TODO: should we add mounpoint _after_ mount? */
 	err = add_spfs_info(ctx->spfs_mounts, info);

@@ -37,6 +37,7 @@ struct spfs_info_s {
 	struct freeze_cgroup_s	*fg;
 	bool			dead;
 	struct shared_list	mountpaths;
+	struct list_head	processes;
 };
 
 struct spfs_info_s *find_spfs_by_id(struct shared_list *mounts, const char *id);
