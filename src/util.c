@@ -130,13 +130,13 @@ int execvp_print(const char *file, char *const argv[])
 	return -errno;
 }
 
-int xatol(const char *string, long *number)
+int xatol_base(const char *string, long *number, int base)
 {
 	char *endptr;
 	long nr;
 
 	errno = 0;
-	nr = strtol(string, &endptr, 10);
+	nr = strtol(string, &endptr, base);
 	if ((errno == ERANGE && (nr == LONG_MAX || nr == LONG_MIN))
 			|| (errno != 0 && nr == 0)) {
 		pr_perror("failed to convert string");
@@ -149,6 +149,11 @@ int xatol(const char *string, long *number)
 	}
 	*number = nr;
 	return 0;
+}
+
+int xatol(const char *string, long *number)
+{
+	return xatol_base(string, number, 10);
 }
 
 int create_dir(const char *fmt, ...)
