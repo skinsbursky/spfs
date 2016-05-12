@@ -113,6 +113,68 @@ static void free_mappings(struct parasite_ctl *ctl)
 		free(m);
 }
 
+static int move_mappings(struct parasite_ctl *ctl, int src_fd, int dst_fd)
+{
+	unsigned int dev_major, dev_minor;
+	struct map_struct *map;
+	int ret, prot, flags;
+	char path[PATH_MAX];
+	unsigned long sret;
+	struct stat st;
+	size_t length;
+
+	sprintf(path, "/proc/%d/fd/%d", ctl->pid, src_fd);
+
+	if (stat(path, &st) < 0) {
+		pr_perror("Can't do stat on %s", path);
+		return -1;
+	}
+
+	dev_major = major(st.st_dev);
+	dev_minor = minor(st.st_dev);
+
+	list_for_each_entry(map, &ctl->maps, list) {
+		if (map->major != dev_major || map->minor != dev_minor ||
+		    map->ino != st.st_ino)
+			continue;
+		pr_debug("BINGO! Found\n");
+		length = map->end - map->start;
+
+		ret = syscall_seized(ctl, __NR_msync, &sret, map->start, length, MS_SYNC, 0, 0, 0);
+		if (ret || sret) {
+			pr_err("Can't msync at [%lx; %lx], ret=%d, sret=%d\n",
+				map->start, map->end, ret, (int)(long)sret);
+			return -1;
+		}
+
+		ret = syscall_seized(ctl, __NR_munmap, &sret, map->start, length, 0, 0, 0, 0);
+		if (ret || sret) {
+			pr_err("Can't munmap at [%lx; %lx], ret=%d, sret=%d\n",
+				map->start, map->end, ret, (int)(long)sret);
+			return -1;
+		}
+
+		prot = 0;
+		if (map->r == 'r')
+			prot |= PROT_READ;
+		if (map->w == 'w')
+			prot |= PROT_WRITE;
+		if (map->x == 'x')
+			prot |= PROT_EXEC;
+
+		flags = map->s == 's' ? MAP_SHARED : MAP_PRIVATE;
+		flags |= MAP_FIXED;
+
+		ret = syscall_seized(ctl, __NR_mmap, &sret, map->start, length, prot, flags, dst_fd, map->pgoff);
+		if (ret || sret == (unsigned long)MAP_FAILED) {
+			pr_err("Can't mmap at [%lx; %lx], ret=%d\n",
+				map->start, map->end, ret);
+			return -1;
+		}
+	}
+	return 0;
+}
+
 static void destroy_parasite_ctl(pid_t pid, struct parasite_ctl *ctl);
 
 static void destroy_dgram_socket(struct parasite_ctl *ctl)
@@ -547,6 +609,9 @@ static int changefd(struct parasite_ctl *ctl, pid_t pid, int src_fd, int dst_fd)
 	}
 
 	pr_debug("Received fd=%d\n", new_fd);
+
+	if (move_mappings(ctl, src_fd, new_fd) < 0)
+		return -1;
 
 	ret = syscall_seized(ctl, __NR_dup2, &sret, new_fd, src_fd, 0, 0, 0, 0);
 	if (ret < 0 || ((int)(long)sret) < 0) {
