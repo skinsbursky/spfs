@@ -179,9 +179,9 @@ static int move_mappings(struct parasite_ctl *ctl, unsigned long src_addr, int s
 		flags |= MAP_FIXED;
 
 		ret = syscall_seized(ctl, __NR_mmap, &sret, map->start, length, prot, flags, dst_fd, map->pgoff);
-		if (ret || sret == (unsigned long)MAP_FAILED) {
-			pr_err("Can't mmap at [%lx; %lx], ret=%d\n",
-				map->start, map->end, ret);
+		if (ret || IS_ERR_VALUE(sret)) {
+			pr_err("Can't mmap at [%lx; %lx], prot=%x, flags=%x, pgoff=%llx, ret=%d, sret=%d\n",
+				map->start, map->end, prot, flags, map->pgoff, ret, (int)(long)sret);
 			return -1;
 		}
 		moved = map->moved = 1;
