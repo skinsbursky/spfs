@@ -27,7 +27,7 @@
 
 #include "swapfd.h"
 
-#define MMAP_SIZE PATH_MAX
+#define MMAP_SIZE (PATH_MAX + BUILTIN_SYSCALL_SIZE)
 
 struct map_struct {
 	struct list_head list;
@@ -296,6 +296,7 @@ static int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl)
 
 	ctl->pid = pid;
 	ctl->syscall_ip = (unsigned long)addr;
+	ctl->syscall_ip_saved = (unsigned long)addr;
 	ctl->remote_sockfd = -1;
 	ctl->local_sockfd = -1;
 
@@ -355,6 +356,11 @@ static int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl)
 
 	syscall_seized(ctl, __NR_close, &sret, fd, 0, 0, 0, 0, 0);
 	close(lfd);
+	/*
+	 * Use allocated memory for syscall number, because task's mappings
+	 * are unstable over our moving of them.
+	 */
+	ctl->syscall_ip = (unsigned long)ctl->remote_map + PATH_MAX;
 
 	if (set_dgram_socket(ctl) < 0) {
 		destroy_parasite_ctl(pid, ctl);
@@ -382,6 +388,7 @@ static void destroy_parasite_ctl(pid_t pid, struct parasite_ctl *ctl)
 
 	destroy_dgram_socket(ctl);
 
+	ctl->syscall_ip = ctl->syscall_ip_saved;
 	ret = syscall_seized(ctl, __NR_munmap, &sret, (unsigned long)ctl->remote_map, ctl->map_length, 0, 0, 0, 0);
 	if (ret || ((int)(long)sret) < 0)
 		pr_err("Can't munmap remote file\n");

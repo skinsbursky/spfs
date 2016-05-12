@@ -101,6 +101,7 @@ struct parasite_ctl {
 	unsigned		map_length;
 	pid_t			pid;
 	unsigned long		syscall_ip;
+	unsigned long		syscall_ip_saved;
 	struct thread_ctx	orig;
 	struct list_head	maps;
 };
