@@ -440,6 +440,23 @@ static int get_next_fd(struct parasite_ctl *ctl)
 	return recv_fd(ctl);
 }
 
+static int changemap(struct parasite_ctl *ctl, unsigned long addr)
+{
+	int fd = get_next_fd(ctl);
+
+	if (fd < 0) {
+		pr_err("Can't receive new fd\n");
+		return -1;
+	}
+	pr_debug("Received fd=%d\n", fd);
+
+	if (move_mappings(ctl, addr, -1, fd) < 0) {
+		pr_err("Can't move mapping on addr %lx\n", addr);
+		return -1;
+	}
+
+	return 0;
+}
 struct lock {
 	loff_t start, end;
 	short type;
@@ -669,10 +686,13 @@ out:
 }
 
 /* Replace tracee's remote @src_fd[] with caller's local @dst_fd */
-int swapfd_tracee(pid_t pid, int src_fd[], int dst_fd[], int num)
+int swapfd_tracee(pid_t pid, unsigned long src_addr[], int naddr,
+		  int src_fd[], int nfd, int dst_fd[])
 {
 	struct parasite_ctl *ctl;
-	int i, ret;
+	int i, num, ret;
+
+	num = naddr + nfd;
 
 	ret = set_parasite_ctl(pid, &ctl);
 	if (ret < 0) {
@@ -683,8 +703,14 @@ int swapfd_tracee(pid_t pid, int src_fd[], int dst_fd[], int num)
 	if (ret < 0)
 		goto out_destroy;
 
-	for (i = 0; i < num; i++) {
-		ret = changefd(ctl, pid, src_fd[i], dst_fd[i]);
+	for (i = 0; i < naddr; i++) {
+		ret = changemap(ctl, src_addr[i]);
+		if (ret < 0)
+			goto out_destroy;
+	}
+
+	for (i = 0; i < nfd; i++) {
+		ret = changefd(ctl, pid, src_fd[i], dst_fd[naddr + i]);
 		if (ret < 0)
 			goto out_destroy;
 	}

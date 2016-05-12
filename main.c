@@ -183,7 +183,7 @@ int main()
 	if (wait_task_seized(child) < 0)
 		goto out_detach;
 
-	if (swapfd_tracee(child, src, dst, 2) == 0)
+	if (swapfd_tracee(child, NULL, 0, src, 2, dst) == 0)
 		ret = 0;
 out_detach:
 	detach_from_task(child);
