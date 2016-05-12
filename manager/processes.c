@@ -623,6 +623,55 @@ static int collect_process_map_fds(struct process_info *p)
 	return iterate_dir_name(dpath, p, collect_map_fd, "collect_map_fd");
 }
 
+static int collect_process_env(struct process_info *p)
+{
+	int dir, err, *env = p->env_array;
+	char path[PATH_MAX];
+	struct spfs_info_s *info = p->info;
+	char *env_vars[] = {
+		"exe",
+		"cwd",
+		"root",
+		NULL
+	}, **var;
+
+	snprintf(path, PATH_MAX, "/proc/%d", p->pid);
+	dir = open(path, O_RDONLY | O_DIRECTORY);
+	if (dir < 0) {
+		pr_perror("failed to open %s", path);
+		return -errno;
+	}
+
+	/* TODO: exec, root and cwd can be shared */
+
+	var = env_vars;
+	while(*var) {
+		char *dentry = *var++;
+		char link[PATH_MAX];
+
+		if (!is_spfs_fd(dir, dentry, info))
+			continue;
+
+		pr_debug("Collecting /proc/%d/%s\n", p->pid, dentry);
+
+		snprintf(link, PATH_MAX, "/proc/%d/%s", p->pid, dentry);
+		err = get_link_path(link, info->mountpoint, path, sizeof(path));
+		if (err)
+			break;
+
+		*env = open(path, O_RDONLY);
+		if (*env < 0) {
+			pr_perror("failed to open %s", path);
+			err = -errno;
+			break;
+		}
+		env++;
+	}
+
+	close(dir);
+	return err;
+}
+
 int collect_one_process(pid_t pid, struct spfs_info_s *info)
 {
 	int err;
@@ -638,8 +687,15 @@ int collect_one_process(pid_t pid, struct spfs_info_s *info)
 	p->info = info;
 	p->fds_nr = 0;
 	p->maps_nr = 0;
+	p->env.exe_fd = -1;
+	p->env.cwd_fd = -1;
+	p->env.root_fd = -1;
 	INIT_LIST_HEAD(&p->fds);
 	INIT_LIST_HEAD(&p->maps);
+
+	err = collect_process_env(p);
+	if (err)
+		goto free_p;
 
 	err = collect_process_open_fds(p);
 	if (err)

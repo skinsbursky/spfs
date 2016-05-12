@@ -63,6 +63,14 @@ struct process_info {
 	int pid;
 	int fds_nr;
 	int maps_nr;
+	union {
+		struct process_env {
+			int exe_fd;
+			int cwd_fd;
+			int root_fd;
+		} env;
+		int env_array[3];
+	};
 	struct list_head fds;
 	struct list_head maps;
 	struct spfs_info_s *info;

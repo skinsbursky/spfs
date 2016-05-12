@@ -215,6 +215,17 @@ static int do_swap_process_resources(struct process_info *p)
 		*ma++ = mfd->start;
 	}
 
+	if (p->env.exe_fd >= 0)
+		pr_debug("/proc/%d/fd/%d --> /proc/%d/exe\n",
+				getpid(), p->env.exe_fd, p->pid);
+
+	if (p->env.cwd_fd >= 0)
+		pr_debug("/proc/%d/fd/%d --> /proc/%d/cwd\n",
+				getpid(), p->env.cwd_fd, p->pid);
+	if (p->env.root_fd >= 0)
+		pr_debug("/proc/%d/fd/%d --> /proc/%d/root\n",
+				getpid(), p->env.root_fd, p->pid);
+
 	err = swapfd_tracee(p->pid, map_addr, map_fd, p->maps_nr,
 			    src_fd, dst_fd, p->fds_nr);
 
