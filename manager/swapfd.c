@@ -563,7 +563,8 @@ static int changefd(struct parasite_ctl *ctl, pid_t pid, int src_fd, int dst_fd)
 	if (exit_code == 0 && need_lseek) {
 		ret = syscall_seized(ctl, __NR_lseek, &sret, src_fd, f_pos, SEEK_SET, 0, 0, 0);
 		if (ret < 0 || ((int)(long)sret) < 0) {
-			pr_err("Can't lseek pid=%d, fd=%d\n", pid, src_fd);
+			pr_err("Can't lseek pid=%d, fd=%d, ret=%d, sret=%d\n",
+				pid, src_fd, ret, (int)(long)sret);
 			exit_code = -1;
 		}
 	}
