@@ -262,7 +262,7 @@ static int spfs_replace_resources(struct spfs_info_s *info, int *ns_fds)
 	if (err)
 		return err;
 
-	err = set_namespaces(ns_fds, true);
+	err = set_namespaces(ns_fds, NS_USER_MASK | NS_MNT_MASK | NS_NET_MASK);
 	if (err)
 		return err;
 
@@ -293,14 +293,14 @@ static int do_replace_resources(struct spfs_info_s *info)
 	int err, status, pid;
 	int ct_ns_fds[NS_MAX];
 
-	err = open_namespaces(info->ns_pid, info->ns_list, ct_ns_fds);
+	err = open_namespaces(info->ns_pid, ct_ns_fds);
 	if (err) {
 		pr_perror("failed to change %d namespaces: %s\n", info->ns_pid,
 				info->ns_list);
 		return err;
 	}
 
-	err = join_one_namespace(info->ns_pid, "pid");
+	err = set_namespaces(ct_ns_fds, NS_PID_MASK);
 	if (err)
 		goto close_namespaces;
 

@@ -15,6 +15,14 @@
 #include "swapfd.h"
 #include "processes.h"
 
+char *ns_names[NS_MAX] = {
+	[NS_UTS] = "uts",
+	[NS_MNT] = "mnt",
+	[NS_NET] = "net",
+	[NS_PID] = "pid",
+	[NS_USER] = "user"
+};
+
 int open_ns(pid_t pid, const char *ns_type)
 {
 	int fd;
@@ -29,23 +37,24 @@ int open_ns(pid_t pid, const char *ns_type)
 	return fd;
 }
 
-int set_namespaces(int *ns_fds, bool close_fds)
+int set_namespaces(int *ns_fds, unsigned ns_mask)
 {
 	int ns_type, err;
 
 	for (ns_type = NS_UTS; ns_type < NS_MAX; ns_type++) {
-		if (ns_fds[ns_type] < 0)
+		if ((ns_mask & (1 << ns_type)) == 0)
 			continue;
+
+		if (ns_fds[ns_type] < 0) {
+			pr_err("failed to set %s ns: fd is closed\n",
+					ns_names[ns_type]);
+			continue;
+		}
 
 		err = setns(ns_fds[ns_type], 0);
 		if (err) {
 			pr_perror("failed to set ns by fd %d", ns_fds[ns_type]);
 			break;
-		}
-
-		if (close_fds) {
-			close(ns_fds[ns_type]);
-			ns_fds[ns_type] = -1;
 		}
 	}
 	return err;
@@ -64,60 +73,11 @@ int close_namespaces(int *ns_fds)
 	return 0;
 }
 
-int def_namespaces(const char *namespaces, bool *ns_req)
+int open_namespaces(pid_t pid, int *ns_fds)
 {
-	char *ns_list, *ns;
-	int err = 0, ns_type;
-
-	ns_list = strdup(namespaces);
-	if (!ns_list) {
-		pr_err("failed to duplicate namespaces\n");
-		return -ENOMEM;
-	}
-
-	while ((ns = strsep(&ns_list, ",")) != NULL) {
-		if (!strcmp(ns, "uts"))
-			ns_type = NS_UTS;
-		else if (!strcmp(ns, "mnt"))
-			ns_type = NS_MNT;
-		else if (!strcmp(ns, "net"))
-			ns_type = NS_NET;
-		else if (!strcmp(ns, "pid"))
-			ns_type = NS_PID;
-		else if (!strcmp(ns, "user"))
-			ns_type = NS_USER;
-		else {
-			pr_err("unknown namespace: %s\n", ns);
-			err = -EINVAL;
-			break;
-		}
-		ns_req[ns_type] = true;
-	}
-	free(ns_list);
-	return err;
-}
-
-char *ns_names[NS_MAX] = {
-	"uts", "mnt", "net", "pid", "user",
-};
-
-int open_namespaces(pid_t pid, const char *namespaces, int *ns_fds)
-{
-	int err = 0, ns_type;
-	bool ns_req[NS_MAX] = {
-		false, false, false, false, false
-	};
-
-	err = def_namespaces(namespaces, ns_req);
-	if (err)
-		return err;
+	int err, ns_type;
 
 	for (ns_type = NS_UTS; ns_type < NS_MAX; ns_type++) {
-		if (ns_req[ns_type] == false) {
-			ns_fds[ns_type] = -1;
-			continue;
-		}
-
 		err = open_ns(pid, ns_names[ns_type]);
 		if (err < 0)
 			goto close_saved_fd;
@@ -131,18 +91,24 @@ close_saved_fd:
 	return err;
 }
 
-int change_namespaces(pid_t pid, const char *namespaces, int *fds[])
+int change_namespaces(pid_t pid, unsigned ns_mask, int *orig_ns_fds[])
 {
 	int ns_fds[NS_MAX] = {
 		-1, -1, -1, -1, -1
 	};
 	int err;
 
-	err = open_namespaces(pid, namespaces, ns_fds);
+	if (orig_ns_fds) {
+		err = open_namespaces(getpid(), ns_fds);
+		if (err)
+			return err;
+	}
+
+	err = open_namespaces(pid, ns_fds);
 	if (err)
 		return err;
 
-	err = set_namespaces(ns_fds, true);
+	err = set_namespaces(ns_fds, ns_mask);
 
 	(void)close_namespaces(ns_fds);
 	return err;
