@@ -176,18 +176,24 @@ static void fd_path(pid_t pid, char *name, void *data)
 }
 #endif
 
-static int do_swap_process_files(struct process_info *p)
+static int do_swap_process_resources(struct process_info *p)
 {
 	struct process_fd *pfd;
+	struct process_map *mfd;
 	int *src_fd, *dst_fd, *s, *d;
-	int i;
+	int *map_fd, *m;
+	unsigned long *map_addr, *ma;
+	int err = -ENOMEM;
 
-	pr_debug("Replacing process %d fds (%d)\n", p->pid, p->fds_nr);
+	pr_debug("Replacing process %d resources (%d)\n", p->pid, p->fds_nr);
 
 	src_fd = malloc(sizeof(int) * p->fds_nr);
 	dst_fd = malloc(sizeof(int) * p->fds_nr);
-	if (!src_fd || !dst_fd)
-		return -ENOMEM;
+	map_fd = malloc(sizeof(int) * p->maps_nr);
+	map_addr = malloc(sizeof(long) * p->maps_nr);
+	if (!src_fd || !dst_fd ||
+	    !map_fd || !map_addr)
+		goto free;
 
 	s = src_fd;
 	d = dst_fd;
@@ -199,43 +205,34 @@ static int do_swap_process_files(struct process_info *p)
 		*d++ = pfd->real_fd;
 	}
 
-	for (i = 0; i < p->fds_nr; i++) {
-		pr_debug("src_fd[%d]: %d\n", i, src_fd[i]);
-		pr_debug("dst_fd[%d]: %d\n", i, dst_fd[i]);
+	m = map_fd;
+	ma = map_addr;
+
+	list_for_each_entry(mfd, &p->maps, list) {
+		pr_debug("/proc/%d/fd/%d --> /proc/%d/map_files/%ld-%ld\n",
+				getpid(), mfd->map_fd, p->pid, mfd->start, mfd->end);
+		*m++ = mfd->map_fd;
+		*ma++ = mfd->start;
 	}
-	return swapfd_tracee(p->pid, src_fd, dst_fd, p->fds_nr);
-}
 
-static int do_swap_files(struct spfs_info_s *info)
-{
-	struct process_info *p;
+	err = swapfd_tracee(p->pid, map_addr, map_fd, p->maps_nr,
+			    src_fd, dst_fd, p->fds_nr);
 
-	list_for_each_entry(p, &info->processes, list) {
-		if (do_swap_process_files(p))
-			pr_err("failed to swap fds fot process %d\n", p->pid);
-	}
-	return 0;
-}
-
-static int do_swap_mappings(struct spfs_info_s *info)
-{
-	return 0;
+free:
+	free(src_fd);
+	free(dst_fd);
+	free(map_fd);
+	free(map_addr);
+	return err;
 }
 
 int do_swap_resources(struct spfs_info_s *info)
 {
-	int err;
+	struct process_info *p;
 
-	err = do_swap_files(info);
-	if (err) {
-		pr_err("failed to swap fds for spfs %s\n", info->id);
-		return err;
-	}
-
-	err = do_swap_mappings(info);
-	if (err) {
-		pr_err("failed to swap mappings for spfs %s\n", info->id);
-		return err;
+	list_for_each_entry(p, &info->processes, list) {
+		if (do_swap_process_resources(p))
+			pr_err("failed to swap resources for process %d\n", p->pid);
 	}
 
 	return 0;
