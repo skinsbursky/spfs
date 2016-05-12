@@ -51,11 +51,20 @@ struct process_fd {
 	int real_fd;
 };
 
+struct process_map {
+	struct list_head list;
+	int map_fd;
+	off_t start;
+	off_t end;
+};
+
 struct process_info {
 	struct list_head list;
 	int pid;
 	int fds_nr;
+	int maps_nr;
 	struct list_head fds;
+	struct list_head maps;
 	struct spfs_info_s *info;
 };
 

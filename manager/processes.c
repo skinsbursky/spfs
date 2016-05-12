@@ -359,24 +359,10 @@ static int create_file_obj(const char *path, unsigned flags, struct replace_fd *
 	return rfd->file_obj ? 0 : -EPERM;
 }
 
-static int open_replace_fd(struct replace_fd *rfd, unsigned flags, const char *mountpoint)
+static int get_link_path(const char *link, const char *mountpoint,
+			 char *path, size_t size)
 {
-	char path[PATH_MAX];
-	char link[PATH_MAX];
 	ssize_t used, bytes;
-	struct stat st;
-
-	/* TODO it makes sense to open only shared files here.
-	 * Private files can be opened by the process itself */
-
-	snprintf(link, PATH_MAX, "/proc/%d/fd/%d", rfd->pid, rfd->spfs_fd);
-
-	if (stat(link, &st)) {
-		pr_err("failed to stat %s", link);
-		return -errno;
-	}
-
-	rfd->mode = st.st_mode;
 
 	/* Why mountpoint is added in front of the path?
 	 * Because spfs in unmounted already. And it means, that mount point
@@ -385,12 +371,38 @@ static int open_replace_fd(struct replace_fd *rfd, unsigned flags, const char *m
 	snprintf(path, PATH_MAX, "%s", mountpoint);
 	used = strlen(path);
 
-	bytes = readlink(link, path + used, sizeof(path) - used);
+	bytes = readlink(link, path + used, size - used - 1);
 	if (bytes < 0) {
 		pr_perror("failed to read link %s\n", link);
 		return -errno;
 	}
 	path[used+bytes] = '\0';
+	pr_debug("%s --> %s\n", link, path);
+	return 0;
+}
+
+static int open_replace_fd(struct replace_fd *rfd, unsigned flags, const char *mountpoint)
+{
+	char link[PATH_MAX];
+	char path[PATH_MAX];
+	struct stat st;
+	int err;
+
+	snprintf(link, PATH_MAX, "/proc/%d/fd/%d", rfd->pid, rfd->spfs_fd);
+
+	err = get_link_path(link, mountpoint, path, sizeof(path));
+	if (err)
+		return err;
+
+	if (stat(path, &st)) {
+		pr_perror("failed to stat %s", path);
+		return -errno;
+	}
+
+	rfd->mode = st.st_mode;
+
+	/* TODO it makes sense to open only shared files here.
+	 * Private files can be opened by the process itself */
 
 	return create_file_obj(path, flags, rfd);
 }
@@ -445,26 +457,9 @@ static int get_real_fd(pid_t pid, int fd, const char *mountpoint)
 	return get_replace_fd(rfd, flags, mountpoint);
 }
 
-static int collect_process_fd(struct process_info *p, int dir, const char *process_fd)
+static int process_add_fd(struct process_info *p, int spfs_fd, int real_fd)
 {
-	int err, spfs_fd, real_fd;
-	struct spfs_info_s *info = p->info;
 	struct process_fd *pfd;
-
-	if (!is_spfs_fd(dir, process_fd, info))
-		return 0;
-
-	pr_debug("Collecting /proc/%d/fd/%s\n", p->pid, process_fd);
-
-	err = xatol(process_fd, (long *)&spfs_fd);
-	if (err) {
-		pr_err("failed to convert fd %s to number\n", process_fd);
-		return err;
-	}
-
-	real_fd = get_real_fd(p->pid, spfs_fd, info->mountpoint);
-	if (real_fd < 0)
-		return real_fd;
 
 	pfd = malloc(sizeof(*pfd));
 	if (!pfd) {
@@ -482,18 +477,104 @@ static int collect_process_fd(struct process_info *p, int dir, const char *proce
 	return 0;
 }
 
+static int process_add_mapping(struct process_info *p, int map_fd,
+				off_t start, off_t end)
+{
+	struct process_map *mfd;
 
-static int iterate_process_fds_name(struct process_info *p,
+	mfd = malloc(sizeof(*mfd));
+	if (!mfd) {
+		pr_err("failed to allocate mfd\n");
+		return -ENOMEM;
+	}
+
+	mfd->map_fd = map_fd;
+	mfd->start = start;
+	mfd->end = end;
+	list_add_tail(&mfd->list, &p->maps);
+	p->maps_nr++;
+
+	pr_debug("Added replace mapping: /proc/%d/fd/%d (%lx-%lx)\n",
+			getpid(), mfd->map_fd, mfd->start, mfd->end);
+	return 0;
+}
+
+static int collect_process_fd(struct process_info *p, int dir, const char *process_fd)
+{
+	int err, spfs_fd, real_fd;
+	struct spfs_info_s *info = p->info;
+
+	if (!is_spfs_fd(dir, process_fd, info))
+		return 0;
+
+	pr_debug("Collecting /proc/%d/fd/%s\n", p->pid, process_fd);
+
+	err = xatol(process_fd, (long *)&spfs_fd);
+	if (err) {
+		pr_err("failed to convert fd %s to number\n", process_fd);
+		return err;
+	}
+
+	real_fd = get_real_fd(p->pid, spfs_fd, info->mountpoint);
+	if (real_fd < 0)
+		return real_fd;
+
+	return process_add_fd(p, spfs_fd, real_fd);
+}
+
+static int get_map_range(const char *map_file, off_t *start, off_t *end)
+{
+	int ret;
+
+	ret = sscanf(map_file, "%lx-%lx", start, end);
+	if (ret != 2) {
+		pr_err("failed to parse map file %s\n", map_file);
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int collect_map_fd(struct process_info *p, int dir, const char *map_file)
+{
+	char link[PATH_MAX];
+	char path[PATH_MAX];
+	off_t start, end;
+	int map_fd, err;
+	struct spfs_info_s *info = p->info;
+
+	if (!is_spfs_fd(dir, map_file, info))
+		return 0;
+
+	snprintf(link, PATH_MAX, "/proc/%d/map_files/%s", p->pid, map_file);
+
+	pr_debug("Collecting %s\n", link);
+
+	err = get_map_range(map_file, &start, &end);
+	if (err)
+		return err;
+
+	err = get_link_path(link, info->mountpoint, path, sizeof(path));
+	if (err)
+		return err;
+
+	map_fd = open(path, O_RDWR);
+	if (map_fd < 0) {
+		pr_perror("failed to open %s", path);
+		return -errno;
+	}
+
+	return process_add_mapping(p, map_fd, start, end);
+}
+
+static int iterate_dir_name(const char *dpath, struct process_info *p,
 		    int (*actor)(struct process_info *p, int dir, const char *fd),
 		    const char *actor_name)
 {
-	char dpath[PATH_MAX];
 	struct dirent *dt;
 	DIR *fdir;
 	int dir;
 	int err;
 
-	snprintf(dpath, PATH_MAX, "/proc/%d/fd", p->pid);
 	fdir = opendir(dpath);
 	if (!fdir) {
 		pr_perror("failed to open %s", dpath);
@@ -502,9 +583,9 @@ static int iterate_process_fds_name(struct process_info *p,
 
 	dir = dirfd(fdir);
 	if (dir < 0) {
-		pr_perror("failed to get fd for %s stream", dpath);
+		pr_perror("failed to get fd for directory stream");
 		err = -errno;
-		goto close_fdir;
+		goto close_dir;
 	}
 
         while ((dt = readdir(fdir)) != NULL) {
@@ -515,15 +596,31 @@ static int iterate_process_fds_name(struct process_info *p,
 
 		err = actor(p, dir, fd);
 		if (err) {
-			pr_err("actor '%s' for /proc/%d/fd/%s\n failed\n",
-					actor_name, p->pid, fd);
+			pr_err("actor '%s' for %s/%s\n failed\n",
+					actor_name, dpath, fd);
 			break;
 		}
 	}
 
-close_fdir:
+close_dir:
 	closedir(fdir);
 	return err;
+}
+
+static int collect_process_open_fds(struct process_info *p)
+{
+	char dpath[PATH_MAX];
+
+	snprintf(dpath, PATH_MAX, "/proc/%d/fd", p->pid);
+	return iterate_dir_name(dpath, p, collect_process_fd, "collect_process_fd");
+}
+
+static int collect_process_map_fds(struct process_info *p)
+{
+	char dpath[PATH_MAX];
+
+	snprintf(dpath, PATH_MAX, "/proc/%d/map_files", p->pid);
+	return iterate_dir_name(dpath, p, collect_map_fd, "collect_map_fd");
 }
 
 int collect_one_process(pid_t pid, struct spfs_info_s *info)
@@ -540,13 +637,19 @@ int collect_one_process(pid_t pid, struct spfs_info_s *info)
 	p->pid = pid;
 	p->info = info;
 	p->fds_nr = 0;
+	p->maps_nr = 0;
 	INIT_LIST_HEAD(&p->fds);
+	INIT_LIST_HEAD(&p->maps);
 
-	err = iterate_process_fds_name(p, collect_process_fd, "collect_process_fd");
+	err = collect_process_open_fds(p);
 	if (err)
-		return err;
+		goto free_p;
 
-	if (p->fds_nr == 0)
+	err = collect_process_map_fds(p);
+	if (err)
+		goto free_p;
+
+	if ((p->fds_nr + p->maps_nr) == 0)
 		goto free_p;
 
 	err = attach_to_process(p);
