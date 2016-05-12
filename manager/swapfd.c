@@ -449,6 +449,8 @@ static int get_next_fd(struct parasite_ctl *ctl)
 static int changemap(struct parasite_ctl *ctl, unsigned long addr)
 {
 	int fd = get_next_fd(ctl);
+	unsigned long sret;
+	int ret;
 
 	if (fd < 0) {
 		pr_err("Can't receive new fd\n");
@@ -458,6 +460,12 @@ static int changemap(struct parasite_ctl *ctl, unsigned long addr)
 
 	if (move_mappings(ctl, addr, -1, fd) < 0) {
 		pr_err("Can't move mapping on addr %lx\n", addr);
+		return -1;
+	}
+
+	ret = syscall_seized(ctl, __NR_close, &sret, fd, 0, 0, 0, 0, 0);
+	if (ret < 0 || sret != 0) {
+		pr_err("Can't close temporary fd=%d, pid=%d\n", fd, ctl->pid);
 		return -1;
 	}
 
