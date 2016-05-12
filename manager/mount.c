@@ -262,13 +262,24 @@ static int spfs_replace_resources(struct spfs_info_s *info, int *ns_fds)
 	if (err)
 		return err;
 
-	err = set_namespaces(ns_fds, NS_USER_MASK | NS_MNT_MASK | NS_NET_MASK);
+	/* Set target mount and network namespaces to be able to collect opened
+	 * files and file mapping information.
+	 * Important: we do not change user namespace here, because
+	 * /proc/<pid>/map_files won't be accessible.
+	 */
+	err = set_namespaces(ns_fds, NS_MNT_MASK | NS_NET_MASK);
 	if (err)
 		return err;
 
 	err = spfs_collect_processes(info, list);
 	if (err)
 		return err;
+#if 0
+	Looks like user namespace is not required at all?
+	err = set_namespaces(ns_fds, NS_USER_MASK);
+	if (err)
+		return err;
+#endif
 
 	err = write(freezer_state_fd, "THAWED", sizeof("THAWED"));
 	if (err != sizeof("THAWED")) {
@@ -300,6 +311,12 @@ static int do_replace_resources(struct spfs_info_s *info)
 		return err;
 	}
 
+	/* Join target pid namespace to extract virtual pids from freezer cgroup.
+	 * This is required, because resources reopen must be performed in
+	 * container's context (correct /proc is needed for different checks
+	 * and opened file modifications).
+	 * Also, ptrace needs to use pids, located in its pid namespace.
+	 */
 	err = set_namespaces(ct_ns_fds, NS_PID_MASK);
 	if (err)
 		goto close_namespaces;
