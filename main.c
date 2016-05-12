@@ -14,7 +14,9 @@
 #include "include/ptrace.h"
 
 #define SRC_FILE "src.txt"
+#define SRC_FILE2 "src2.txt"
 #define DST_FILE "dst.txt"
+#define DST_FILE2 "dst2.txt"
 
 #define CGROUP_DIR "/sys/fs/cgroup/freezer/user/kirill/3"
 
@@ -115,7 +117,7 @@ static void do_something(int *pipe_fd, int fd)
 
 int main()
 {
-	int src, dst, ret;
+	int src[2], dst[2], ret;
 	pid_t child;
 	char c='\n';
 	int fd[2];
@@ -124,17 +126,19 @@ int main()
 		printf("Can't unlink\n");
 	if (unlink(SRC_FILE) < 0)
 		printf("Can't unlink\n");
-	src = open(SRC_FILE, O_RDWR|O_CREAT|O_CLOEXEC, 0777);
-	dst = open(DST_FILE, O_RDWR|O_CREAT, 0777);
-	if (src < 0 || dst < 0) {
+	src[0] = open(SRC_FILE, O_RDWR|O_CREAT|O_CLOEXEC, 0777);
+	dst[0] = open(DST_FILE, O_RDWR|O_CREAT, 0777);
+	src[1] = open(SRC_FILE2, O_RDWR|O_CREAT|O_CLOEXEC, 0777);
+	dst[1] = open(DST_FILE2, O_RDWR|O_CREAT, 0777);
+	if (src[0] < 0 || dst[0] < 0 || src[1] < 0 || dst[1] < 0) {
 		perror("main: Can't open");
 		return 1;
 	}
-	if (write(dst, &c, 1) != 1) {
+	if (write(dst[0], &c, 1) != 1) {
 		perror("Can't read");
 		return 1;
 	}
-	if (write(src, &c, 1) != 1) {
+	if (write(src[0], &c, 1) != 1) {
 		perror("Can't read");
 		return 1;
 	}
@@ -149,8 +153,9 @@ int main()
 		perror("Can't fork");
 		return 1;
 	} else if (child == 0) {
-		close(dst);
-		do_something(fd, src);
+		close(dst[0]);
+		close(dst[1]);
+		do_something(fd, src[0]);
 		return 0;
 	}
 
@@ -178,7 +183,7 @@ int main()
 	if (wait_task_seized(child) < 0)
 		goto out_detach;
 
-	if (swapfd_tracee(child, &src, &dst, 1) == 0)
+	if (swapfd_tracee(child, src, dst, 2) == 0)
 		ret = 0;
 out_detach:
 	detach_from_task(child);
