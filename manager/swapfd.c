@@ -296,9 +296,13 @@ static void close_fds(int fd[], int num)
 
 static int send_dst_fds(struct parasite_ctl *ctl, int fd[], int num)
 {
-	int ret;
+	int ret = 0, i;
 
-	ret = send_fds(ctl->local_sockfd, &ctl->addr, ctl->addrlen, fd, num, false);
+	for (i = 0; i < num; i++) {
+		ret = send_fd(ctl->local_sockfd, &ctl->addr, ctl->addrlen, fd[i]);
+		if (ret)
+			break;
+	}
 
 	return ret;
 }
@@ -486,9 +490,12 @@ static int changefd(struct parasite_ctl *ctl, pid_t pid, int src_fd, int dst_fd)
 
 	new_fd = get_next_fd(ctl);
 	if (new_fd < 0) {
+		pr_err("Can't receive fd\n");
 		exit_code = -1;
 		goto out;
 	}
+
+	pr_debug("Received fd=%d\n", new_fd);
 
 	ret = syscall_seized(ctl, __NR_dup2, &sret, new_fd, src_fd, 0, 0, 0, 0);
 	if (ret < 0 || ((int)(long)sret) < 0) {

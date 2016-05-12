@@ -11,6 +11,11 @@
 #include "include/pie-util-fd.h"
 #include "include/log.h"
 
+/* Borrowed from kernel */
+#define __CMSG_FIRSTHDR(ctl,len) ((len) >= sizeof(struct cmsghdr) ? \
+		                                  (struct cmsghdr *)(ctl) : \
+		                                  (struct cmsghdr *)NULL)
+
 #define CR_SCM_MSG_SIZE		(1024)
 #define CR_SCM_MAX_FD		(252)
 
@@ -34,33 +39,33 @@ struct f_owner_ex {
 #define F_GETOWNER_UIDS 17
 #endif
 
-static void scm_fdset_init_chunk(struct scm_fdset *fdset, int nr_fds)
+static void scm_fdset_init_chunk(struct scm_fdset *fdset, struct scm_fdset *rfdset, int nr_fds)
 {
 	struct cmsghdr *cmsg;
 
 	fdset->hdr.msg_controllen = CMSG_LEN(sizeof(int) * nr_fds);
 
-	cmsg		= CMSG_FIRSTHDR(&fdset->hdr);
+	cmsg		= __CMSG_FIRSTHDR(&fdset->msg_buf, fdset->hdr.msg_controllen);
 	cmsg->cmsg_len	= fdset->hdr.msg_controllen;
 }
 
-static int *scm_fdset_init(struct scm_fdset *fdset, struct sockaddr_un *saddr,
-		int saddr_len, bool with_flags)
+static int *scm_fdset_init(struct scm_fdset *fdset, struct scm_fdset *rfdset,
+			   struct sockaddr_un *saddr, int saddr_len, bool with_flags)
 {
 	struct cmsghdr *cmsg;
 
-	fdset->iov.iov_base		= fdset->opts;
-	fdset->iov.iov_len		= with_flags ? sizeof(fdset->opts) : 1;
+	fdset->iov.iov_base		= rfdset->opts;
+	fdset->iov.iov_len		= with_flags ? sizeof(rfdset->opts) : 1;
 
-	fdset->hdr.msg_iov		= &fdset->iov;
+	fdset->hdr.msg_iov		= &rfdset->iov;
 	fdset->hdr.msg_iovlen		= 1;
 	fdset->hdr.msg_name		= (struct sockaddr *)saddr;
 	fdset->hdr.msg_namelen		= saddr_len;
 
-	fdset->hdr.msg_control		= &fdset->msg_buf;
+	fdset->hdr.msg_control		= &rfdset->msg_buf;
 	fdset->hdr.msg_controllen	= CMSG_LEN(sizeof(int) * CR_SCM_MAX_FD);
 
-	cmsg				= CMSG_FIRSTHDR(&fdset->hdr);
+	cmsg				= __CMSG_FIRSTHDR(&fdset->msg_buf, fdset->hdr.msg_controllen);
 	cmsg->cmsg_len			= fdset->hdr.msg_controllen;
 	cmsg->cmsg_level		= SOL_SOCKET;
 	cmsg->cmsg_type			= SCM_RIGHTS;
@@ -75,10 +80,10 @@ int send_fds(int sock, struct sockaddr_un *saddr, int len,
 	int *cmsg_data;
 	int i, min_fd, ret;
 
-	cmsg_data = scm_fdset_init(&fdset, saddr, len, with_flags);
+	cmsg_data = scm_fdset_init(&fdset, &fdset, saddr, len, with_flags);
 	for (i = 0; i < nr_fds; i += min_fd) {
 		min_fd = min(CR_SCM_MAX_FD, nr_fds - i);
-		scm_fdset_init_chunk(&fdset, min_fd);
+		scm_fdset_init_chunk(&fdset, &fdset, min_fd);
 		memcpy(cmsg_data, &fds[i], sizeof(int) * min_fd);
 
 		if (with_flags) {
@@ -136,30 +141,35 @@ int send_fds(int sock, struct sockaddr_un *saddr, int len,
 int recv_fds(struct parasite_ctl *ctl, int *fds, int nr_fds, struct fd_opts *opts)
 {
 	struct scm_fdset *fdset = (void *)ctl->local_map;
+	struct scm_fdset *rfdset = (void *)ctl->remote_map;
 	struct cmsghdr *cmsg;
 	unsigned long sret;
 	int *cmsg_data;
 	int ret;
 	int i, min_fd;
 
-	cmsg_data = scm_fdset_init(fdset, NULL, 0, opts != NULL);
+	cmsg_data = scm_fdset_init(fdset, rfdset, NULL, 0, opts != NULL);
 	for (i = 0; i < nr_fds; i += min_fd) {
 		min_fd = min(CR_SCM_MAX_FD, nr_fds - i);
-		scm_fdset_init_chunk(fdset, min_fd);
+		scm_fdset_init_chunk(fdset, rfdset, min_fd);
 
 		ret = syscall_seized(ctl, __NR_recvmsg, &sret,
-				     ctl->remote_sockfd, (unsigned long)&fdset->hdr,
+				     ctl->remote_sockfd, (unsigned long)&rfdset->hdr,
 				     0, 0, 0, 0);
 		if (ret < 0 || (int)(long)sret < 0) {
 			pr_err("Can't receive sock\n");
 			return -1;
 		}
 
-		cmsg = CMSG_FIRSTHDR(&fdset->hdr);
-		if (!cmsg || cmsg->cmsg_type != SCM_RIGHTS)
+		cmsg = __CMSG_FIRSTHDR(&fdset->msg_buf, fdset->hdr.msg_controllen);
+		if (!cmsg || cmsg->cmsg_type != SCM_RIGHTS) {
+			pr_err("Crappy cmsg_type\n");
 			return -EINVAL;
-		if (fdset->hdr.msg_flags & MSG_CTRUNC)
+		}
+		if (fdset->hdr.msg_flags & MSG_CTRUNC) {
+			pr_err("Message truncated\n");
 			return -ENFILE;
+		}
 
 		min_fd = (cmsg->cmsg_len - sizeof(struct cmsghdr)) / sizeof(int);
 		/*
@@ -176,8 +186,10 @@ int recv_fds(struct parasite_ctl *ctl, int *fds, int nr_fds, struct fd_opts *opt
 			return -1;
 		}
 
-		if (min_fd <= 0)
+		if (min_fd <= 0) {
+			pr_err("Too small mid_fd=%d\n", min_fd);
 			return -1;
+		}
 		memcpy(&fds[i], cmsg_data, sizeof(int) * min_fd);
 		if (opts)
 			memcpy(opts + i, fdset->opts, sizeof(struct fd_opts) * min_fd);
