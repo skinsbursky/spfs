@@ -48,7 +48,7 @@ static int collect_map(struct parasite_ctl *ctl, struct map_struct *m)
 	}
 
 	memcpy(new, m, sizeof(*m));
-	m->moved = 0;
+	new->moved = 0;
 	list_add_tail(&new->list, &ctl->maps);
 
 	return 0;
