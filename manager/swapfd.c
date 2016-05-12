@@ -29,7 +29,7 @@
 
 #define MMAP_SIZE PATH_MAX
 
-static void *find_mapping(pid_t pid)
+static void *find_mapping(pid_t pid, struct parasite_ctl *ctl)
 {
 	char path[strlen("/proc/4294967295/maps") + 1];
 	void *result = MAP_FAILED;
@@ -147,23 +147,26 @@ static int set_dgram_socket(struct parasite_ctl *ctl)
 static int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl)
 {
 	char path[] = "/proc/XXXXXXXXXX/fd/XXXXXXXXXX";
-	void *addr = find_mapping(pid);
-	void *where = addr + BUILTIN_SYSCALL_SIZE;
+	void *addr, *where;
 	uint8_t orig_code[] = "SWAPMFD";
 	unsigned long sret = -ENOSYS;
 	struct parasite_ctl *ctl;
 	int ret, fd, lfd;
-
-	if (addr == MAP_FAILED) {
-		pr_err("Can't find a useful mapping, pid=%d\n", pid);
-		return -ENOMEM;
-	}
 
 	ctl = malloc(sizeof(*ctl));
 	if (!ctl) {
 		pr_err("Can't alloc ctl\n");
 		return -ENOMEM;
 	}
+
+	addr = find_mapping(pid, ctl);
+	where = addr + BUILTIN_SYSCALL_SIZE;
+
+	if (addr == MAP_FAILED) {
+		pr_err("Can't find a useful mapping, pid=%d\n", pid);
+		return -ENOMEM;
+	}
+
 	ctl->pid = pid;
 	ctl->syscall_ip = (unsigned long)addr;
 	ctl->remote_sockfd = -1;
