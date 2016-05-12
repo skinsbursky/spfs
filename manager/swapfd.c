@@ -29,9 +29,32 @@
 
 #define MMAP_SIZE PATH_MAX
 
+struct map_struct {
+	struct list_head list;
+	unsigned long start, end, ino;
+	unsigned long long pgoff;
+	unsigned major, minor;
+	char r, w, x, s;
+};
+
+static int collect_map(struct parasite_ctl *ctl, struct map_struct *m)
+{
+	struct map_struct *new = malloc(sizeof(*new));
+
+	if (!new) {
+		pr_perror("Can't alloc map_struct");
+		return -1;
+	}
+
+	memcpy(new, m, sizeof(*m));
+	list_add_tail(&new->list, &ctl->maps);
+
+	return 0;
+}
+
 static void *find_mapping(pid_t pid, struct parasite_ctl *ctl)
 {
-	char path[strlen("/proc/4294967295/maps") + 1];
+	char path[PATH_MAX];
 	void *result = MAP_FAILED;
 	size_t size = 0;
 	char *line;
@@ -45,29 +68,49 @@ static void *find_mapping(pid_t pid, struct parasite_ctl *ctl)
 	}
 
 	while (getline(&line, &size, fp) != -1) {
-		unsigned long start, end;
-		char r, w, x;
+		struct map_struct m;
 		int ret;
 
-		ret = sscanf(line, "%lx%*c%lx %c%c%c", &start, &end, &r, &w, &x);
-		if (ret != 5) {
+		ret = sscanf(line, "%lx%*c%lx %c%c%c%c %llx %x%*c%x %lu",
+			     &m.start, &m.end, &m.r, &m.w, &m.x, &m.s,
+			     &m.pgoff, &m.major, &m.minor, &m.ino);
+		if (ret != 10) {
 			pr_err("Can't parse line: %s", line);
-			continue;
+			result = MAP_FAILED;
+			break;
 		}
 
-		if (x != 'x')
+		if (m.ino && collect_map(ctl, &m) < 0) {
+			result = MAP_FAILED;
+			break;
+		}
+
+		if (m.x != 'x' || m.start > TASK_SIZE)
 			continue;
 
 		pr_debug("Found: start=%08lx, end=%08lx, r=%c, w=%c, x=%c\n",
-				start, end, r, w, x);
-		result = (void *)start;
-		break;
+				m.start, m.end, m.r, m.w, m.x);
+		result = (void *)m.start;
 	}
 
 	free(line);
 	fclose(fp);
 
+	if (result == MAP_FAILED) {
+		struct map_struct *m, *tmp;
+		list_for_each_entry_safe(m, tmp, &ctl->maps, list) {
+			free(m);
+		}
+	}
+
 	return result;
+}
+
+static void free_mappings(struct parasite_ctl *ctl)
+{
+	struct map_struct *m, *tmp;
+	list_for_each_entry_safe(m, tmp, &ctl->maps, list)
+		free(m);
 }
 
 static void destroy_parasite_ctl(pid_t pid, struct parasite_ctl *ctl);
@@ -159,6 +202,8 @@ static int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl)
 		return -ENOMEM;
 	}
 
+	INIT_LIST_HEAD(&ctl->maps);
+
 	addr = find_mapping(pid, ctl);
 	where = addr + BUILTIN_SYSCALL_SIZE;
 
@@ -243,6 +288,7 @@ err_curef:
 err_cure:
 	syscall_seized(ctl, __NR_close, &sret, fd, 0, 0, 0, 0, 0);
 err_free:
+	free_mappings(ctl);
 	free(ctl);
 	return -1;
 }
@@ -261,6 +307,7 @@ static void destroy_parasite_ctl(pid_t pid, struct parasite_ctl *ctl)
 	ret = munmap(ctl->local_map, ctl->map_length);
 	if (ret)
 		pr_perror("Can't munmap local map");
+	free_mappings(ctl);
 }
 
 /* Get pos and flags from just open fdinfo file */

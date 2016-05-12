@@ -2,9 +2,11 @@
 #define __SPFS_PTRACE_H__
 
 #include <sys/types.h>
+#include <sys/user.h>
 #include <sys/un.h>
 #include <unistd.h>
 #include <stdint.h>
+#include "include/list.h"
 
 typedef _Bool bool;
 typedef uint32_t u32;
@@ -44,6 +46,7 @@ enum {
 #define X86_EFLAGS_TF	0x00000100 /* Trap Flag */
 #define X86_EFLAGS_IF	0x00000200 /* Interrupt Flag */
 #define X86_EFLAGS_DF	0x00000400 /* Direction Flag */
+#define TASK_SIZE	((1UL << 47) - PAGE_SIZE)
 
 #define _KNSIG		64
 # define _NSIG_BPW	64
@@ -99,6 +102,7 @@ struct parasite_ctl {
 	pid_t			pid;
 	unsigned long		syscall_ip;
 	struct thread_ctx	orig;
+	struct list_head	maps;
 };
 
 int ptrace_peek_area(pid_t pid, void *dst, void *addr, long bytes);

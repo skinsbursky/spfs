@@ -1,5 +1,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -10,6 +11,7 @@
 #include <errno.h>
 
 #include "manager/swapfd.h"
+#include "include/ptrace.h"
 
 #define SRC_FILE "src.txt"
 #define DST_FILE "dst.txt"
@@ -89,9 +91,18 @@ static int set_locks(int fd)
 
 static void do_something(int *pipe_fd, int fd)
 {
+	void *addr;
+
 	if (set_locks(fd) < 0) {
 		perror("Can't set locks");
 	}
+
+	addr = mmap(0, PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+	if (addr == MAP_FAILED) {
+		perror("Can't mmap");
+		return;
+	}
+	printf("Setting address %lx\n", (unsigned long)addr);
 
 	if (write(pipe_fd[1], "1", 1) != 1) {
 		perror("Can't write");
