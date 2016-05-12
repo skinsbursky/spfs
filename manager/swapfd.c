@@ -691,32 +691,37 @@ out:
 	return exit_code;
 }
 
-/* Replace tracee's remote @src_fd[] with caller's local @dst_fd */
-int swapfd_tracee(pid_t pid, unsigned long src_addr[], int naddr,
-		  int src_fd[], int nfd, int dst_fd[])
+/*
+ * Replace tracee's remote @src_fd[] with caller's local @dst_fd,
+ * and mappings with addr[] will be moved and backed by addr_fd.
+ */
+int swapfd_tracee(pid_t pid, unsigned long addr[], int addr_fd[], int naddr,
+		  int src_fd[], int dst_fd[], int nfd)
 {
 	struct parasite_ctl *ctl;
-	int i, num, ret;
-
-	num = naddr + nfd;
+	int i, ret;
 
 	ret = set_parasite_ctl(pid, &ctl);
 	if (ret < 0) {
 		goto out_close;
 	}
 
-	ret = send_dst_fds(ctl, dst_fd, num);
+	ret = send_dst_fds(ctl, addr_fd, naddr);
+	if (ret < 0)
+		goto out_destroy;
+
+	ret = send_dst_fds(ctl, dst_fd, nfd);
 	if (ret < 0)
 		goto out_destroy;
 
 	for (i = 0; i < naddr; i++) {
-		ret = changemap(ctl, src_addr[i]);
+		ret = changemap(ctl, addr[i]);
 		if (ret < 0)
 			goto out_destroy;
 	}
 
 	for (i = 0; i < nfd; i++) {
-		ret = changefd(ctl, pid, src_fd[i], dst_fd[naddr + i]);
+		ret = changefd(ctl, pid, src_fd[i], dst_fd[i]);
 		if (ret < 0)
 			goto out_destroy;
 	}
@@ -724,7 +729,7 @@ int swapfd_tracee(pid_t pid, unsigned long src_addr[], int naddr,
 out_destroy:
 	destroy_parasite_ctl(pid, ctl);
 out_close:
-	close_fds(dst_fd, num);
+	close_fds(dst_fd, naddr + nfd);
 	return ret;
 }
 

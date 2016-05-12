@@ -125,8 +125,8 @@ static void do_something(int *pipe_fd, int fd)
 int main()
 {
 	unsigned long addr = 0x12345678;
-	int src[2], dst[2], tmp[3], ret;
 	unsigned size = sizeof(addr);
+	int src[2], dst[2], ret;
 	pid_t child;
 	int fd[2];
 
@@ -191,10 +191,7 @@ int main()
 	if (wait_task_seized(child) < 0)
 		goto out_detach;
 
-	memcpy(&tmp[1], &dst[0], 2 * sizeof(int));
-	tmp[0] = tmp[1];
-
-	if (swapfd_tracee(child, &addr, 1, src, 2, tmp) == 0)
+	if (swapfd_tracee(child, &addr, &dst[0], 1, src, dst, 2) == 0)
 		ret = 0;
 out_detach:
 	detach_from_task(child);
