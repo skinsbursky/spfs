@@ -308,6 +308,7 @@ static void destroy_parasite_ctl(pid_t pid, struct parasite_ctl *ctl)
 	if (ret)
 		pr_perror("Can't munmap local map");
 	free_mappings(ctl);
+	free(ctl);
 }
 
 /* Get pos and flags from just open fdinfo file */
