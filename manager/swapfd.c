@@ -113,9 +113,10 @@ static void free_mappings(struct parasite_ctl *ctl)
 		free(m);
 }
 
-static int move_mappings(struct parasite_ctl *ctl, int src_fd, int dst_fd)
+/* Find mapping backed by src_fd OR starting at src_addr and make them backed by dst_fd */
+static int move_mappings(struct parasite_ctl *ctl, unsigned long src_addr, int src_fd, int dst_fd)
 {
-	unsigned int dev_major, dev_minor;
+	unsigned int dev_major = 0, dev_minor = 0;
 	struct map_struct *map;
 	int ret, prot, flags;
 	char path[PATH_MAX];
@@ -123,20 +124,28 @@ static int move_mappings(struct parasite_ctl *ctl, int src_fd, int dst_fd)
 	struct stat st;
 	size_t length;
 
-	sprintf(path, "/proc/%d/fd/%d", ctl->pid, src_fd);
+	if (src_fd >= 0) {
+		sprintf(path, "/proc/%d/fd/%d", ctl->pid, src_fd);
 
-	if (stat(path, &st) < 0) {
-		pr_perror("Can't do stat on %s", path);
-		return -1;
+		if (stat(path, &st) < 0) {
+			pr_perror("Can't do stat on %s", path);
+			return -1;
+		}
+
+		dev_major = major(st.st_dev);
+		dev_minor = minor(st.st_dev);
 	}
 
-	dev_major = major(st.st_dev);
-	dev_minor = minor(st.st_dev);
-
 	list_for_each_entry(map, &ctl->maps, list) {
-		if (map->major != dev_major || map->minor != dev_minor ||
-		    map->ino != st.st_ino)
-			continue;
+		if (src_fd >= 0) {
+			if (map->major != dev_major || map->minor != dev_minor ||
+			    map->ino != st.st_ino)
+				continue;
+		} else {
+			if (map->start != src_addr)
+				continue;
+		}
+
 		pr_debug("BINGO! Found\n");
 		length = map->end - map->start;
 
@@ -610,7 +619,7 @@ static int changefd(struct parasite_ctl *ctl, pid_t pid, int src_fd, int dst_fd)
 
 	pr_debug("Received fd=%d\n", new_fd);
 
-	if (move_mappings(ctl, src_fd, new_fd) < 0)
+	if (move_mappings(ctl, ~0UL, src_fd, new_fd) < 0)
 		return -1;
 
 	ret = syscall_seized(ctl, __NR_dup2, &sret, new_fd, src_fd, 0, 0, 0, 0);
