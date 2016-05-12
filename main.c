@@ -106,7 +106,14 @@ static void do_something(int *pipe_fd, int fd)
 	}
 	printf("Setting address %lx\n", (unsigned long)addr);
 
-	if (write(pipe_fd[1], "1", 1) != 1) {
+	addr = mmap(0, PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, 0);
+	if (addr == MAP_FAILED) {
+		perror("Can't mmap");
+		return;
+	}
+	printf("Setting address %lx\n", (unsigned long)addr);
+
+	if (write(pipe_fd[1], &addr, sizeof(addr)) != sizeof(addr)) {
 		perror("Can't write");
 		return;
 	}
@@ -117,9 +124,10 @@ static void do_something(int *pipe_fd, int fd)
 
 int main()
 {
-	int src[2], dst[2], ret;
+	unsigned long addr = 0x12345678;
+	int src[2], dst[2], tmp[3], ret;
+	unsigned size = sizeof(addr);
 	pid_t child;
-	char c='\n';
 	int fd[2];
 
 	if (unlink(DST_FILE) < 0)
@@ -134,12 +142,12 @@ int main()
 		perror("main: Can't open");
 		return 1;
 	}
-	if (write(dst[0], &c, 1) != 1) {
-		perror("Can't read");
+	if (write(dst[0], &addr, size) != size) {
+		perror("Can't write");
 		return 1;
 	}
-	if (write(src[0], &c, 1) != 1) {
-		perror("Can't read");
+	if (write(src[0], &addr, size) != size) {
+		perror("Can't write");
 		return 1;
 	}
 
@@ -160,7 +168,7 @@ int main()
 	}
 
 	ret = 1;
-	if (read(fd[0], &c, 1) != 1) {
+	if (read(fd[0], &addr, size) != size) {
 		perror("Can't read");
 		goto out_kill;
 	}
@@ -183,7 +191,10 @@ int main()
 	if (wait_task_seized(child) < 0)
 		goto out_detach;
 
-	if (swapfd_tracee(child, NULL, 0, src, 2, dst) == 0)
+	memcpy(&tmp[1], &dst[0], 2 * sizeof(int));
+	tmp[0] = tmp[1];
+
+	if (swapfd_tracee(child, &addr, 1, src, 2, tmp) == 0)
 		ret = 0;
 out_detach:
 	detach_from_task(child);
