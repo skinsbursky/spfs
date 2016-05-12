@@ -119,8 +119,8 @@ static void free_mappings(struct parasite_ctl *ctl)
 static int move_mappings(struct parasite_ctl *ctl, unsigned long src_addr, int src_fd, int dst_fd)
 {
 	unsigned int dev_major = 0, dev_minor = 0;
+	int ret, prot, flags, moved = 0;
 	struct map_struct *map;
-	int ret, prot, flags;
 	char path[PATH_MAX];
 	unsigned long sret;
 	struct stat st;
@@ -184,8 +184,14 @@ static int move_mappings(struct parasite_ctl *ctl, unsigned long src_addr, int s
 				map->start, map->end, ret);
 			return -1;
 		}
-		map->moved = 1;
+		moved = map->moved = 1;
 	}
+
+	if (src_fd < 0 && !moved) {
+		pr_err("Can't find a mapping with addr=%lx\n", src_addr);
+		return -1;
+	}
+
 	return 0;
 }
 
