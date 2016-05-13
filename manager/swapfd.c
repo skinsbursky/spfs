@@ -20,6 +20,7 @@
 #include <sys/mman.h>
 #include <syscall.h>
 #include <stdint.h>
+#include <linux/prctl.h>
 
 #include "include/ptrace.h"
 #include "include/pie-util-fd.h"
@@ -446,6 +447,32 @@ static int get_next_fd(struct parasite_ctl *ctl)
 	return recv_fd(ctl);
 }
 
+static int change_exe(struct parasite_ctl *ctl)
+{
+	unsigned long sret;
+	int exe_fd, ret;
+
+	exe_fd = get_next_fd(ctl);
+	if (exe_fd < 0) {
+		pr_err("Can't receive exe fd\n");
+		return -1;
+	}
+
+	ret = syscall_seized(ctl, __NR_prctl, &sret, PR_SET_MM, PR_SET_MM_EXE_FILE, exe_fd, 0, 0, 0);
+	if (ret < 0 || sret != 0) {
+		pr_err("Can't set new exe pid=%d, ret=%d, sret=%d\n", ctl->pid, ret, (int)(long)sret);
+		return -1;
+	}
+
+	ret = syscall_seized(ctl, __NR_close, &sret, exe_fd, 0, 0, 0, 0, 0);
+	if (ret < 0 || sret != 0) {
+		pr_err("Can't close temporary exe_fd=%d, pid=%d\n", exe_fd, ctl->pid);
+		return -1;
+	}
+
+	return 0;
+}
+
 static int changemap(struct parasite_ctl *ctl, unsigned long addr)
 {
 	int fd = get_next_fd(ctl);
@@ -723,6 +750,16 @@ int swapfd_tracee(struct swapfd_exchange *se)
 		if (ret)
 			goto out_destroy;
 		ret = changefd(ctl, se->pid, se->src_fd[i], se->dst_fd[i]);
+		if (ret < 0)
+			goto out_destroy;
+	}
+
+	if (se->exe_fd >= 0) {
+		ret = send_dst_fd(ctl, se->exe_fd);
+		if (ret < 0)
+			goto out_destroy;
+
+		ret = change_exe(ctl);
 		if (ret < 0)
 			goto out_destroy;
 	}
