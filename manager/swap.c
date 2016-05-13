@@ -180,60 +180,78 @@ static int do_swap_process_resources(struct process_info *p)
 {
 	struct process_fd *pfd;
 	struct process_map *mfd;
-	int *src_fd, *dst_fd, *s, *d;
-	int *map_fd, *m;
-	unsigned long *map_addr, *ma;
 	int err = -ENOMEM;
+	struct swapfd_exchange se = { };
 
 	pr_debug("Replacing process %d resources (%d)\n", p->pid, p->fds_nr);
 
-	src_fd = malloc(sizeof(int) * p->fds_nr);
-	dst_fd = malloc(sizeof(int) * p->fds_nr);
-	map_fd = malloc(sizeof(int) * p->maps_nr);
-	map_addr = malloc(sizeof(long) * p->maps_nr);
-	if (!src_fd || !dst_fd ||
-	    !map_fd || !map_addr)
-		goto free;
+	if (p->fds_nr) {
+		int *s, *d;
 
-	s = src_fd;
-	d = dst_fd;
+		se.src_fd = malloc(sizeof(*se.src_fd) * p->fds_nr);
+		se.dst_fd = malloc(sizeof(*se.dst_fd) * p->fds_nr);
+		if (!se.src_fd || !se.dst_fd) {
+			pr_err("failed to allocate\n");
+			goto free;
+		}
 
-	list_for_each_entry(pfd, &p->fds, list) {
-		pr_debug("/proc/%d/fd/%d --> /proc/%d/fd/%d\n",
-				getpid(), pfd->real_fd, p->pid, pfd->spfs_fd);
-		*s++ = pfd->spfs_fd;
-		*d++ = pfd->real_fd;
+		s = se.src_fd;
+		d = se.dst_fd;
+		list_for_each_entry(pfd, &p->fds, list) {
+			pr_debug("/proc/%d/fd/%d --> /proc/%d/fd/%d\n",
+					getpid(), pfd->real_fd, p->pid, pfd->spfs_fd);
+			*s++ = pfd->spfs_fd;
+			*d++ = pfd->real_fd;
+		}
 	}
 
-	m = map_fd;
-	ma = map_addr;
+	if (p->maps_nr) {
+		int *m;
+		unsigned long *ma;
 
-	list_for_each_entry(mfd, &p->maps, list) {
-		pr_debug("/proc/%d/fd/%d --> /proc/%d/map_files/%ld-%ld\n",
-				getpid(), mfd->map_fd, p->pid, mfd->start, mfd->end);
-		*m++ = mfd->map_fd;
-		*ma++ = mfd->start;
+		se.addr = malloc(sizeof(*se.addr) * p->maps_nr);
+		se.addr_fd = malloc(sizeof(*se.addr_fd) * p->maps_nr);
+		if (!se.addr || !se.addr) {
+			pr_err("failed to allocate\n");
+			goto free;
+		}
+
+		m = se.addr_fd;
+		ma = se.addr;
+		list_for_each_entry(mfd, &p->maps, list) {
+			pr_debug("/proc/%d/fd/%d --> /proc/%d/map_files/%ld-%ld\n",
+					getpid(), mfd->map_fd, p->pid, mfd->start, mfd->end);
+			*m++ = mfd->map_fd;
+			*ma++ = mfd->start;
+		}
 	}
 
-	if (p->env.exe_fd >= 0)
+	if (p->env.exe_fd >= 0) {
 		pr_debug("/proc/%d/fd/%d --> /proc/%d/exe\n",
 				getpid(), p->env.exe_fd, p->pid);
+		se.exe_fd = p->env.exe_fd;
+	}
 
-	if (p->env.cwd_fd >= 0)
+	if (p->env.cwd_fd >= 0) {
 		pr_debug("/proc/%d/fd/%d --> /proc/%d/cwd\n",
 				getpid(), p->env.cwd_fd, p->pid);
-	if (p->env.root_fd >= 0)
+		se.cwd_fd = p->env.cwd_fd;
+	}
+
+	if (p->env.root_fd >= 0) {
 		pr_debug("/proc/%d/fd/%d --> /proc/%d/root\n",
 				getpid(), p->env.root_fd, p->pid);
+	}
 
-	err = swapfd_tracee(p->pid, map_addr, map_fd, p->maps_nr,
-			    src_fd, dst_fd, p->fds_nr);
+	se.pid = p->pid;
+
+	err = swapfd_tracee(&se);
 
 free:
-	free(src_fd);
-	free(dst_fd);
-	free(map_fd);
-	free(map_addr);
+	free(se.src_fd);
+	free(se.dst_fd);
+	free(se.addr);
+	free(se.addr_fd);
 	return err;
 }
 
