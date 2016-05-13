@@ -121,8 +121,9 @@ static int copy_private_content(struct parasite_ctl *ctl, unsigned long to,
 				unsigned long from, unsigned long size)
 {
 	char path[] = "/proc/XXXXXXXXXX/mem";
+	ssize_t copied = 0, count;
 	int src, dst, ret = -1;
-	size_t copied;
+	char buf[PAGE_SIZE];
 	off_t off;
 
 	sprintf(path, "/proc/%d/mem", ctl->pid);
@@ -145,12 +146,22 @@ static int copy_private_content(struct parasite_ctl *ctl, unsigned long to,
 		goto out;
 	}
 
-	copied = sendfile(dst, src, NULL, size);
-	if (copied < 0) {
-		pr_perror("Can't sendfile: pid=%d, from=%lx, to=%lx, size=%lx",
-			  ctl->pid, from, to, size);
-		goto out;
-	}
+	do {
+		count = size - copied;
+		if (count > PAGE_SIZE)
+			count = PAGE_SIZE;
+
+		count = read(src, buf, count);
+		if (count < 0) {
+			pr_perror("Can't read from tracee's memory");
+			goto out;
+		}
+		if (count != write(dst, buf, count)) {
+			pr_perror("Can't write to tracee's memory");
+			goto out;
+		}
+		copied += count;
+	} while (copied != size);
 
 	ret = 0;
 out:
