@@ -9,6 +9,7 @@
 #include <limits.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/sendfile.h>
 
 #include "manager/swapfd.h"
 #include "include/ptrace.h"
@@ -64,6 +65,33 @@ static int change_cgroup_state(const char *state)
 
 	close(fd);
 	return ret;	
+}
+
+static int copy_exe(void)
+{
+	int exe, new_exe, ret;
+
+	exe = open("/proc/self/exe", O_RDONLY);
+	if (exe < 0) {
+		perror("Can't open exe");
+		return -1;
+	}
+
+	new_exe = open("/tmp/test_exe", O_RDWR|O_CREAT, 0777);
+	if (new_exe < 0) {
+		perror("Can't create exe");
+		return -1;
+	}
+
+	while ((ret = sendfile(new_exe, exe, NULL, 1024)) > 0)
+		;
+	if (ret < 0) {
+		perror("sendfile");
+		return -1;
+	}
+
+	close(exe);
+	return new_exe;
 }
 
 static int set_locks(int fd)
@@ -125,9 +153,9 @@ static void do_something(int *pipe_fd, int fd)
 int main()
 {
 	unsigned long addr = 0x12345678;
+	int src[3], dst[3], ret, exe;
 	unsigned size = sizeof(addr);
 	struct swapfd_exchange se;
-	int src[2], dst[2], ret;
 	pid_t child;
 	int fd[2];
 
@@ -139,7 +167,10 @@ int main()
 	dst[0] = open(DST_FILE, O_RDWR|O_CREAT, 0777);
 	src[1] = open(SRC_FILE2, O_RDWR|O_CREAT|O_CLOEXEC, 0777);
 	dst[1] = open(DST_FILE2, O_RDWR|O_CREAT, 0777);
-	if (src[0] < 0 || dst[0] < 0 || src[1] < 0 || dst[1] < 0) {
+	src[2] = open("/proc/self/exe", O_RDONLY);
+	dst[2] = exe = copy_exe();
+
+	if (src[0] < 0 || dst[0] < 0 || src[1] < 0 || dst[1] < 0 || src[2] < 0 || dst[2] < 0) {
 		perror("main: Can't open");
 		return 1;
 	}
@@ -164,6 +195,7 @@ int main()
 	} else if (child == 0) {
 		close(dst[0]);
 		close(dst[1]);
+		close(dst[2]);
 		do_something(fd, src[0]);
 		return 0;
 	}
@@ -200,9 +232,9 @@ int main()
 
 	se.src_fd	= src;
 	se.dst_fd	= dst;
-	se.nfd		= 2;
+	se.nfd		= 3;
 
-	se.exe_fd	= -1;
+	se.exe_fd	= exe;
 	se.cwd_fd	= -1;
 
 	if (swapfd_tracee(&se) == 0)
