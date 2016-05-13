@@ -181,7 +181,10 @@ static int do_swap_process_resources(struct process_info *p)
 	struct process_fd *pfd;
 	struct process_map *mfd;
 	int err = -ENOMEM;
-	struct swapfd_exchange se = { };
+	struct swapfd_exchange se = {
+		.exe_fd = -1,
+		.cwd_fd = -1,
+	};
 
 	pr_debug("Replacing process %d resources (%d)\n", p->pid, p->fds_nr);
 
@@ -203,6 +206,7 @@ static int do_swap_process_resources(struct process_info *p)
 			*s++ = pfd->spfs_fd;
 			*d++ = pfd->real_fd;
 		}
+		se.nfd = p->fds_nr;
 	}
 
 	if (p->maps_nr) {
@@ -224,6 +228,7 @@ static int do_swap_process_resources(struct process_info *p)
 			*m++ = mfd->map_fd;
 			*ma++ = mfd->start;
 		}
+		se.naddr = p->maps_nr;
 	}
 
 	if (p->env.exe_fd >= 0) {
