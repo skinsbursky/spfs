@@ -435,17 +435,9 @@ static void close_fds(int fd[], int num)
 		}
 }
 
-static int send_dst_fds(struct parasite_ctl *ctl, int fd[], int num)
+static int send_dst_fd(struct parasite_ctl *ctl, int fd)
 {
-	int ret = 0, i;
-
-	for (i = 0; i < num; i++) {
-		ret = send_fd(ctl->local_sockfd, &ctl->addr, ctl->addrlen, fd[i]);
-		if (ret)
-			break;
-	}
-
-	return ret;
+	return send_fd(ctl->local_sockfd, &ctl->addr, ctl->addrlen, fd);
 }
 
 /* Receive next fd from receive queue of remote_sockfd */
@@ -713,25 +705,23 @@ int swapfd_tracee(struct swapfd_exchange *se)
 	int i, ret;
 
 	ret = set_parasite_ctl(se->pid, &ctl);
-	if (ret < 0) {
+	if (ret < 0)
 		goto out_close;
-	}
-
-	ret = send_dst_fds(ctl, se->addr_fd, se->naddr);
-	if (ret < 0)
-		goto out_destroy;
-
-	ret = send_dst_fds(ctl, se->dst_fd, se->nfd);
-	if (ret < 0)
-		goto out_destroy;
 
 	for (i = 0; i < se->naddr; i++) {
+		ret = send_dst_fd(ctl, se->addr_fd[i]);
+		if (ret < 0)
+			goto out_destroy;
+
 		ret = changemap(ctl, se->addr[i]);
 		if (ret < 0)
 			goto out_destroy;
 	}
 
 	for (i = 0; i < se->nfd; i++) {
+		ret = send_dst_fd(ctl, se->dst_fd[i]);
+		if (ret)
+			goto out_destroy;
 		ret = changefd(ctl, se->pid, se->src_fd[i], se->dst_fd[i]);
 		if (ret < 0)
 			goto out_destroy;
