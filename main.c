@@ -126,6 +126,7 @@ int main()
 {
 	unsigned long addr = 0x12345678;
 	unsigned size = sizeof(addr);
+	struct swapfd_exchange se;
 	int src[2], dst[2], ret;
 	pid_t child;
 	int fd[2];
@@ -191,7 +192,20 @@ int main()
 	if (wait_task_seized(child) < 0)
 		goto out_detach;
 
-	if (swapfd_tracee(child, &addr, &dst[0], 1, src, dst, 2) == 0)
+	se.pid		= child;
+
+	se.addr		= &addr;
+	se.addr_fd	= &dst[0];
+	se.naddr	= 1;
+
+	se.src_fd	= src;
+	se.dst_fd	= dst;
+	se.nfd		= 2;
+
+	se.exe_fd	= -1;
+	se.cwd_fd	= -1;
+
+	if (swapfd_tracee(&se) == 0)
 		ret = 0;
 out_detach:
 	detach_from_task(child);
