@@ -1,3 +1,4 @@
+#include <sys/sendfile.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/types.h>
@@ -116,14 +117,56 @@ static void free_mappings(struct parasite_ctl *ctl)
 		free(m);
 }
 
+static int copy_private_content(struct parasite_ctl *ctl, unsigned long to,
+				unsigned long from, unsigned long size)
+{
+	char path[] = "/proc/XXXXXXXXXX/mem";
+	int src, dst, ret = -1;
+	size_t copied;
+	off_t off;
+
+	sprintf(path, "/proc/%d/mem", ctl->pid);
+	src = open(path, O_RDONLY);
+	dst = open(path, O_WRONLY);
+	if (src < 0 || dst < 0) {
+		pr_perror("Can't open %s: %d %d\n", path, src, dst);
+		goto out;
+	}
+
+	off = lseek(dst, to, SEEK_SET);
+	if (off == (off_t) -1) {
+		pr_perror("Can't lseek in %s on %lx", path, to);
+		goto out;
+	}
+
+	off = lseek(src, from, SEEK_SET);
+	if (off == (off_t) -1) {
+		pr_perror("Can't lseek in %s on %lx", path, from);
+		goto out;
+	}
+
+	copied = sendfile(dst, src, NULL, size);
+	if (copied < 0) {
+		pr_perror("Can't sendfile: pid=%d, from=%lx, to=%lx, size=%lx",
+			  ctl->pid, from, to, size);
+		goto out;
+	}
+
+	ret = 0;
+out:
+	close(src);
+	close(dst);
+	return ret;
+}
+
 /* Find mapping backed by src_fd OR starting at src_addr and make them backed by dst_fd */
 static int move_mappings(struct parasite_ctl *ctl, unsigned long src_addr, int src_fd, int dst_fd)
 {
 	unsigned int dev_major = 0, dev_minor = 0;
 	int ret, prot, flags, moved = 0;
+	unsigned long sret, addr;
 	struct map_struct *map;
 	char path[PATH_MAX];
-	unsigned long sret;
 	struct stat st;
 	size_t length;
 
@@ -160,13 +203,6 @@ static int move_mappings(struct parasite_ctl *ctl, unsigned long src_addr, int s
 			return -1;
 		}
 
-		ret = syscall_seized(ctl, __NR_munmap, &sret, map->start, length, 0, 0, 0, 0);
-		if (ret || sret) {
-			pr_err("Can't munmap at [%lx; %lx], ret=%d, sret=%d\n",
-				map->start, map->end, ret, (int)(long)sret);
-			return -1;
-		}
-
 		prot = 0;
 		if (map->r == 'r')
 			prot |= PROT_READ;
@@ -176,16 +212,30 @@ static int move_mappings(struct parasite_ctl *ctl, unsigned long src_addr, int s
 			prot |= PROT_EXEC;
 
 		flags = map->s == 's' ? MAP_SHARED : MAP_PRIVATE;
-		flags |= MAP_FIXED;
 
-		pr_debug("mmap: start=%lx, len=%lx, prot=%x, flags=%x, off=%lx\n",
+		pr_debug("mmap to replace %lx: len=%lx, prot=%x, flags=%x, off=%lx\n",
 			 map->start, length, prot, flags, map->pgoff);
-		ret = syscall_seized(ctl, __NR_mmap, &sret, map->start, length, prot, flags, dst_fd, map->pgoff);
+		ret = syscall_seized(ctl, __NR_mmap, &sret, 0, length, prot, flags, dst_fd, map->pgoff);
 		if (ret || IS_ERR_VALUE(sret)) {
-			pr_err("Can't mmap at [%lx; %lx], prot=%x, flags=%x, pgoff=%llx, ret=%d, sret=%d\n",
-				map->start, map->end, prot, flags, map->pgoff, ret, (int)(long)sret);
+			pr_err("Can't mmap: ret=%d, sret=%d\n", ret, (int)(long)sret);
 			return -1;
 		}
+		addr = sret;
+
+		if (flags & MAP_PRIVATE) {
+			ret = copy_private_content(ctl, addr, map->start, length);
+			if (ret)
+				return -1;
+		}
+
+		flags = MREMAP_FIXED | MREMAP_MAYMOVE;
+		pr_debug("remapping %lx to %lx, size=%lx\n", addr, map->start, length);
+		ret = syscall_seized(ctl, __NR_mremap, &sret, addr, length, length, flags, map->start, 0);
+		if (ret || IS_ERR_VALUE(sret)) {
+			pr_err("Can't remap: ret=%d, sret=%d\n", ret, (int)(long)sret);
+			return -1;
+		}
+
 		moved = map->moved = 1;
 	}
 
