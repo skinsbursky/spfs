@@ -477,15 +477,6 @@ static int get_fd_mode(FILE *fp, long long int *pos, mode_t *mode)
 	return ret;
 }
 
-static void close_fds(int fd[], int num)
-{
-	while (num > 0)
-		if (fd[--num] >= 0) {
-			close(fd[num]);
-			fd[num] = -1;
-		}
-}
-
 static int send_dst_fd(struct parasite_ctl *ctl, int fd)
 {
 	return send_fd(ctl->local_sockfd, &ctl->addr, ctl->addrlen, fd);
@@ -809,7 +800,7 @@ int swapfd_tracee(struct swapfd_exchange *se)
 
 	ret = set_parasite_ctl(se->pid, &ctl);
 	if (ret < 0)
-		goto out_close;
+		goto out_ret;
 
 	for (i = 0; i < se->naddr; i++) {
 		ret = send_dst_fd(ctl, se->addr_fd[i]);
@@ -852,8 +843,7 @@ int swapfd_tracee(struct swapfd_exchange *se)
 
 out_destroy:
 	destroy_parasite_ctl(se->pid, ctl);
-out_close:
-	close_fds(se->dst_fd, se->naddr + se->nfd);
+out_ret:
 	return ret;
 }
 
