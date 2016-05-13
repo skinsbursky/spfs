@@ -152,8 +152,8 @@ static void do_something(int *pipe_fd, int fd)
 
 int main()
 {
+	int src[3], dst[3], ret, exe, cwd_fd;
 	unsigned long addr = 0x12345678;
-	int src[3], dst[3], ret, exe;
 	unsigned size = sizeof(addr);
 	struct swapfd_exchange se;
 	pid_t child;
@@ -169,8 +169,9 @@ int main()
 	dst[1] = open(DST_FILE2, O_RDWR|O_CREAT, 0777);
 	src[2] = open("/proc/self/exe", O_RDONLY);
 	dst[2] = exe = copy_exe();
+	cwd_fd = open("/tmp", O_RDONLY);
 
-	if (src[0] < 0 || dst[0] < 0 || src[1] < 0 || dst[1] < 0 || src[2] < 0 || dst[2] < 0) {
+	if (src[0] < 0 || dst[0] < 0 || src[1] < 0 || dst[1] < 0 || src[2] < 0 || dst[2] < 0 || cwd_fd < 0) {
 		perror("main: Can't open");
 		return 1;
 	}
@@ -196,6 +197,7 @@ int main()
 		close(dst[0]);
 		close(dst[1]);
 		close(dst[2]);
+		close(cwd_fd);
 		do_something(fd, src[0]);
 		return 0;
 	}
@@ -235,7 +237,7 @@ int main()
 	se.nfd		= 3;
 
 	se.exe_fd	= exe;
-	se.cwd_fd	= -1;
+	se.cwd_fd	= cwd_fd;
 
 	if (swapfd_tracee(&se) == 0)
 		ret = 0;
