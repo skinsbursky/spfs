@@ -360,8 +360,4 @@ void context_fini(void)
 
 	if (close(ctx->packet_socket))
 		pr_perror("failed to close pthread socket");
-
-	if (unlink(ctx->sock_addr.sun_path))
-		pr_perror("failed to unlink %s", ctx->sock_addr.sun_path);
-
 }
