@@ -150,7 +150,6 @@ static int move_mappings(struct parasite_ctl *ctl, unsigned long src_addr, int s
 				continue;
 		}
 
-		pr_debug("BINGO! Found\n");
 		length = map->end - map->start;
 
 		ret = syscall_seized(ctl, __NR_msync, &sret, map->start, length, MS_SYNC, 0, 0, 0);
@@ -178,6 +177,8 @@ static int move_mappings(struct parasite_ctl *ctl, unsigned long src_addr, int s
 		flags = map->s == 's' ? MAP_SHARED : MAP_PRIVATE;
 		flags |= MAP_FIXED;
 
+		pr_debug("mmap: start=%lx, len=%lx, prot=%x, flags=%x, off=%lx\n",
+			 map->start, length, prot, flags, map->pgoff);
 		ret = syscall_seized(ctl, __NR_mmap, &sret, map->start, length, prot, flags, dst_fd, map->pgoff);
 		if (ret || IS_ERR_VALUE(sret)) {
 			pr_err("Can't mmap at [%lx; %lx], prot=%x, flags=%x, pgoff=%llx, ret=%d, sret=%d\n",
