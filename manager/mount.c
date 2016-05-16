@@ -21,6 +21,7 @@
 #include "swap.h"
 #include "swapfd.h"
 #include "processes.h"
+#include "cgroup.h"
 
 #define ct_run(func, info, ...)							\
 ({										\
@@ -341,6 +342,12 @@ close_namespaces:
 static int do_replace_spfs(struct spfs_info_s *info, const char *source)
 {
 	int err, res;
+
+	if (info->ovz_id) {
+		err = move_to_cgroup("ve", "/");
+		if (err)
+			return err;
+	}
 
 	res = spfs_freeze_and_lock(info);
 	if (res)
