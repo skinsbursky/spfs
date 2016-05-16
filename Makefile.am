@@ -6,7 +6,7 @@ AM_MAKEFLAGS = --no-print-directory
 
 sbin_PROGRAMS = bin/spfs bin/spfs-client bin/spfs-manager bin/swapfd
 
-scriptsdir = @libexecdir@
+scriptsdir = @libexecdir@/spfs
 scripts_DATA = scripts/spfs-change-mode.sh
 
 bin_spfs_SOURCES =		spfs/main.c			\
