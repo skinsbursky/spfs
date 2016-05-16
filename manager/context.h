@@ -18,6 +18,7 @@ struct spfs_manager_context_s {
 	int	verbosity;
 	bool	daemonize;
 	bool	exit_with_spfs;
+	char	*ovz_id;
 
 	int	sock;
 

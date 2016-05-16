@@ -396,6 +396,8 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 	if (err)
 		return err;
 
+	info->ovz_id = ctx->ovz_id;
+
 	INIT_LIST_HEAD(&info->list);
 	INIT_LIST_HEAD(&info->processes);
 

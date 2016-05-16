@@ -249,6 +249,8 @@ static int configure(struct spfs_manager_context_s *ctx)
 	if (!ctx->freeze_cgroups)
 		return -1;
 
+	ctx->ovz_id = getenv("VEID");
+
 	return 0;
 }
 
