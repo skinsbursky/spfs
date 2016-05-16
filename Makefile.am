@@ -51,6 +51,7 @@ bin_spfs_manager_SOURCES =	manager/main.c			\
 				manager/swap.c			\
 				manager/fd_tree.c		\
 				manager/processes.c		\
+				manager/cgroup.c		\
 								\
 				manager/context.h		\
 				manager/interface.h		\
@@ -61,6 +62,7 @@ bin_spfs_manager_SOURCES =	manager/main.c			\
 				manager/swap.h			\
 				manager/fd_tree.h		\
 				manager/processes.h		\
+				manager/cgroup.h		\
 								\
 				src/util.c			\
 				src/socket.c			\
