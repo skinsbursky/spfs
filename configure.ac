@@ -49,5 +49,8 @@ AC_DEFINE_UNQUOTED(CLIENT_NAME, "$CLIENT_NAME", [spfs])
 MANAGER_NAME=spfs-manager
 AC_DEFINE_UNQUOTED(MANAGER_NAME, "$MANAGER_NAME", [spfs])
 
+libexec_spfsdir='${libexecdir}/spfs'
+AC_SUBST([libexec_spfsdir], [$libexec_spfsdir])
+
 AC_OUTPUT
 
