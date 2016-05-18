@@ -238,15 +238,20 @@ static int do_replace_mounts(struct spfs_info_s *info, const char *source)
 	}
 
 	list_for_each_entry(bm, &info->mountpaths.list, list) {
-		if (do_replace_one_spfs(source, bm->path)) {
+		err = do_replace_one_spfs(source, bm->path);
+		if (err) {
 			pr_err("failed to replace %s by %s\n", bm->path, source);
+			goto unlock_shared_list;
 		}
 	}
-	(void) unlock_shared_list(&info->mountpaths);
 
+	err = spfs_send_mode(info, SPFS_PROXY_MODE, info->mountpoint);
+
+unlock_shared_list:
+	(void) unlock_shared_list(&info->mountpaths);
 close_spfs_ref:
 	close(spfs_ref);
-	return spfs_send_mode(info, SPFS_PROXY_MODE, info->mountpoint);
+	return err;
 }
 
 static int spfs_replace_resources(struct spfs_info_s *info, int *ns_fds)
