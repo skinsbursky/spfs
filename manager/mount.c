@@ -111,24 +111,10 @@ int prepare_mount_env(struct spfs_info_s *info, const char *proxy_dir)
 
 static int cleanup_mount_env_ct(struct spfs_info_s *info)
 {
-	int tries = 3;
-	int err;
-
-	while (tries--) {
-		err = umount(info->work_dir);
-		if (err && tries) {
-			pr_warn("failed to umount %s: %s\n", info->work_dir, strerror(errno));
-			pr_warn("Retry in 1 second...\n");
-			sleep(1);
-			continue;
-		}
-		break;
-	}
-	if (err) {
+	if (umount2(info->work_dir, MNT_DETACH)) {
 		pr_perror("failed to umount %s", info->work_dir);
 		return -errno;
 	}
-	pr_debug("Unmounted %s\n", info->work_dir);
 
 	if (rmdir(info->work_dir)) {
 		pr_perror("failed to remove directory %s", info->work_dir);
