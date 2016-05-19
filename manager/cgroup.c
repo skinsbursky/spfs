@@ -29,11 +29,10 @@ static int move_to_cgroup_fd(int fd, const char *cg)
 	int err;
 	ssize_t bytes;
 
-	err = -ENOMEM;
 	process_id = xsprintf("%d", getpid());
 	if (!process_id) {
 		pr_err("failed to construct string\n");
-		goto close_fd;
+		return -ENOMEM;
 	}
 
 	bytes = write(fd, process_id, strlen(process_id) + 1);
@@ -53,8 +52,6 @@ static int move_to_cgroup_fd(int fd, const char *cg)
 
 free_process_id:
 	free(process_id);
-close_fd:
-	close(fd);
 	return err;
 }
 
