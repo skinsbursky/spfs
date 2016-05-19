@@ -4,7 +4,9 @@ CLEANFILES = `find . -name "*~"`
 AM_CFLAGS = -Wall -Werror -ggdb -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64
 AM_MAKEFLAGS = --no-print-directory
 
-sbin_PROGRAMS = bin/spfs bin/spfs-client bin/spfs-manager bin/swapfd
+sbin_PROGRAMS = bin/spfs bin/spfs-client bin/spfs-manager
+
+noinst_PROGRAMS = bin/swapfd
 
 bin_spfs_SOURCES =		spfs/main.c			\
 				spfs/gateway.c			\
