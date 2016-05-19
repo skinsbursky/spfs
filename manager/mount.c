@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/mount.h>
 #include <fcntl.h>
+#include <signal.h>
 
 #include "include/util.h"
 #include "include/log.h"
@@ -408,6 +409,13 @@ int replace_spfs(int sock, struct spfs_info_s *info,
 {
 	char *mnt;
 	int err;
+
+	/* TODO dropping inherited handlerforof the SIGCHLD might be done
+	 * somehow better.
+	 * This is required to prevent a situation, when wait() returns ECHILD
+	 * (ct_run()->collect_child)
+	 */
+	signal(SIGCHLD, SIG_DFL);
 
 	(void) send_status(sock, 0);
 
