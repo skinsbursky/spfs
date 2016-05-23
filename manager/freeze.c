@@ -1,13 +1,16 @@
-#include "errno.h"
+#include <errno.h>
 #include "limits.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <stdlib.h>
 
 #include "include/log.h"
 #include "include/shm.h"
+#include "include/util.h"
 
 #include "freeze.h"
+#include "processes.h"
 
 struct freeze_cgroup_s *__find_freeze_cgroup(const struct shared_list *groups, const char *path)
 {
@@ -131,4 +134,19 @@ int open_cgroup_state(const struct freeze_cgroup_s *fg)
 		pr_debug("cgroup %s state was opened\n", fg->path);
 	return fd;
 
+}
+
+int cgroup_pids(const struct freeze_cgroup_s *fg, char **list)
+{
+	char *tasks_file;
+	int err;
+
+	tasks_file = xsprintf("%s/tasks", fg->path);
+	if (!tasks_file)
+		return -ENOMEM;
+
+	err = get_pids_list(tasks_file, list);
+
+	free(tasks_file);
+	return err;
 }

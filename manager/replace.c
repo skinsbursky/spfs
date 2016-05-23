@@ -52,21 +52,6 @@
 	_err ? _err : _status;							\
 })
 
-static int spfs_pids_list(struct spfs_info_s *info, char **list)
-{
-	char *tasks_file;
-	int err;
-
-	tasks_file = xsprintf("%s/tasks", info->fg->path);
-	if (!tasks_file)
-		return -ENOMEM;
-
-	err = get_pids_list(tasks_file, list);
-
-	free(tasks_file);
-	return err;
-}
-
 static int prepare_mount_env_ct(struct spfs_info_s *info, const char *proxy_dir)
 {
 	int err;
@@ -263,7 +248,7 @@ static int spfs_replace_resources(struct spfs_info_s *info, int *ns_fds)
 	if (freezer_state_fd < 0)
 		return freezer_state_fd;
 
-	err = spfs_pids_list(info, &pids);
+	err = cgroup_pids(info->fg, &pids);
 	if (err)
 		return err;
 
