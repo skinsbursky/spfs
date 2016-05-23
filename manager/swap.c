@@ -202,9 +202,10 @@ static int do_swap_process_resources(struct process_info *p)
 		d = se.dst_fd;
 		list_for_each_entry(pfd, &p->fds, list) {
 			pr_debug("/proc/%d/fd/%d --> /proc/%d/fd/%d\n",
-					getpid(), pfd->real_fd, p->pid, pfd->spfs_fd);
-			*s++ = pfd->spfs_fd;
-			*d++ = pfd->real_fd;
+					getpid(), pfd->target_fd,
+					p->pid, pfd->source_fd);
+			*s++ = pfd->source_fd;
+			*d++ = pfd->target_fd;
 		}
 		se.nfd = p->fds_nr;
 	}

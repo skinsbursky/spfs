@@ -4,7 +4,7 @@
 struct replace_fd {
 	pid_t pid;
 	mode_t mode;
-	int spfs_fd;
+	int fd;
 	void *file_obj;
 	bool shared;
 };

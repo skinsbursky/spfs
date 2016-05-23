@@ -30,8 +30,7 @@ static int compare_fds(const void *a, const void *b)
 	const struct replace_fd *f = a, *s = b;
 	int ret;
 
-	ret = syscall(SYS_kcmp, f->pid, s->pid, KCMP_FILE,
-		      f->spfs_fd, s->spfs_fd);
+	ret = syscall(SYS_kcmp, f->pid, s->pid, KCMP_FILE, f->fd, s->fd);
 
 	switch (ret) {
 		case 0:
@@ -44,11 +43,11 @@ static int compare_fds(const void *a, const void *b)
 
 	if (ret < 0)
 		pr_err("failed to compare /proc/%d/fd/%d with /proc/%d/fd/%d: %s\n",
-			f->pid, f->spfs_fd, s->pid, s->spfs_fd, strerror(-ret));
+			f->pid, f->fd, s->pid, s->fd, strerror(-ret));
 	else
 		pr_err("failed to compare /proc/%d/fd/%d with "
 			"/proc/%d/fd/%d: ordering information is unavailable\n",
-			f->pid, f->spfs_fd, s->pid, s->spfs_fd);
+			f->pid, f->fd, s->pid, s->fd);
 	_exit(EXIT_FAILURE);
 }
 
@@ -63,7 +62,7 @@ int add_fd_to_tree(pid_t pid, int fd, struct replace_fd **rfd)
 		return -ENOMEM;
 	}
 	new_fd->pid = pid;
-	new_fd->spfs_fd = fd;
+	new_fd->fd = fd;
 	new_fd->shared = false;
 	new_fd->file_obj = NULL;
 

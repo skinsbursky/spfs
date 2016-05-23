@@ -48,8 +48,8 @@ struct replace_fd;
 
 struct process_fd {
 	struct list_head list;
-	int spfs_fd;
-	int real_fd;
+	int source_fd;
+	int target_fd;
 };
 
 struct process_map {

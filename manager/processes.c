@@ -356,8 +356,8 @@ static int create_file_obj(const char *path, unsigned flags, struct replace_fd *
 	return rfd->file_obj ? 0 : -EPERM;
 }
 
-static int get_link_path(const char *link, const char *mountpoint,
-			 char *path, size_t size)
+static int get_target_path(const char *link, const char *mountpoint,
+			   char *path, size_t size)
 {
 	ssize_t used, bytes;
 
@@ -378,16 +378,17 @@ static int get_link_path(const char *link, const char *mountpoint,
 	return 0;
 }
 
-static int open_replace_fd(struct replace_fd *rfd, unsigned flags, const char *mountpoint)
+static int open_target_fd(struct replace_fd *rfd, unsigned flags,
+			  const char *mountpoint)
 {
 	char link[PATH_MAX];
 	char path[PATH_MAX];
 	struct stat st;
 	int err;
 
-	snprintf(link, PATH_MAX, "/proc/%d/fd/%d", rfd->pid, rfd->spfs_fd);
+	snprintf(link, PATH_MAX, "/proc/%d/fd/%d", rfd->pid, rfd->fd);
 
-	err = get_link_path(link, mountpoint, path, sizeof(path));
+	err = get_target_path(link, mountpoint, path, sizeof(path));
 	if (err)
 		return err;
 
@@ -404,15 +405,27 @@ static int open_replace_fd(struct replace_fd *rfd, unsigned flags, const char *m
 	return create_file_obj(path, flags, rfd);
 }
 
-static int get_replace_fd(struct replace_fd *rfd, unsigned flags, const char *mountpoint)
+static int get_target_fd(pid_t pid, int fd, const char *mountpoint)
 {
 	int err;
+	struct replace_fd *rfd;
+	int flags;
+
+	flags = get_fd_flags(pid, fd);
+	if (flags < 0)
+		return flags;
+
+	err = add_fd_to_tree(pid, fd, &rfd);
+	if (err) {
+		pr_err("failed to add /proc/%d/fd/%d to tree\n", pid, fd);
+		return err;
+	}
 
 	if (!rfd->file_obj) {
-		err = open_replace_fd(rfd, flags, mountpoint);
+		err = open_target_fd(rfd, flags, mountpoint);
 		if (err) {
 			pr_err("failed to open file object for /proc/%d/fd/%d\n",
-					rfd->pid, rfd->spfs_fd);
+					rfd->pid, rfd->fd);
 			return err;
 		}
 	}
@@ -434,27 +447,7 @@ static int get_replace_fd(struct replace_fd *rfd, unsigned flags, const char *mo
 	return -ENOTSUP;
 }
 
-
-static int get_real_fd(pid_t pid, int fd, const char *mountpoint)
-{
-	int err;
-	struct replace_fd *rfd;
-	int flags;
-
-	flags = get_fd_flags(pid, fd);
-	if (flags < 0)
-		return flags;
-
-	err = add_fd_to_tree(pid, fd, &rfd);
-	if (err) {
-		pr_err("failed to add /proc/%d/fd/%d to tree\n", pid, fd);
-		return err;
-	}
-
-	return get_replace_fd(rfd, flags, mountpoint);
-}
-
-static int process_add_fd(struct process_info *p, int spfs_fd, int real_fd)
+static int process_add_fd(struct process_info *p, int source_fd, int target_fd)
 {
 	struct process_fd *pfd;
 
@@ -464,13 +457,13 @@ static int process_add_fd(struct process_info *p, int spfs_fd, int real_fd)
 		return -ENOMEM;
 	}
 
-	pfd->spfs_fd = spfs_fd;
-	pfd->real_fd = real_fd;
+	pfd->source_fd = source_fd;
+	pfd->target_fd = target_fd;
 	list_add_tail(&pfd->list, &p->fds);
 	p->fds_nr++;
 
 	pr_debug("Added replace fd: /proc/%d/fd/%d --> /proc/%d/fd/%d\n",
-			getpid(), pfd->spfs_fd, p->pid, pfd->real_fd);
+			getpid(), pfd->source_fd, p->pid, pfd->target_fd);
 	return 0;
 }
 
@@ -513,7 +506,7 @@ static int collect_process_fd(struct process_info *p, int dir,
 		return err;
 	}
 
-	target_fd = get_real_fd(p->pid, source_fd, mnt->mountpoint);
+	target_fd = get_target_fd(p->pid, source_fd, mnt->mountpoint);
 	if (target_fd < 0)
 		return target_fd;
 
@@ -552,7 +545,7 @@ static int collect_map_fd(struct process_info *p, int dir,
 	if (err)
 		return err;
 
-	err = get_link_path(link, mnt->mountpoint, path, sizeof(path));
+	err = get_target_path(link, mnt->mountpoint, path, sizeof(path));
 	if (err)
 		return err;
 
@@ -654,7 +647,7 @@ static int collect_process_env(struct process_info *p, const struct mount_info_s
 		pr_debug("Collecting /proc/%d/%s\n", p->pid, dentry);
 
 		snprintf(link, PATH_MAX, "/proc/%d/%s", p->pid, dentry);
-		err = get_link_path(link, mnt->mountpoint, path, sizeof(path));
+		err = get_target_path(link, mnt->mountpoint, path, sizeof(path));
 		if (err)
 			break;
 
