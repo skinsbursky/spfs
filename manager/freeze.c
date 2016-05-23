@@ -12,7 +12,7 @@
 #include "freeze.h"
 #include "processes.h"
 
-struct freeze_cgroup_s *__find_freeze_cgroup(const struct shared_list *groups, const char *path)
+static struct freeze_cgroup_s *__find_freeze_cgroup(const struct shared_list *groups, const char *path)
 {
 	struct freeze_cgroup_s *fg;
 
@@ -24,7 +24,7 @@ struct freeze_cgroup_s *__find_freeze_cgroup(const struct shared_list *groups, c
 	return NULL;
 }
 
-struct freeze_cgroup_s *create_freeze_cgroup(const char *path)
+static struct freeze_cgroup_s *create_freeze_cgroup(const char *path)
 {
 	struct freeze_cgroup_s *fg;
 
@@ -45,6 +45,28 @@ struct freeze_cgroup_s *create_freeze_cgroup(const char *path)
 		return NULL;
 	}
 
+	return fg;
+}
+
+struct freeze_cgroup_s *get_freeze_cgroup(struct shared_list *list, const char *path)
+{
+	int err;
+	struct freeze_cgroup_s *fg;
+
+	err = lock_shared_list(list);
+	if (err)
+		return NULL;
+
+	fg = __find_freeze_cgroup(list, path);
+	if (!fg) {
+		fg = create_freeze_cgroup(path);
+		if (!fg)
+			pr_err("failed to create freezer object\n");
+		else
+			list_add_tail(&fg->list, &list->list);
+	}
+
+	(void) unlock_shared_list(list);
 	return fg;
 }
 

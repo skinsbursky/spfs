@@ -14,6 +14,7 @@
 #include "context.h"
 #include "spfs.h"
 #include "freeze.h"
+#include "replace.h"
 
 /*
  * 1) Mount of SPFS
@@ -31,6 +32,10 @@
  * 3) Replace SPFS with another file system:
  *
  * replace:id=<spfs_id>;source=<source>;type=<fs_type>;flags=<mount flags>;freeze_cgroup=<path to cgroup>
+ *
+ * 4) Switch processes from one fs to another
+ *
+ * switch:source=<path-to_source_mnt>;target=<path_to_target_mnt>;device=<src_mnt_dev_id>;freeze_cgroup=<path to cgroup>;ns_pid=<pid>
  *
  * After string comes options as blob (string or binary).
  */
@@ -481,32 +486,6 @@ static int process_mode_cmd(int sock, struct spfs_manager_context_s *ctx,
 	return change_spfs_mode(ctx, info, mode, opt_array[2].value);
 }
 
-int set_freeze_cgroup(struct spfs_manager_context_s *ctx, struct spfs_info_s *info, const char *path)
-{
-	int err;
-	struct shared_list *list = ctx->freeze_cgroups;
-	struct freeze_cgroup_s *fg;
-
-	err = lock_shared_list(list);
-	if (err)
-		return err;
-
-	fg = __find_freeze_cgroup(list, path);
-	if (!fg) {
-		fg = create_freeze_cgroup(path);
-		if (fg) {
-			list_add_tail(&fg->list, &ctx->freeze_cgroups->list);
-			info->fg = fg;
-		} else
-			err = -ENOMEM;
-	}
-	if (fg)
-		info->fg = fg;
-
-	(void) unlock_shared_list(list);
-	return err;
-}
-
 static int process_replace_cmd(int sock, struct spfs_manager_context_s *ctx,
 			       char *options, size_t size)
 {
@@ -568,9 +547,9 @@ static int process_replace_cmd(int sock, struct spfs_manager_context_s *ctx,
 					opt_array[4].value, info->mnt.id);
 			err = -EEXIST;
 		} else {
-			err = set_freeze_cgroup(ctx, info, opt_array[4].value);
-			if (err)
-				pr_err("failed to set freezer cgroup %s for info %s\n",
+			info->fg = get_freeze_cgroup(ctx->freeze_cgroups, opt_array[4].value);
+			if (!info->fg)
+				pr_err("failed to get freezer cgroup %s for info %s\n",
 						opt_array[4].value, info->mnt.id);
 		}
 
@@ -590,10 +569,74 @@ static int process_replace_cmd(int sock, struct spfs_manager_context_s *ctx,
 			     opt_array[3].value, opts);
 }
 
+static int process_switch_cmd(int sock, struct spfs_manager_context_s *ctx,
+			      char *options, size_t size)
+{
+	struct opt_array_s opt_array[] = {
+		[0] = { "source=", NULL },
+		[1] = { "target=", NULL },
+		[2] = { "freeze_cgroup=", NULL },
+		[3] = { "device=", NULL },
+		[4] = { "ns_pid=", NULL },
+		{ NULL, NULL },
+	};
+	int err;
+	struct freeze_cgroup_s *fg;
+	long ns_pid = 0, src_dev = 0;
+
+	err = parse_cmd_options(opt_array, options);
+	if (err) {
+		pr_err("failed to parse options for replace command\n");
+		return -EINVAL;
+	}
+
+	if (opt_array[1].value == NULL) {
+		pr_err("target mountpoint wasn't provided\n");
+		return -EINVAL;
+	}
+
+	if (opt_array[2].value == NULL) {
+		pr_err("freezer cgroup wasn't provided\n");
+		return -EINVAL;
+	}
+
+	if ((opt_array[0].value && opt_array[4].value) ||
+	    (!opt_array[0].value && !opt_array[4].value)) {
+		pr_err("either source mountpoint or source device must be specified\n");
+		return -EINVAL;
+	}
+
+	if (opt_array[3].value) {
+		err = xatol(opt_array[3].value, &src_dev);
+		if (err) {
+			pr_err("failed to convert device id: %s\n", opt_array[3].value);
+			return err;
+		}
+	}
+
+	if (opt_array[4].value) {
+		err = xatol(opt_array[4].value, &ns_pid);
+		if (err) {
+			pr_err("failed to convert pid: %s\n", opt_array[4].value);
+			return err;
+		}
+	}
+
+	fg = get_freeze_cgroup(ctx->freeze_cgroups, opt_array[2].value);
+	if (!fg) {
+		pr_err("failed to get freezer cgroup %s\n", opt_array[2].value);
+		return -EINVAL;
+	}
+
+	return replace_resources(fg, opt_array[0].value, src_dev,
+				 opt_array[1].value, ns_pid);
+}
+
 const struct spfs_manager_cmd_handler_s handlers[] = {
 	{ "mount", process_mount_cmd, false },
 	{ "mode", process_mode_cmd, true },
 	{ "replace", process_replace_cmd, true },
+	{ "switch", process_switch_cmd, true },
 	{ NULL, NULL }
 };
 

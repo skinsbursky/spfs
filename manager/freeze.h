@@ -14,9 +14,8 @@ struct freeze_cgroup_s {
 	sem_t			sem;
 };
 
-struct freeze_cgroup_s *__find_freeze_cgroup(const struct shared_list *groups, const char *path);
+struct freeze_cgroup_s *get_freeze_cgroup(struct shared_list *list, const char *path);
 
-struct freeze_cgroup_s *create_freeze_cgroup(const char *path);
 int lock_cgroup(struct freeze_cgroup_s *fg);
 int unlock_cgroup(struct freeze_cgroup_s *fg);
 int thaw_cgroup(const struct freeze_cgroup_s *fg);
