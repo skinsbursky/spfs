@@ -237,18 +237,20 @@ close_spfs_ref:
 	return err;
 }
 
-static int spfs_replace_resources(struct spfs_info_s *info, int *ns_fds)
+static int do_replace_resources(struct freeze_cgroup_s *fg,
+				struct mount_info_s *mnt,
+				int *ns_fds)
 {
 	char *pids;
 	int err;
 	int freezer_state_fd;
 	LIST_HEAD(processes);
 
-	freezer_state_fd = open_cgroup_state(info->fg);
+	freezer_state_fd = open_cgroup_state(fg);
 	if (freezer_state_fd < 0)
 		return freezer_state_fd;
 
-	err = cgroup_pids(info->fg, &pids);
+	err = cgroup_pids(fg, &pids);
 	if (err)
 		return err;
 
@@ -261,7 +263,7 @@ static int spfs_replace_resources(struct spfs_info_s *info, int *ns_fds)
 	if (err)
 		goto free_pids;
 
-	err = collect_processes(pids, &processes, &info->mnt);
+	err = collect_processes(pids, &processes, mnt);
 	if (err)
 		goto free_pids;
 #if 0
@@ -293,15 +295,16 @@ free_pids:
 	return err;
 }
 
-static int do_replace_resources(struct spfs_info_s *info)
+static int replace_resources(struct freeze_cgroup_s *fg,
+			     struct mount_info_s *mnt,
+			     pid_t ns_pid)
 {
 	int err, status, pid;
 	int ct_ns_fds[NS_MAX];
 
-	err = open_namespaces(info->ns_pid, ct_ns_fds);
+	err = open_namespaces(ns_pid, ct_ns_fds);
 	if (err) {
-		pr_perror("failed to change %d namespaces: %s\n", info->ns_pid,
-				info->ns_list);
+		pr_perror("failed to open %d namespaces\n", ns_pid);
 		return err;
 	}
 
@@ -321,7 +324,7 @@ static int do_replace_resources(struct spfs_info_s *info)
 			pr_perror("failed to fork");
 			err = -errno;
 		case 0:
-			_exit(spfs_replace_resources(info, ct_ns_fds));
+			_exit(do_replace_resources(fg, mnt, ct_ns_fds));
 	}
 
 	if (pid > 0)
@@ -348,7 +351,7 @@ static int do_replace_spfs(struct spfs_info_s *info, const char *source)
 
 	err = ct_run(do_replace_mounts, info, source);
 	if (!err)
-		err = do_replace_resources(info);
+		err = replace_resources(info->fg, &info->mnt, info->ns_pid);
 
 	res = spfs_thaw_and_unlock(info);
 
