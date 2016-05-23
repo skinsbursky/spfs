@@ -67,11 +67,6 @@ static int spfs_pids_list(struct spfs_info_s *info, char **list)
 	return err;
 }
 
-static int spfs_collect_processes(struct spfs_info_s *info, const char *list)
-{
-	return iterate_pids_list(list, info, collect_one_process);
-}
-
 static int prepare_mount_env_ct(struct spfs_info_s *info, const char *proxy_dir)
 {
 	int err;
@@ -259,15 +254,16 @@ close_spfs_ref:
 
 static int spfs_replace_resources(struct spfs_info_s *info, int *ns_fds)
 {
-	char *list;
+	char *pids;
 	int err;
 	int freezer_state_fd;
+	LIST_HEAD(processes);
 
 	freezer_state_fd = open_cgroup_state(info->fg);
 	if (freezer_state_fd < 0)
 		return freezer_state_fd;
 
-	err = spfs_pids_list(info, &list);
+	err = spfs_pids_list(info, &pids);
 	if (err)
 		return err;
 
@@ -278,34 +274,38 @@ static int spfs_replace_resources(struct spfs_info_s *info, int *ns_fds)
 	 */
 	err = set_namespaces(ns_fds, NS_MNT_MASK | NS_NET_MASK);
 	if (err)
-		return err;
+		goto free_pids;
 
-	err = spfs_collect_processes(info, list);
+	err = collect_processes(pids, &processes, &info->mnt);
 	if (err)
-		return err;
+		goto free_pids;
 #if 0
 	Looks like user namespace is not required at all?
 	err = set_namespaces(ns_fds, NS_USER_MASK);
 	if (err)
-		return err;
+		goto free_pids;
 #endif
 
 	err = write(freezer_state_fd, "THAWED", sizeof("THAWED"));
 	if (err != sizeof("THAWED")) {
 		pr_perror("Unable to thaw");
-		return err;
+		goto free_pids;
 	}
 	close(freezer_state_fd);
 
-	err = spfs_seize_processes(info);
+	err = seize_processes(&processes);
 	if (err)
-		return err;
+		goto free_pids;
 
-	err = do_swap_resources(info);
+	err = do_swap_resources(&processes);
 	if (err)
-		return err;
+		goto free_pids;
 
-	return spfs_release_processes(info);
+	err = release_processes(&processes);
+
+free_pids:
+	free(pids);
+	return err;
 }
 
 static int do_replace_resources(struct spfs_info_s *info)

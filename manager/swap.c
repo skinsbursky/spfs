@@ -260,11 +260,11 @@ free:
 	return err;
 }
 
-int do_swap_resources(struct spfs_info_s *info)
+int do_swap_resources(const struct list_head *processes)
 {
 	struct process_info *p;
 
-	list_for_each_entry(p, &info->processes, list) {
+	list_for_each_entry(p, processes, list) {
 		if (do_swap_process_resources(p))
 			pr_err("failed to swap resources for process %d\n", p->pid);
 	}

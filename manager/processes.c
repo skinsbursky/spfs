@@ -124,11 +124,11 @@ static int seize_one_process(const struct process_info *p)
 	return 0;
 }
 
-int spfs_seize_processes(struct spfs_info_s *info)
+int seize_processes(struct list_head *processes)
 {
 	const struct process_info *p;
 
-	list_for_each_entry(p, &info->processes, list) {
+	list_for_each_entry(p, processes, list) {
 		if (seize_one_process(p))
 			return -EPERM;
 	}
@@ -145,11 +145,11 @@ static int detach_from_process(const struct process_info *p)
 	return 0;
 }
 
-int spfs_release_processes(struct spfs_info_s *info)
+int release_processes(struct list_head *processes)
 {
 	struct process_info *p, *tmp;
 
-	list_for_each_entry_safe(p, tmp, &info->processes, list) {
+	list_for_each_entry_safe(p, tmp, processes, list) {
 		(void) detach_from_process(p);
 		list_del(&p->list);
 		free(p);
@@ -167,7 +167,7 @@ static int attach_to_process(const struct process_info *p)
 	return 0;
 }
 
-static bool is_spfs_fd(int dir, const char *fd, struct spfs_info_s *info)
+static bool is_mnt_fd(int dir, const char *fd, dev_t device)
 {
 	struct stat st;
 
@@ -181,10 +181,7 @@ static bool is_spfs_fd(int dir, const char *fd, struct spfs_info_s *info)
 		}
 		return false;
 	}
-	if (st.st_dev != info->mnt.st.st_dev)
-		return false;
-
-	return true;
+	return st.st_dev == device;
 }
 
 static int pid_is_kthread(pid_t pid)
@@ -198,8 +195,8 @@ static int pid_is_kthread(pid_t pid)
 	return false;
 }
 
-int iterate_pids_list_name(const char *pids_list, struct spfs_info_s *info,
-			   int (*actor)(pid_t pid, struct spfs_info_s *info),
+int iterate_pids_list_name(const char *pids_list, void *data, const void *filter,
+			   int (*actor)(pid_t pid, void *data, const void *filter),
 			   const char *actor_name)
 {
 	char *list, *pid;
@@ -233,7 +230,7 @@ int iterate_pids_list_name(const char *pids_list, struct spfs_info_s *info,
 			continue;
 		}
 
-		err = actor(p, info);
+		err = actor(p, data, filter);
 		if (err) {
 			pr_err("actor %s failed for pid %d\n", actor_name, p);
 			break;
@@ -499,27 +496,28 @@ static int process_add_mapping(struct process_info *p, int map_fd,
 	return 0;
 }
 
-static int collect_process_fd(struct process_info *p, int dir, const char *process_fd)
+static int collect_process_fd(struct process_info *p, int dir,
+			      const char *process_fd, const void *data)
 {
-	int err, spfs_fd, real_fd;
-	struct spfs_info_s *info = p->info;
+	int err, source_fd, target_fd;
+	const struct mount_info_s *mnt = data;
 
-	if (!is_spfs_fd(dir, process_fd, info))
+	if (!is_mnt_fd(dir, process_fd, mnt->st.st_dev))
 		return 0;
 
 	pr_debug("Collecting /proc/%d/fd/%s\n", p->pid, process_fd);
 
-	err = xatol(process_fd, (long *)&spfs_fd);
+	err = xatol(process_fd, (long *)&source_fd);
 	if (err) {
 		pr_err("failed to convert fd %s to number\n", process_fd);
 		return err;
 	}
 
-	real_fd = get_real_fd(p->pid, spfs_fd, info->mnt.mountpoint);
-	if (real_fd < 0)
-		return real_fd;
+	target_fd = get_real_fd(p->pid, source_fd, mnt->mountpoint);
+	if (target_fd < 0)
+		return target_fd;
 
-	return process_add_fd(p, spfs_fd, real_fd);
+	return process_add_fd(p, source_fd, target_fd);
 }
 
 static int get_map_range(const char *map_file, off_t *start, off_t *end)
@@ -534,15 +532,16 @@ static int get_map_range(const char *map_file, off_t *start, off_t *end)
 	return 0;
 }
 
-static int collect_map_fd(struct process_info *p, int dir, const char *map_file)
+static int collect_map_fd(struct process_info *p, int dir,
+			  const char *map_file, const void *data)
 {
 	char link[PATH_MAX];
 	char path[PATH_MAX];
 	off_t start, end;
 	int map_fd, err;
-	struct spfs_info_s *info = p->info;
+	const struct mount_info_s *mnt = data;
 
-	if (!is_spfs_fd(dir, map_file, info))
+	if (!is_mnt_fd(dir, map_file, mnt->st.st_dev))
 		return 0;
 
 	snprintf(link, PATH_MAX, "/proc/%d/map_files/%s", p->pid, map_file);
@@ -553,7 +552,7 @@ static int collect_map_fd(struct process_info *p, int dir, const char *map_file)
 	if (err)
 		return err;
 
-	err = get_link_path(link, info->mnt.mountpoint, path, sizeof(path));
+	err = get_link_path(link, mnt->mountpoint, path, sizeof(path));
 	if (err)
 		return err;
 
@@ -567,7 +566,8 @@ static int collect_map_fd(struct process_info *p, int dir, const char *map_file)
 }
 
 static int iterate_dir_name(const char *dpath, struct process_info *p,
-		    int (*actor)(struct process_info *p, int dir, const char *fd),
+		    int (*actor)(struct process_info *p, int dir, const char *fd, const void *data),
+		    const void *data,
 		    const char *actor_name)
 {
 	struct dirent *dt;
@@ -594,7 +594,7 @@ static int iterate_dir_name(const char *dpath, struct process_info *p,
 		if (!strcmp(fd, ".") || !strcmp(fd, ".."))
 			continue;
 
-		err = actor(p, dir, fd);
+		err = actor(p, dir, fd, data);
 		if (err) {
 			pr_err("actor '%s' for %s/%s\n failed\n",
 					actor_name, dpath, fd);
@@ -607,27 +607,26 @@ close_dir:
 	return err;
 }
 
-static int collect_process_open_fds(struct process_info *p)
+static int collect_process_open_fds(struct process_info *p, const struct mount_info_s *mnt)
 {
 	char dpath[PATH_MAX];
 
 	snprintf(dpath, PATH_MAX, "/proc/%d/fd", p->pid);
-	return iterate_dir_name(dpath, p, collect_process_fd, "collect_process_fd");
+	return iterate_dir_name(dpath, p, collect_process_fd, mnt, "collect_process_fd");
 }
 
-static int collect_process_map_fds(struct process_info *p)
+static int collect_process_map_fds(struct process_info *p, const struct mount_info_s *mnt)
 {
 	char dpath[PATH_MAX];
 
 	snprintf(dpath, PATH_MAX, "/proc/%d/map_files", p->pid);
-	return iterate_dir_name(dpath, p, collect_map_fd, "collect_map_fd");
+	return iterate_dir_name(dpath, p, collect_map_fd, mnt, "collect_map_fd");
 }
 
-static int collect_process_env(struct process_info *p)
+static int collect_process_env(struct process_info *p, const struct mount_info_s *mnt)
 {
 	int dir, err, *env = p->env_array;
 	char path[PATH_MAX];
-	struct spfs_info_s *info = p->info;
 	char *env_vars[] = {
 		"exe",
 		"cwd",
@@ -649,13 +648,13 @@ static int collect_process_env(struct process_info *p)
 		char *dentry = *var++;
 		char link[PATH_MAX];
 
-		if (!is_spfs_fd(dir, dentry, info))
+		if (!is_mnt_fd(dir, dentry, mnt->st.st_dev))
 			continue;
 
 		pr_debug("Collecting /proc/%d/%s\n", p->pid, dentry);
 
 		snprintf(link, PATH_MAX, "/proc/%d/%s", p->pid, dentry);
-		err = get_link_path(link, info->mnt.mountpoint, path, sizeof(path));
+		err = get_link_path(link, mnt->mountpoint, path, sizeof(path));
 		if (err)
 			break;
 
@@ -672,10 +671,12 @@ static int collect_process_env(struct process_info *p)
 	return err;
 }
 
-int collect_one_process(pid_t pid, struct spfs_info_s *info)
+static int collect_one_process(pid_t pid, void *data, const void *filter)
 {
 	int err;
 	struct process_info *p;
+	struct list_head *collection = data;
+	const struct mount_info_s *mnt = filter;
 
 	p = malloc(sizeof(*p));
 	if (!p) {
@@ -684,7 +685,6 @@ int collect_one_process(pid_t pid, struct spfs_info_s *info)
 	}
 
 	p->pid = pid;
-	p->info = info;
 	p->fds_nr = 0;
 	p->maps_nr = 0;
 	p->env.exe_fd = -1;
@@ -693,15 +693,15 @@ int collect_one_process(pid_t pid, struct spfs_info_s *info)
 	INIT_LIST_HEAD(&p->fds);
 	INIT_LIST_HEAD(&p->maps);
 
-	err = collect_process_env(p);
+	err = collect_process_env(p, mnt);
 	if (err)
 		goto free_p;
 
-	err = collect_process_open_fds(p);
+	err = collect_process_open_fds(p, mnt);
 	if (err)
 		goto free_p;
 
-	err = collect_process_map_fds(p);
+	err = collect_process_map_fds(p, mnt);
 	if (err)
 		goto free_p;
 
@@ -711,7 +711,7 @@ int collect_one_process(pid_t pid, struct spfs_info_s *info)
 	err = attach_to_process(p);
 	if (err)
 		goto free_p;
-	list_add_tail(&p->list, &info->processes);
+	list_add_tail(&p->list, collection);
 	pr_debug("collected process %d\n", pid);
 	return 0;
 
@@ -720,3 +720,8 @@ free_p:
 	return err;
 }
 
+int collect_processes(const char *pids, struct list_head *collection,
+		      const struct mount_info_s *mnt)
+{
+	return iterate_pids_list(pids, collection, mnt, collect_one_process);
+}

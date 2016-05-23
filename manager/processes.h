@@ -1,23 +1,24 @@
-#ifndef __SPFS_MANAGER_PROCESSES_H
-#define __SPFS_MANAGER_PROCESSES_H
+#ifndef __SPFS_MANAGER_PROCESSES_H_
+#define __SPFS_MANAGER_PROCESSES_H_
 
-struct spfs_info_s;
+struct mount_info_s;
 
 int get_pids_list(const char *tasks_file, char **list);
-int collect_one_process(pid_t pid, struct spfs_info_s *info);
+int collect_processes(const char *pids, struct list_head *collection,
+		      const struct mount_info_s *mnt);
 
-int iterate_pids_list_name(const char *pids_list, struct spfs_info_s *info,
-			   int (*actor)(pid_t pid, struct spfs_info_s *info),
+int iterate_pids_list_name(const char *pids_list, void *data, const void *filter,
+			   int (*actor)(pid_t pid, void *data, const void *filter),
 			   const char *actor_name);
 
 #define __stringify(x...)     #x
 #define stringify(x...)       __stringify(x)
 
-#define iterate_pids_list(pids_list, info, actor)			\
-	iterate_pids_list_name(pids_list, info, actor, stringify(actor))
+#define iterate_pids_list(pids_list, data, filter, actor)		\
+	iterate_pids_list_name(pids_list, data, filter, actor, stringify(actor))
 
-int spfs_seize_processes(struct spfs_info_s *info);
-int spfs_release_processes(struct spfs_info_s *info);
+int seize_processes(struct list_head *processes);
+int release_processes(struct list_head *processes);
 
 enum {
 	NS_UTS,
@@ -73,7 +74,6 @@ struct process_info {
 	};
 	struct list_head fds;
 	struct list_head maps;
-	struct spfs_info_s *info;
 };
 
 #endif
