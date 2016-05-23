@@ -48,6 +48,9 @@ int set_namespaces(int *ns_fds, unsigned ns_mask)
 {
 	int ns_type, err;
 
+	if (!ns_fds)
+		return 0;
+
 	for (ns_type = NS_UTS; ns_type < NS_MAX; ns_type++) {
 		if ((ns_mask & (1 << ns_type)) == 0)
 			continue;
@@ -70,6 +73,9 @@ int set_namespaces(int *ns_fds, unsigned ns_mask)
 int close_namespaces(int *ns_fds)
 {
 	int ns_type;
+
+	if (!ns_fds)
+		return 0;
 
 	for (ns_type = NS_UTS; ns_type < NS_MAX; ns_type++) {
 		if (ns_fds[ns_type] < 0)

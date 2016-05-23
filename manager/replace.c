@@ -96,12 +96,15 @@ int replace_resources(struct freeze_cgroup_s *fg,
 		      pid_t ns_pid)
 {
 	int err, status, pid;
-	int ct_ns_fds[NS_MAX];
+	int ct_ns_fds[NS_MAX], *ns_fds = NULL;
 
-	err = open_namespaces(ns_pid, ct_ns_fds);
-	if (err) {
-		pr_perror("failed to open %d namespaces\n", ns_pid);
-		return err;
+	if (ns_pid) {
+		err = open_namespaces(ns_pid, ct_ns_fds);
+		if (err) {
+			pr_perror("failed to open %d namespaces", ns_pid);
+			return err;
+		}
+		ns_fds = ct_ns_fds;
 	}
 
 	/* Join target pid namespace to extract virtual pids from freezer cgroup.
@@ -110,7 +113,7 @@ int replace_resources(struct freeze_cgroup_s *fg,
 	 * and opened file modifications).
 	 * Also, ptrace needs to use pids, located in its pid namespace.
 	 */
-	err = set_namespaces(ct_ns_fds, NS_PID_MASK);
+	err = set_namespaces(ns_fds, NS_PID_MASK);
 	if (err)
 		goto close_namespaces;
 
@@ -121,13 +124,13 @@ int replace_resources(struct freeze_cgroup_s *fg,
 			err = -errno;
 		case 0:
 			_exit(do_replace_resources(fg, source_mnt, src_dev,
-						   target_mnt, ct_ns_fds));
+						   target_mnt, ns_fds));
 	}
 
 	if (pid > 0)
 		err = collect_child(pid, &status, 0);
 
 close_namespaces:
-	close_namespaces(ct_ns_fds);
+	close_namespaces(ns_fds);
 	return err ? err : status;
 }
