@@ -112,7 +112,7 @@ static void cleanup_spfs_mount(struct spfs_info_s *info, int status)
 	unlink(info->socket_path);
 
 	if (WIFEXITED(status) && (WEXITSTATUS(status) == 0))
-		cleanup_mount_env(info);
+		spfs_cleanup_env(info);
 }
 
 static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)

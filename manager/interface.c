@@ -2,21 +2,16 @@
 
 #include <stdlib.h>
 #include <poll.h>
+#include <signal.h>
 
 #include <sys/mount.h>
 
 #include "include/socket.h"
-
 #include "include/log.h"
 #include "include/util.h"
-#include "include/shm.h"
 #include "include/ipc.h"
 
-#include "spfs/interface.h"
-
 #include "context.h"
-#include "interface.h"
-#include "replace.h"
 #include "spfs.h"
 #include "freeze.h"
 
@@ -171,7 +166,7 @@ static int mount_spfs(struct spfs_manager_context_s *ctx,
 		}
 	}
 
-	status = prepare_mount_env(info, proxy_dir);
+	status = spfs_prepare_env(info, proxy_dir);
 	if (status)
 		goto free_proxy_dir;
 
@@ -260,7 +255,7 @@ kill_spfs:
 umount_spfs:
 	umount(info->mnt.mountpoint);
 cleanup_env:
-	cleanup_mount_env(info);
+	spfs_cleanup_env(info);
 	goto free_proxy_dir;
 }
 
@@ -657,6 +652,15 @@ int spfs_manager_packet_handler(int sock, void *data, void *package, size_t psiz
 				pr_perror("failed to fork");
 				return -errno;
 			case 0:
+
+				/* TODO dropping inherited handlerforof the
+				 * SIGCHLD might be done somehow better.
+				 * This is required to prevent a situation,
+				 * when wait() returns ECHILD
+				 * (ct_run()->collect_child).
+				 */
+				signal(SIGCHLD, SIG_DFL);
+
 				_exit(spfs_manager_handle_packet(handler->handle, sock, data, options, psize - (options - cmd)));
 			default:
 				return 0;

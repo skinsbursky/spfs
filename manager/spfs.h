@@ -1,16 +1,12 @@
 #ifndef __SPFS_MANAGER_SPFS_H_
 #define __SPFS_MANAGER_SPFS_H_
 
-#include <unistd.h>
 #include <stdbool.h>
-#include <semaphore.h>
-
 #include <sys/stat.h>
 
 #include "include/list.h"
 #include "include/shm.h"
 
-#include "spfs/context.h"
 #include "spfs/interface.h"
 
 #include "mount.h"
@@ -47,15 +43,14 @@ void del_spfs_info(struct shared_list *mounts, struct spfs_info_s *info);
 
 int spfs_add_mount_paths(struct spfs_info_s *info, const char *bind_mounts);
 
-int enter_spfs_context(const struct spfs_info_s *info);
-
 int spfs_send_mode(const struct spfs_info_s *info,
 		   spfs_mode_t mode, const char *proxy_dir);
 
-int spfs_thaw(struct spfs_info_s *info);
-int spfs_unlock(struct spfs_info_s *info);
+int replace_spfs(int sock, struct spfs_info_s *info,
+		  const char *source, const char *fstype,
+		  const char *mountflags, const void *options);
 
-int spfs_freeze_and_lock(struct spfs_info_s *info);
-int spfs_thaw_and_unlock(struct spfs_info_s *info);
+int spfs_prepare_env(struct spfs_info_s *info, const char *proxy_dir);
+int spfs_cleanup_env(struct spfs_info_s *info);
 
 #endif

@@ -1,9 +1,7 @@
 #ifndef __SPFS_MANAGER_MOUNT_H_
 #define __SPFS_MANAGER_MOUNT_H_
 
-#include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
 #include "include/list.h"
 

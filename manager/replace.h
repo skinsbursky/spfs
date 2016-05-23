@@ -3,13 +3,10 @@
 
 #include <stddef.h>
 
-struct spfs_info_s;
+struct mount_info_s;
+struct freeze_cgroup_s;
 
-int prepare_mount_env(struct spfs_info_s *info, const char *proxy_dir);
-int cleanup_mount_env(struct spfs_info_s *info);
-
-int replace_spfs(int sock, struct spfs_info_s *info,
-		  const char *source, const char *fstype,
-		  const char *mountflags, const void *options);
+int replace_resources(struct freeze_cgroup_s *fg, struct mount_info_s *mnt,
+		      pid_t ns_pid);
 
 #endif

@@ -2,12 +2,6 @@
 #define __SPFS_MANAGER_CONTEXT_H_
 
 #include <stdbool.h>
-#include <stddef.h>
-#include <semaphore.h>
-
-#include <spfs/context.h>
-
-struct spfs_mounts_s;
 
 struct spfs_manager_context_s {
 	const char	*progname;
