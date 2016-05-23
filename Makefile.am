@@ -43,7 +43,7 @@ bin_spfs_client_SOURCES =	client/main.c			\
 bin_spfs_manager_SOURCES =	manager/main.c			\
 				manager/context.c		\
 				manager/interface.c		\
-				manager/mount.c			\
+				manager/replace.c		\
 				manager/spfs.c			\
 				manager/freeze.c		\
 				manager/swapfd.c		\
@@ -54,7 +54,7 @@ bin_spfs_manager_SOURCES =	manager/main.c			\
 								\
 				manager/context.h		\
 				manager/interface.h		\
-				manager/mount.h			\
+				manager/replace.h		\
 				manager/spfs.h			\
 				manager/freeze.h		\
 				manager/swapfd.h		\

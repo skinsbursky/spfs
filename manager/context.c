@@ -23,7 +23,7 @@
 
 #include "context.h"
 #include "spfs.h"
-#include "mount.h"
+#include "replace.h"
 
 static struct spfs_manager_context_s spfs_manager_context;
 

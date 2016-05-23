@@ -16,7 +16,7 @@
 
 #include "context.h"
 #include "interface.h"
-#include "mount.h"
+#include "replace.h"
 #include "spfs.h"
 #include "freeze.h"
 #include "swap.h"
