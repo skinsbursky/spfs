@@ -3,10 +3,11 @@
 
 #include <stddef.h>
 
-struct mount_info_s;
 struct freeze_cgroup_s;
 
-int replace_resources(struct freeze_cgroup_s *fg, struct mount_info_s *mnt,
+int replace_resources(struct freeze_cgroup_s *fg,
+		      const char *source_mnt, dev_t src_dev,
+		      const char *target_mnt,
 		      pid_t ns_pid);
 
 #endif

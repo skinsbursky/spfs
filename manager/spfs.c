@@ -431,6 +431,7 @@ close_spfs_ref:
 static int do_replace_spfs(struct spfs_info_s *info, const char *source)
 {
 	int err, res;
+	struct mount_info_s *mnt = &info->mnt;
 
 	if (info->ovz_id) {
 		err = move_to_cgroup("ve", "/");
@@ -444,7 +445,8 @@ static int do_replace_spfs(struct spfs_info_s *info, const char *source)
 
 	err = ct_run(do_replace_mounts, info, source);
 	if (!err)
-		err = replace_resources(info->fg, &info->mnt, info->ns_pid);
+		err = replace_resources(info->fg, NULL, mnt->st.st_dev,
+					mnt->mountpoint, info->ns_pid);
 
 	res = spfs_thaw_and_unlock(info);
 

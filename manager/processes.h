@@ -4,18 +4,21 @@
 struct mount_info_s;
 
 int get_pids_list(const char *tasks_file, char **list);
-int collect_processes(const char *pids, struct list_head *collection,
-		      const struct mount_info_s *mnt);
 
-int iterate_pids_list_name(const char *pids_list, void *data, const void *filter,
-			   int (*actor)(pid_t pid, void *data, const void *filter),
+int collect_dev_processes(const char *pids, struct list_head *collection,
+			  dev_t src_dev, const char *target_mnt);
+int collect_mnt_processes(const char *pids, struct list_head *collection,
+			  const char *source_mnt, const char *target_mnt);
+
+int iterate_pids_list_name(const char *pids_list, void *data,
+			   int (*actor)(pid_t pid, void *data),
 			   const char *actor_name);
 
 #define __stringify(x...)     #x
 #define stringify(x...)       __stringify(x)
 
-#define iterate_pids_list(pids_list, data, filter, actor)		\
-	iterate_pids_list_name(pids_list, data, filter, actor, stringify(actor))
+#define iterate_pids_list(pids_list, data, actor)		\
+	iterate_pids_list_name(pids_list, data, actor, stringify(actor))
 
 int seize_processes(struct list_head *processes);
 int release_processes(struct list_head *processes);

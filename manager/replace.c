@@ -25,7 +25,9 @@
 #include "cgroup.h"
 
 static int do_replace_resources(struct freeze_cgroup_s *fg,
-				struct mount_info_s *mnt,
+				const char *source_mnt,
+				dev_t src_dev,
+				const char *target_mnt,
 				int *ns_fds)
 {
 	char *pids;
@@ -50,9 +52,15 @@ static int do_replace_resources(struct freeze_cgroup_s *fg,
 	if (err)
 		goto free_pids;
 
-	err = collect_processes(pids, &processes, mnt);
+	if (source_mnt)
+		err = collect_mnt_processes(pids, &processes,
+					    source_mnt, target_mnt);
+	else
+		err = collect_dev_processes(pids, &processes,
+					    src_dev, target_mnt);
 	if (err)
 		goto free_pids;
+
 #if 0
 	Looks like user namespace is not required at all?
 	err = set_namespaces(ns_fds, NS_USER_MASK);
@@ -82,7 +90,9 @@ free_pids:
 	return err;
 }
 
-int replace_resources(struct freeze_cgroup_s *fg, struct mount_info_s *mnt,
+int replace_resources(struct freeze_cgroup_s *fg,
+		      const char *source_mnt, dev_t src_dev,
+		      const char *target_mnt,
 		      pid_t ns_pid)
 {
 	int err, status, pid;
@@ -110,7 +120,8 @@ int replace_resources(struct freeze_cgroup_s *fg, struct mount_info_s *mnt,
 			pr_perror("failed to fork");
 			err = -errno;
 		case 0:
-			_exit(do_replace_resources(fg, mnt, ct_ns_fds));
+			_exit(do_replace_resources(fg, source_mnt, src_dev,
+						   target_mnt, ct_ns_fds));
 	}
 
 	if (pid > 0)

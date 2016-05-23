@@ -15,6 +15,13 @@
 #include "swapfd.h"
 #include "processes.h"
 
+struct processes_collection_s {
+	struct list_head	*collection;
+	dev_t			src_dev;
+	const char		*source_mnt;
+	const char		*target_mnt;
+};
+
 char *ns_names[NS_MAX] = {
 	[NS_UTS] = "uts",
 	[NS_MNT] = "mnt",
@@ -167,17 +174,17 @@ static int attach_to_process(const struct process_info *p)
 	return 0;
 }
 
-static bool is_mnt_fd(int dir, const char *fd, dev_t device)
+static bool is_mnt_fd(int dir, const char *dentry, dev_t device)
 {
 	struct stat st;
 
-	if (fstatat(dir, fd, &st, 0)) {
+	if (fstatat(dir, dentry, &st, 0)) {
 		switch (errno) {
 			case ENOENT:
 			case ENOTDIR:
 				break;
 			default:
-				pr_perror("failed to stat fd %s", fd);
+				pr_perror("failed to stat dentry %s", dentry);
 		}
 		return false;
 	}
@@ -195,8 +202,8 @@ static int pid_is_kthread(pid_t pid)
 	return false;
 }
 
-int iterate_pids_list_name(const char *pids_list, void *data, const void *filter,
-			   int (*actor)(pid_t pid, void *data, const void *filter),
+int iterate_pids_list_name(const char *pids_list, void *data,
+			   int (*actor)(pid_t pid, void *data),
 			   const char *actor_name)
 {
 	char *list, *pid;
@@ -230,7 +237,7 @@ int iterate_pids_list_name(const char *pids_list, void *data, const void *filter
 			continue;
 		}
 
-		err = actor(p, data, filter);
+		err = actor(p, data);
 		if (err) {
 			pr_err("actor %s failed for pid %d\n", actor_name, p);
 			break;
@@ -356,30 +363,42 @@ static int create_file_obj(const char *path, unsigned flags, struct replace_fd *
 	return rfd->file_obj ? 0 : -EPERM;
 }
 
-static int get_target_path(const char *link, const char *mountpoint,
+static int get_target_path(const char *link,
+			   const char *source_mnt, const char *target_mnt,
 			   char *path, size_t size)
 {
-	ssize_t used, bytes;
+	char source_path[PATH_MAX], *sp = source_path;
+	ssize_t bytes;
 
-	/* Why mountpoint is added in front of the path?
-	 * Because spfs in unmounted already. And it means, that mount point
-	 * was removed from the beginning of the path fd points to.
-	 */
-	snprintf(path, PATH_MAX, "%s", mountpoint);
-	used = strlen(path);
-
-	bytes = readlink(link, path + used, size - used - 1);
+	bytes = readlink(link, source_path, PATH_MAX - 1);
 	if (bytes < 0) {
 		pr_perror("failed to read link %s\n", link);
 		return -errno;
 	}
-	path[used+bytes] = '\0';
+	source_path[bytes] = '\0';
+
+	if (source_mnt) {
+		size_t len = strlen(source_mnt);
+
+		if (strncmp(source_path, source_mnt, len)) {
+			pr_err("link %s doesn't start with source mnt %s\n",
+					source_path, source_mnt);
+			return -EINVAL;
+		}
+		sp += len;
+	}
+
+	bytes = snprintf(path, size, "%s/%s", target_mnt, sp);
+	if (bytes > size) {
+		pr_err("target path is too long (%ld > %ld)\n",	bytes, size);
+		return -ENOMEM;
+	}
 	pr_debug("%s --> %s\n", link, path);
 	return 0;
 }
 
 static int open_target_fd(struct replace_fd *rfd, unsigned flags,
-			  const char *mountpoint)
+			  const char *source_mnt, const char *target_mnt)
 {
 	char link[PATH_MAX];
 	char path[PATH_MAX];
@@ -388,7 +407,7 @@ static int open_target_fd(struct replace_fd *rfd, unsigned flags,
 
 	snprintf(link, PATH_MAX, "/proc/%d/fd/%d", rfd->pid, rfd->fd);
 
-	err = get_target_path(link, mountpoint, path, sizeof(path));
+	err = get_target_path(link, source_mnt, target_mnt, path, sizeof(path));
 	if (err)
 		return err;
 
@@ -405,7 +424,8 @@ static int open_target_fd(struct replace_fd *rfd, unsigned flags,
 	return create_file_obj(path, flags, rfd);
 }
 
-static int get_target_fd(pid_t pid, int fd, const char *mountpoint)
+static int get_target_fd(pid_t pid, int fd,
+			 const char *source_mnt, const char *target_mnt)
 {
 	int err;
 	struct replace_fd *rfd;
@@ -422,7 +442,7 @@ static int get_target_fd(pid_t pid, int fd, const char *mountpoint)
 	}
 
 	if (!rfd->file_obj) {
-		err = open_target_fd(rfd, flags, mountpoint);
+		err = open_target_fd(rfd, flags, source_mnt, target_mnt);
 		if (err) {
 			pr_err("failed to open file object for /proc/%d/fd/%d\n",
 					rfd->pid, rfd->fd);
@@ -493,9 +513,9 @@ static int collect_process_fd(struct process_info *p, int dir,
 			      const char *process_fd, const void *data)
 {
 	int err, source_fd, target_fd;
-	const struct mount_info_s *mnt = data;
+	const struct processes_collection_s *pc = data;
 
-	if (!is_mnt_fd(dir, process_fd, mnt->st.st_dev))
+	if (!is_mnt_fd(dir, process_fd, pc->src_dev))
 		return 0;
 
 	pr_debug("Collecting /proc/%d/fd/%s\n", p->pid, process_fd);
@@ -506,7 +526,8 @@ static int collect_process_fd(struct process_info *p, int dir,
 		return err;
 	}
 
-	target_fd = get_target_fd(p->pid, source_fd, mnt->mountpoint);
+	target_fd = get_target_fd(p->pid, source_fd,
+				  pc->source_mnt, pc->target_mnt);
 	if (target_fd < 0)
 		return target_fd;
 
@@ -532,9 +553,9 @@ static int collect_map_fd(struct process_info *p, int dir,
 	char path[PATH_MAX];
 	off_t start, end;
 	int map_fd, err;
-	const struct mount_info_s *mnt = data;
+	const struct processes_collection_s *pc = data;
 
-	if (!is_mnt_fd(dir, map_file, mnt->st.st_dev))
+	if (!is_mnt_fd(dir, map_file, pc->src_dev))
 		return 0;
 
 	snprintf(link, PATH_MAX, "/proc/%d/map_files/%s", p->pid, map_file);
@@ -545,7 +566,7 @@ static int collect_map_fd(struct process_info *p, int dir,
 	if (err)
 		return err;
 
-	err = get_target_path(link, mnt->mountpoint, path, sizeof(path));
+	err = get_target_path(link, pc->source_mnt, pc->target_mnt, path, sizeof(path));
 	if (err)
 		return err;
 
@@ -559,7 +580,8 @@ static int collect_map_fd(struct process_info *p, int dir,
 }
 
 static int iterate_dir_name(const char *dpath, struct process_info *p,
-		    int (*actor)(struct process_info *p, int dir, const char *fd, const void *data),
+		    int (*actor)(struct process_info *p, int dir,
+				 const char *fd, const void *data),
 		    const void *data,
 		    const char *actor_name)
 {
@@ -600,23 +622,26 @@ close_dir:
 	return err;
 }
 
-static int collect_process_open_fds(struct process_info *p, const struct mount_info_s *mnt)
+static int collect_process_open_fds(struct process_info *p,
+				    struct processes_collection_s *pc)
 {
 	char dpath[PATH_MAX];
 
 	snprintf(dpath, PATH_MAX, "/proc/%d/fd", p->pid);
-	return iterate_dir_name(dpath, p, collect_process_fd, mnt, "collect_process_fd");
+	return iterate_dir_name(dpath, p, collect_process_fd, pc, "collect_process_fd");
 }
 
-static int collect_process_map_fds(struct process_info *p, const struct mount_info_s *mnt)
+static int collect_process_map_fds(struct process_info *p,
+				   struct processes_collection_s *pc)
 {
 	char dpath[PATH_MAX];
 
 	snprintf(dpath, PATH_MAX, "/proc/%d/map_files", p->pid);
-	return iterate_dir_name(dpath, p, collect_map_fd, mnt, "collect_map_fd");
+	return iterate_dir_name(dpath, p, collect_map_fd, pc, "collect_map_fd");
 }
 
-static int collect_process_env(struct process_info *p, const struct mount_info_s *mnt)
+static int collect_process_env(struct process_info *p,
+			       struct processes_collection_s *pc)
 {
 	int dir, err, *env = p->env_array;
 	char path[PATH_MAX];
@@ -641,13 +666,13 @@ static int collect_process_env(struct process_info *p, const struct mount_info_s
 		char *dentry = *var++;
 		char link[PATH_MAX];
 
-		if (!is_mnt_fd(dir, dentry, mnt->st.st_dev))
+		if (!is_mnt_fd(dir, dentry, pc->src_dev))
 			continue;
 
 		pr_debug("Collecting /proc/%d/%s\n", p->pid, dentry);
 
 		snprintf(link, PATH_MAX, "/proc/%d/%s", p->pid, dentry);
-		err = get_target_path(link, mnt->mountpoint, path, sizeof(path));
+		err = get_target_path(link, pc->source_mnt, pc->target_mnt, path, sizeof(path));
 		if (err)
 			break;
 
@@ -664,12 +689,11 @@ static int collect_process_env(struct process_info *p, const struct mount_info_s
 	return err;
 }
 
-static int collect_one_process(pid_t pid, void *data, const void *filter)
+static int collect_one_process(pid_t pid, void *data)
 {
 	int err;
+	struct processes_collection_s *pc = data;
 	struct process_info *p;
-	struct list_head *collection = data;
-	const struct mount_info_s *mnt = filter;
 
 	p = malloc(sizeof(*p));
 	if (!p) {
@@ -686,15 +710,15 @@ static int collect_one_process(pid_t pid, void *data, const void *filter)
 	INIT_LIST_HEAD(&p->fds);
 	INIT_LIST_HEAD(&p->maps);
 
-	err = collect_process_env(p, mnt);
+	err = collect_process_env(p, pc);
 	if (err)
 		goto free_p;
 
-	err = collect_process_open_fds(p, mnt);
+	err = collect_process_open_fds(p, pc);
 	if (err)
 		goto free_p;
 
-	err = collect_process_map_fds(p, mnt);
+	err = collect_process_map_fds(p, pc);
 	if (err)
 		goto free_p;
 
@@ -704,7 +728,7 @@ static int collect_one_process(pid_t pid, void *data, const void *filter)
 	err = attach_to_process(p);
 	if (err)
 		goto free_p;
-	list_add_tail(&p->list, collection);
+	list_add_tail(&p->list, pc->collection);
 	pr_debug("collected process %d\n", pid);
 	return 0;
 
@@ -713,8 +737,35 @@ free_p:
 	return err;
 }
 
-int collect_processes(const char *pids, struct list_head *collection,
-		      const struct mount_info_s *mnt)
+static int collect_processes(const char *pids, struct list_head *collection,
+			     dev_t src_dev,
+			     const char *source_mnt, const char *target_mnt)
 {
-	return iterate_pids_list(pids, collection, mnt, collect_one_process);
+	struct processes_collection_s pc = {
+		.collection = collection,
+		.src_dev = src_dev,
+		.source_mnt = source_mnt,
+		.target_mnt = target_mnt,
+	};
+
+	return iterate_pids_list(pids, &pc, collect_one_process);
+}
+
+int collect_dev_processes(const char *pids, struct list_head *collection,
+			  dev_t src_dev, const char *target_mnt)
+{
+	return collect_processes(pids, collection, src_dev, NULL, target_mnt);
+}
+
+int collect_mnt_processes(const char *pids, struct list_head *collection,
+			  const char *source_mnt, const char *target_mnt)
+{
+	struct stat st;
+
+	if (stat(source_mnt, &st) < 0) {
+		pr_perror("failed to stat %s", source_mnt);
+		return -errno;
+	}
+
+	return collect_processes(pids, collection, st.st_dev, source_mnt, target_mnt);
 }
