@@ -9,85 +9,44 @@
 #include "spfs.h"
 #include "context.h"
 #include "freeze.h"
+#include "mount.h"
 
-static struct spfs_info_s *__find_spfs_by_id(struct shared_list *mounts, const char *id)
+static bool spfs_pid_match(const struct mount_info_s *mnt, const void *data)
 {
-	struct spfs_info_s *info;
+	pid_t pid = (pid_t)(unsigned long)data;
+	const struct spfs_info_s *info = container_of(mnt, const struct spfs_info_s, mnt);
 
-	list_for_each_entry(info, &mounts->list, list) {
-		if (!strcmp(info->id, id))
-			return info;
-	}
+	return info->pid == pid;
+}
 
+struct spfs_info_s *find_spfs_by_pid(struct shared_list *mounts, pid_t pid)
+{
+	struct mount_info_s *mnt;
+
+	mnt = iterate_mounts(mounts, (void *)(unsigned long)pid, spfs_pid_match);
+	if (mnt)
+		return container_of(mnt, struct spfs_info_s, mnt);
 	return NULL;
 }
 
 struct spfs_info_s *find_spfs_by_id(struct shared_list *mounts, const char *id)
 {
-	struct spfs_info_s *info = NULL;
+	struct mount_info_s *mnt;
 
-	if (lock_shared_list(mounts))
-		return NULL;
-
-	info = __find_spfs_by_id(mounts, id);
-
-	(void) unlock_shared_list(mounts);
-
-	return info;
-}
-
-struct spfs_info_s *__find_spfs_by_pid(struct shared_list *mounts, pid_t pid)
-{
-	struct spfs_info_s *info;
-
-	list_for_each_entry(info, &mounts->list, list) {
-		if (info->pid == pid)
-			return info;
-	}
-
+	mnt = find_mount_by_id(mounts, id);
+	if (mnt)
+		return container_of(mnt, struct spfs_info_s, mnt);
 	return NULL;
-}
-
-struct spfs_info_s *find_spfs_by_pid(struct shared_list *mounts, pid_t pid)
-{
-	struct spfs_info_s *info = NULL;
-
-	if (lock_shared_list(mounts))
-		return NULL;
-
-	info = __find_spfs_by_pid(mounts, pid);
-
-	(void) unlock_shared_list(mounts);
-
-	return info;
 }
 
 int add_spfs_info(struct shared_list *mounts, struct spfs_info_s *info)
 {
-	int err = 0;
-
-	if (lock_shared_list(mounts))
-		return -EINVAL;
-
-	if (__find_spfs_by_id(mounts, info->id)) {
-		pr_err("spfs info with id %s already exists\n", info->id);
-		err = -EEXIST;
-	} else {
-		pr_info("added info with id %s\n", info->id);
-		list_add_tail(&info->list, &mounts->list);
-	}
-
-	(void) unlock_shared_list(mounts);
-
-	return err;
+	return add_mount_info(mounts, &info->mnt);
 }
 
 void del_spfs_info(struct shared_list *mounts, struct spfs_info_s *info)
 {
-	if (!lock_shared_list(mounts)) {
-		list_del(&info->list);
-		(void) unlock_shared_list(mounts);
-	}
+	del_mount_info(mounts, &info->mnt);
 }
 
 int enter_spfs_context(const struct spfs_info_s *info)
@@ -131,7 +90,7 @@ static int __spfs_add_one_mountpath(struct spfs_info_s *info, char *path)
 	list_for_each_entry(bm, &info->mountpaths.list, list) {
 		if (!strcmp(bm->path, path)) {
 			pr_warn("spfs %s already has bind mount with path %s\n",
-					info->id, path);
+					info->mnt.id, path);
 			return -EEXIST;
 		}
 	}
@@ -147,7 +106,7 @@ static int __spfs_add_one_mountpath(struct spfs_info_s *info, char *path)
 		return -ENOMEM;
 	}
 	list_add_tail(&bm->list, &info->mountpaths.list);
-	pr_debug("added mount path %s to spfs info %s\n", bm->path, info->id);
+	pr_debug("added mount path %s to spfs info %s\n", bm->path, info->mnt.id);
 	return 0;
 }
 
@@ -164,7 +123,7 @@ int spfs_add_mount_paths(struct spfs_info_s *info, const char *bind_mounts)
 
 	err = lock_shared_list(&info->mountpaths);
 	if (err) {
-		pr_err("failed to lock info %s bind mounts list\n", info->id);
+		pr_err("failed to lock info %s bind mounts list\n", info->mnt.id);
 		goto free_bm_array;
 	}
 
@@ -174,7 +133,7 @@ int spfs_add_mount_paths(struct spfs_info_s *info, const char *bind_mounts)
 		err = __spfs_add_one_mountpath(info, bm);
 		if (err && (err != -EEXIST)) {
 			pr_err("failed to add bind-mount %s to info %s\n",
-					bm, info->id);
+					bm, info->mnt.id);
 			break;
 		}
 		err = 0;
@@ -194,7 +153,7 @@ int spfs_send_mode(const struct spfs_info_s *info,
 	struct external_cmd *package;
 	int err;
 
-	pr_debug("changing spfs %s mode to %d (path: %s)\n", info->id, mode,
+	pr_debug("changing spfs %s mode to %d (path: %s)\n", info->mnt.id, mode,
 			proxy_dir ? : "none");
 
 	psize = mode_packet_size(proxy_dir);
@@ -209,10 +168,10 @@ int spfs_send_mode(const struct spfs_info_s *info,
 	err = seqpacket_sock_send(info->sock, package, psize);
 	if (err)
 		pr_err("failed to switch spfs %s to proxy mode to %s: %d\n",
-				info->id, proxy_dir, err);
+				info->mnt.id, proxy_dir, err);
 	else
 		pr_debug("spfs %s mode was changed to %d (path: %s)\n",
-				info->id, mode, proxy_dir);
+				info->mnt.id, mode, proxy_dir);
 
 	free(package);
 	return err;
@@ -225,7 +184,7 @@ int spfs_freeze_and_lock(struct spfs_info_s *info)
 
 	if (fg) {
 		pr_debug("Freeze %s and lock in favor of spfs %s\n",
-				fg->path, info->id);
+				fg->path, info->mnt.id);
 		err = lock_cgroup(fg);
 		if (!err) {
 			err = freeze_cgroup(fg);
@@ -241,7 +200,7 @@ int spfs_thaw(struct spfs_info_s *info)
 	struct freeze_cgroup_s *fg = info->fg;
 
 	if (fg) {
-		pr_debug("Thaw %s in favor of spfs %s\n", fg->path, info->id);
+		pr_debug("Thaw %s in favor of spfs %s\n", fg->path, info->mnt.id);
 		return thaw_cgroup(fg);
 	}
 	return 0;
@@ -252,7 +211,7 @@ int spfs_unlock(struct spfs_info_s *info)
 	struct freeze_cgroup_s *fg = info->fg;
 
 	if (fg) {
-		pr_debug("Unlock %s in favor of spfs %s\n", fg->path, info->id);
+		pr_debug("Unlock %s in favor of spfs %s\n", fg->path, info->mnt.id);
 		return unlock_cgroup(fg);
 	}
 	return 0;
@@ -265,7 +224,7 @@ int spfs_thaw_and_unlock(struct spfs_info_s *info)
 
 	if (fg) {
 		pr_debug("Thaw %s and unlock in favor of spfs %s\n",
-				fg->path, info->id);
+				fg->path, info->mnt.id);
 		err = thaw_cgroup(fg);
 		if (!err)
 			(void) unlock_cgroup(fg);

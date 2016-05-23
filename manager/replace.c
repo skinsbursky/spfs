@@ -46,7 +46,7 @@
 										\
 	if (_pid > 0) {								\
 		pr_debug("Created child %d in spfs %s context\n",		\
-				_pid, info->id);				\
+				_pid, info->mnt.id);				\
 		_err = collect_child(_pid, &_status, 0);			\
 	}									\
 	_err ? _err : _status;							\
@@ -220,22 +220,23 @@ static int do_replace_mounts(struct spfs_info_s *info, const char *source)
 {
 	int err;
 	struct spfs_bindmount *bm;
+	struct mount_info_s *mnt = &info->mnt;
 	int spfs_ref;
 
-	if (stat(info->mountpoint, &info->spfs_stat)) {
-		pr_perror("failed to stat %s", info->mountpoint);
+	if (stat(mnt->mountpoint, &mnt->st)) {
+		pr_perror("failed to stat %s", mnt->mountpoint);
 		return -errno;
 	}
 
-	spfs_ref = open(info->mountpoint, O_RDONLY | O_DIRECTORY);
+	spfs_ref = open(mnt->mountpoint, O_RDONLY | O_DIRECTORY);
 	if (spfs_ref < 0) {
-		pr_perror("failed to open %s", info->mountpoint);
+		pr_perror("failed to open %s", mnt->mountpoint);
 		return spfs_ref;
 	}
 
 	err = lock_shared_list(&info->mountpaths);
 	if (err) {
-		pr_err("failed to lock info %s mount paths list\n", info->id);
+		pr_err("failed to lock info %s mount paths list\n", mnt->id);
 		goto close_spfs_ref;
 	}
 
@@ -247,7 +248,7 @@ static int do_replace_mounts(struct spfs_info_s *info, const char *source)
 		}
 	}
 
-	err = spfs_send_mode(info, SPFS_PROXY_MODE, info->mountpoint);
+	err = spfs_send_mode(info, SPFS_PROXY_MODE, mnt->mountpoint);
 
 unlock_shared_list:
 	(void) unlock_shared_list(&info->mountpaths);

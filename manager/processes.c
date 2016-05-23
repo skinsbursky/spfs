@@ -181,7 +181,7 @@ static bool is_spfs_fd(int dir, const char *fd, struct spfs_info_s *info)
 		}
 		return false;
 	}
-	if (st.st_dev != info->spfs_stat.st_dev)
+	if (st.st_dev != info->mnt.st.st_dev)
 		return false;
 
 	return true;
@@ -515,7 +515,7 @@ static int collect_process_fd(struct process_info *p, int dir, const char *proce
 		return err;
 	}
 
-	real_fd = get_real_fd(p->pid, spfs_fd, info->mountpoint);
+	real_fd = get_real_fd(p->pid, spfs_fd, info->mnt.mountpoint);
 	if (real_fd < 0)
 		return real_fd;
 
@@ -553,7 +553,7 @@ static int collect_map_fd(struct process_info *p, int dir, const char *map_file)
 	if (err)
 		return err;
 
-	err = get_link_path(link, info->mountpoint, path, sizeof(path));
+	err = get_link_path(link, info->mnt.mountpoint, path, sizeof(path));
 	if (err)
 		return err;
 
@@ -655,7 +655,7 @@ static int collect_process_env(struct process_info *p)
 		pr_debug("Collecting /proc/%d/%s\n", p->pid, dentry);
 
 		snprintf(link, PATH_MAX, "/proc/%d/%s", p->pid, dentry);
-		err = get_link_path(link, info->mountpoint, path, sizeof(path));
+		err = get_link_path(link, info->mnt.mountpoint, path, sizeof(path));
 		if (err)
 			break;
 

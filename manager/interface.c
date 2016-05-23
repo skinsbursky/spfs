@@ -150,7 +150,7 @@ static int mount_spfs(struct spfs_manager_context_s *ctx,
 		goto close_pipe;
 	}
 
-	mountpoint = xsprintf("%s%s", info->root, info->mountpoint);
+	mountpoint = xsprintf("%s%s", info->root, info->mnt.mountpoint);
 	if (!mountpoint)
 		goto free_cwd;
 
@@ -158,7 +158,7 @@ static int mount_spfs(struct spfs_manager_context_s *ctx,
 	if (!socket_path)
 		goto free_mountpoint;
 
-	log_path = xsprintf("%s/spfs-%s.log", cwd, info->id);
+	log_path = xsprintf("%s/spfs-%s.log", cwd, info->mnt.id);
 	if (!log_path)
 		goto free_socket_path;
 
@@ -228,13 +228,13 @@ repeat:
 
 	info->sock = seqpacket_sock(info->socket_path, true, false, NULL);
 	if (info->sock < 0) {
-		pr_err("failed to connect to spfs with id %s\n", info->id);
+		pr_err("failed to connect to spfs with id %s\n", info->mnt.id);
 		goto umount_spfs;
 	}
 
 	status = 0;
 	pr_info("%s: spfs on %s with pid %d started successfully\n", __func__,
-			info->mountpoint, pid);
+			info->mnt.mountpoint, pid);
 
 	info->pid = pid;
 
@@ -258,7 +258,7 @@ close_pipe:
 kill_spfs:
 	kill_child_and_collect(pid);
 umount_spfs:
-	umount(info->mountpoint);
+	umount(info->mnt.mountpoint);
 cleanup_env:
 	cleanup_mount_env(info);
 	goto free_proxy_dir;
@@ -324,11 +324,9 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 		return -ENOMEM;
 	}
 
-	info->id = shm_xsprintf(opt_array[0].value);
-	if (!info->id) {
-		pr_perror("failed to allocate string\n");
-		return -ENOMEM;
-	}
+	err = init_mount_info(&info->mnt, opt_array[0].value, opt_array[6].value);
+	if (err)
+		return err;
 
 	if (opt_array[1].value) {
 		err = xatol(opt_array[1].value, &info->ns_pid);
@@ -364,25 +362,19 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 		info->root[0] = '\0';
 	}
 
-	info->mountpoint = shm_xsprintf(opt_array[6].value);
-	if (!info->mountpoint) {
-		pr_perror("failed to allocate string\n");
-		return -ENOMEM;
-	}
-
 	/*
 	 * SPFS work dir is placed to the root mount.
 	 * Would be nice to have it somewhere in /run/..., but in case of CRIU,
 	 * /run can not be mounted yet. Thus, our directory can be overmounted
 	 * after creation.
 	 */
-	info->work_dir = shm_xsprintf("/.spfs-%s", info->id);
+	info->work_dir = shm_xsprintf("/.spfs-%s", info->mnt.id);
 	if (!info->work_dir) {
 		pr_perror("failed to allocate string\n");
 		return -ENOMEM;
 	}
 
-	info->socket_path = shm_xsprintf("spfs-%s.sock", info->id);
+	info->socket_path = shm_xsprintf("spfs-%s.sock", info->mnt.id);
 	if (!info->socket_path) {
 		pr_perror("failed to allocate string\n");
 		return -ENOMEM;
@@ -392,13 +384,13 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 	if (err)
 		return err;
 
-	err = spfs_add_mount_paths(info, info->mountpoint);
+	err = spfs_add_mount_paths(info, info->mnt.mountpoint);
 	if (err)
 		return err;
 
 	info->ovz_id = ctx->ovz_id;
 
-	INIT_LIST_HEAD(&info->list);
+	INIT_LIST_HEAD(&info->mnt.list);
 	INIT_LIST_HEAD(&info->processes);
 
 	/* TODO: should we add mounpoint _after_ mount? */
@@ -422,6 +414,7 @@ static int change_spfs_mode(struct spfs_manager_context_s *ctx,
 			    spfs_mode_t mode, const char *proxy_dir)
 {
 	int err;
+	struct mount_info_s *mnt;
 
 	if (info)
 		return spfs_send_mode(info, mode, proxy_dir);
@@ -430,7 +423,9 @@ static int change_spfs_mode(struct spfs_manager_context_s *ctx,
 	if (err)
 		return err;
 
-	list_for_each_entry(info, &ctx->spfs_mounts->list, list) {
+	list_for_each_entry(mnt, &ctx->spfs_mounts->list, list) {
+		info = container_of(mnt, const struct spfs_info_s, mnt);
+
 		err = spfs_send_mode(info, mode, proxy_dir);
 		if (err)
 			break;
@@ -575,13 +570,13 @@ static int process_replace_cmd(int sock, struct spfs_manager_context_s *ctx,
 
 		if (info->fg) {
 			pr_err("failed to set freezer cgroup %s for info %s\n",
-					opt_array[4].value, info->id);
+					opt_array[4].value, info->mnt.id);
 			err = -EEXIST;
 		} else {
 			err = set_freeze_cgroup(ctx, info, opt_array[4].value);
 			if (err)
 				pr_err("failed to set freezer cgroup %s for info %s\n",
-						opt_array[4].value, info->id);
+						opt_array[4].value, info->mnt.id);
 		}
 
 		(void) unlock_shared_list(ctx->spfs_mounts);
