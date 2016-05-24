@@ -414,7 +414,7 @@ static int get_target_path(const char *link,
 		sp += len;
 	}
 
-	bytes = snprintf(path, size, "%s/%s", target_mnt, sp);
+	bytes = snprintf(path, size, "%s%s", target_mnt, sp);
 	if (bytes > size) {
 		pr_err("target path is too long (%ld > %ld)\n",	bytes, size);
 		return -ENOMEM;
@@ -572,6 +572,59 @@ static int get_map_range(const char *map_file, off_t *start, off_t *end)
 	return 0;
 }
 
+static int get_map_mode(pid_t pid, const char *map_file, mode_t *mode)
+{
+	char str[PATH_MAX];
+	FILE *fmap;
+	int err = -ENOENT;
+	unsigned long map_start;
+
+	if (sscanf(map_file, "%lx-%*x", &map_start) != 1) {
+		pr_err("failed to parse %s\n", str);
+		return -EINVAL;
+	}
+
+	snprintf(str, PATH_MAX, "/proc/%d/maps", pid);
+
+	fmap = fopen(str, "r");
+	if (!fmap) {
+		pr_perror("failed to open %s", str);
+		return -errno;
+	}
+
+	while (fgets(str, sizeof(str), fmap)) {
+		unsigned long start;
+		char r, w, p;
+		int ret;
+
+		ret = sscanf(str, "%lx-%*x %c%c%*c%c", &start, &r, &w, &p);
+		if (ret != 4) {
+			pr_err("failed to parse '%s': %d\n", str, ret);
+			err = -EINVAL;
+			goto close_fmap;
+		}
+
+		if (map_start != start)
+			continue;
+
+		if ((w == 'w') && (p == 's')) {
+			if (r == 'r')
+				*mode = O_RDWR;
+			else
+				*mode = O_WRONLY;
+		} else
+			*mode = O_RDONLY;
+
+		err = 0;
+		break;
+	}
+	if (err)
+		pr_err("failed to find map %s in /proc/%d/maps\n", map_file, pid);
+close_fmap:
+	fclose(fmap);
+	return err;
+}
+
 static int collect_map_fd(struct process_info *p, int dir,
 			  const char *map_file, const void *data)
 {
@@ -580,6 +633,7 @@ static int collect_map_fd(struct process_info *p, int dir,
 	off_t start, end;
 	int map_fd, err;
 	const struct processes_collection_s *pc = data;
+	mode_t mode = O_RDONLY;
 
 	if (!is_mnt_file(dir, map_file, pc->source_mnt, pc->src_dev))
 		return 0;
@@ -596,7 +650,11 @@ static int collect_map_fd(struct process_info *p, int dir,
 	if (err)
 		return err;
 
-	map_fd = open(path, O_RDWR);
+	err = get_map_mode(p->pid, map_file, &mode);
+	if (err)
+		return err;
+
+	map_fd = open(path, mode);
 	if (map_fd < 0) {
 		pr_perror("failed to open %s", path);
 		return -errno;
@@ -662,6 +720,7 @@ static int collect_process_map_fds(struct process_info *p,
 {
 	char dpath[PATH_MAX];
 
+	/* TODO rework to use /proc/pid/maps instead. */
 	snprintf(dpath, PATH_MAX, "/proc/%d/map_files", p->pid);
 	return iterate_dir_name(dpath, p, collect_map_fd, pc, "collect_map_fd");
 }
