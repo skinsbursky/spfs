@@ -90,7 +90,7 @@ free_pids:
 	return err;
 }
 
-int replace_resources(struct freeze_cgroup_s *fg,
+int __replace_resources(struct freeze_cgroup_s *fg,
 		      const char *source_mnt, dev_t src_dev,
 		      const char *target_mnt,
 		      pid_t ns_pid)
@@ -133,4 +133,30 @@ int replace_resources(struct freeze_cgroup_s *fg,
 close_namespaces:
 	close_namespaces(ns_fds);
 	return err ? err : status;
+}
+
+int replace_resources(struct freeze_cgroup_s *fg,
+		      const char *source_mnt, dev_t src_dev,
+		      const char *target_mnt,
+		      pid_t ns_pid)
+{
+	int res, err;
+
+	res = lock_cgroup(fg);
+	if (!res) {
+		res = freeze_cgroup(fg);
+		if (res)
+			(void) unlock_cgroup(fg);
+	}
+	if (res)
+		return res;
+
+	err = __replace_resources(fg, source_mnt, src_dev, target_mnt, ns_pid);
+
+	res = thaw_cgroup(fg);
+	if (!res)
+		(void) unlock_cgroup(fg);
+
+	return err ? err : res;
+
 }
