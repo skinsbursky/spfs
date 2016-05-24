@@ -180,9 +180,29 @@ static int attach_to_process(const struct process_info *p)
 	return 0;
 }
 
-static bool is_mnt_fd(int dir, const char *dentry, dev_t device)
+static bool is_mnt_file(int dir, const char *dentry, const char *source_mnt, dev_t device)
 {
 	struct stat st;
+	char link[PATH_MAX];
+	ssize_t bytes;
+
+	/* First check, that link points to the desired mount (if any).
+	 * This is required to be able to switch between 2 different mounts
+	 * with the same superblock.
+	 */
+	if (source_mnt) {
+		bytes = readlinkat(dir, dentry, link, PATH_MAX - 1);
+		if (bytes < 0) {
+			pr_perror("failed to read link %s\n", dentry);
+			return -errno;
+		}
+
+		if (strncmp(link, source_mnt, strlen(source_mnt)))
+			return false;
+
+		if (link[strlen(source_mnt)] != '/')
+			return false;
+	}
 
 	if (fstatat(dir, dentry, &st, 0)) {
 		switch (errno) {
@@ -521,7 +541,7 @@ static int collect_process_fd(struct process_info *p, int dir,
 	int err, source_fd, target_fd;
 	const struct processes_collection_s *pc = data;
 
-	if (!is_mnt_fd(dir, process_fd, pc->src_dev))
+	if (!is_mnt_file(dir, process_fd, pc->source_mnt, pc->src_dev))
 		return 0;
 
 	pr_debug("Collecting /proc/%d/fd/%s\n", p->pid, process_fd);
@@ -561,7 +581,7 @@ static int collect_map_fd(struct process_info *p, int dir,
 	int map_fd, err;
 	const struct processes_collection_s *pc = data;
 
-	if (!is_mnt_fd(dir, map_file, pc->src_dev))
+	if (!is_mnt_file(dir, map_file, pc->source_mnt, pc->src_dev))
 		return 0;
 
 	snprintf(link, PATH_MAX, "/proc/%d/map_files/%s", p->pid, map_file);
@@ -672,7 +692,7 @@ static int collect_process_env(struct process_info *p,
 		char *dentry = *var++;
 		char link[PATH_MAX];
 
-		if (!is_mnt_fd(dir, dentry, pc->src_dev))
+		if (!is_mnt_file(dir, dentry, pc->source_mnt, pc->src_dev))
 			continue;
 
 		pr_debug("Collecting /proc/%d/%s\n", p->pid, dentry);
