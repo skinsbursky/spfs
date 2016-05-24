@@ -146,9 +146,10 @@ int thaw_cgroup(const struct freeze_cgroup_s *fg)
 	int err;
 
 	err = freezer_set_state(fg->path, "THAWED");
-	if (err)
+	if (err) {
+		freezer_set_state(fg->path, "FROZEN");
 		pr_err("failed to thaw cgroup %s\n", fg->path);
-	else
+	} else
 		pr_debug("cgroup %s was thawed\n", fg->path);
 	return err;
 }
@@ -158,9 +159,10 @@ int freeze_cgroup(const struct freeze_cgroup_s *fg)
 	int err;
 
 	err = freezer_set_state(fg->path, "FROZEN");
-	if (err)
+	if (err) {
+		freezer_set_state(fg->path, "THAWED");
 		pr_err("failed to freeze cgroup %s\n", fg->path);
-	else
+	} else
 		pr_debug("cgroup %s was frozen\n", fg->path);
 	return err;
 }
