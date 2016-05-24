@@ -146,9 +146,9 @@ static int __spfs_add_one_mountpath(struct spfs_info_s *info, char *path)
 int spfs_add_mount_paths(struct spfs_info_s *info, const char *bind_mounts)
 {
 	int err;
-	char *bm_array, *bm;
+	char *bm_array, *ba, *bm;
 
-	bm_array = strdup(bind_mounts);
+	bm_array = ba = strdup(bind_mounts);
 	if (!bm_array) {
 		pr_err("failed to allocate\n");
 		return -ENOMEM;
@@ -160,7 +160,7 @@ int spfs_add_mount_paths(struct spfs_info_s *info, const char *bind_mounts)
 		goto free_bm_array;
 	}
 
-        while ((bm = strsep(&bm_array, ",")) != NULL) {
+        while ((bm = strsep(&ba, ",")) != NULL) {
 		if (!strlen(bm))
 			continue;
 		err = __spfs_add_one_mountpath(info, bm);

@@ -212,7 +212,7 @@ int iterate_pids_list_name(const char *pids_list, void *data,
 			   int (*actor)(pid_t pid, void *data),
 			   const char *actor_name)
 {
-	char *list, *pid;
+	char *list, *l, *pid;
 	int err = 0;
 
 	if (!pids_list) {
@@ -220,13 +220,13 @@ int iterate_pids_list_name(const char *pids_list, void *data,
 		return -EINVAL;
 	}
 
-	list = strdup(pids_list);
+	list = l = strdup(pids_list);
 	if (!list) {
 		pr_err("failed to allocate\n");
 		return -ENOMEM;
 	}
 
-	while ((pid = strsep(&list, "\n")) != NULL) {
+	while ((pid = strsep(&l, "\n")) != NULL) {
 		long p;
 
 		if (!strlen(pid))

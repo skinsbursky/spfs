@@ -80,18 +80,18 @@ free_path:
 
 int join_namespaces(int pid, const char *namespaces)
 {
-	char *ns, *ns_list;
+	char *ns, *ns_list, *nl;
 	int err = 0;
 
 	pr_debug("Join process %d namespaces: %s\n", pid, namespaces);
 
-	ns_list = strdup(namespaces);
+	ns_list = nl = strdup(namespaces);
 	if (!ns_list) {
 		pr_err("failed to duplicate namespaces\n");
 		return -ENOMEM;
 	}
 
-	while ((ns = strsep(&ns_list, ",")) != NULL) {
+	while ((ns = strsep(&nl, ",")) != NULL) {
 		err = join_one_namespace(pid, ns);
 		if (err)
 			goto free_ns_list;
