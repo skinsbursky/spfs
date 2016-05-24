@@ -583,6 +583,8 @@ static int process_switch_cmd(int sock, struct spfs_manager_context_s *ctx,
 	int err;
 	struct freeze_cgroup_s *fg;
 	long ns_pid = 0, src_dev = 0;
+	char *source_mnt, *target_mnt;
+	char *freeze_cgroup, *device, *ns_process_id;
 
 	err = parse_cmd_options(opt_array, options);
 	if (err) {
@@ -590,46 +592,71 @@ static int process_switch_cmd(int sock, struct spfs_manager_context_s *ctx,
 		return -EINVAL;
 	}
 
-	if (opt_array[1].value == NULL) {
+	source_mnt = opt_array[0].value;
+	target_mnt = opt_array[1].value;
+	freeze_cgroup = opt_array[2].value;
+	device = opt_array[3].value;
+	ns_process_id = opt_array[4].value;
+
+	if (target_mnt == NULL) {
 		pr_err("target mountpoint wasn't provided\n");
 		return -EINVAL;
 	}
 
-	if (opt_array[2].value == NULL) {
+	if (freeze_cgroup == NULL) {
 		pr_err("freezer cgroup wasn't provided\n");
 		return -EINVAL;
 	}
 
-	if ((opt_array[0].value && opt_array[4].value) ||
-	    (!opt_array[0].value && !opt_array[4].value)) {
+	if ((source_mnt && device) ||
+	    (!source_mnt && !device)) {
 		pr_err("either source mountpoint or source device must be specified\n");
 		return -EINVAL;
 	}
 
-	if (opt_array[3].value) {
-		err = xatol(opt_array[3].value, &src_dev);
+	if (device) {
+		err = xatol(device, &src_dev);
 		if (err) {
-			pr_err("failed to convert device id: %s\n", opt_array[3].value);
+			pr_err("failed to convert device id: %s\n", device);
 			return err;
 		}
 	}
 
-	if (opt_array[4].value) {
-		err = xatol(opt_array[4].value, &ns_pid);
+	if (ns_process_id) {
+		err = xatol(ns_process_id, &ns_pid);
 		if (err) {
-			pr_err("failed to convert pid: %s\n", opt_array[4].value);
+			pr_err("failed to convert pid: %s\n", ns_process_id);
 			return err;
 		}
 	}
 
-	fg = get_freeze_cgroup(ctx->freeze_cgroups, opt_array[2].value);
+	fg = get_freeze_cgroup(ctx->freeze_cgroups, freeze_cgroup);
 	if (!fg) {
-		pr_err("failed to get freezer cgroup %s\n", opt_array[2].value);
+		pr_err("failed to get freezer cgroup %s\n", freeze_cgroup);
 		return -EINVAL;
 	}
 
-	return replace_resources(fg, opt_array[0].value, src_dev,
-				 opt_array[1].value, ns_pid);
+	target_mnt = canonicalize_file_name(target_mnt);
+	if (!target_mnt) {
+		pr_perror("failed to get %s canonical view", opt_array[1].value);
+		return -errno;
+	}
+
+	if (source_mnt) {
+		source_mnt = canonicalize_file_name(source_mnt);
+		if (!source_mnt) {
+			pr_perror("failed to get %s canonical view", opt_array[0].value);
+			err = -errno;
+			goto free_target_mnt;
+		}
+	}
+
+	err = replace_resources(fg, source_mnt, src_dev, target_mnt, ns_pid);
+
+	free(source_mnt);
+free_target_mnt:
+	free(target_mnt);
+	return err;
 }
 
 const struct spfs_manager_cmd_handler_s handlers[] = {
