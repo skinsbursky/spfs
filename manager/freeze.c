@@ -104,21 +104,41 @@ static int freezer_open_state(const char *freezer_cgroup)
 	return fd;
 }
 
-static int freezer_set_state(const char *freezer_cgroup, const char state[])
+static int freezer_set_state(const char *freezer_cgroup, const char *state)
 {
-	int fd;
+	int fd, err, tries = 5;
 
 	fd = freezer_open_state(freezer_cgroup);
 	if (fd < 0)
 		return fd;
 
-	if (write(fd, state, sizeof(state)) != sizeof(state)) {
+	if (write(fd, state, strlen(state)) != strlen(state)) {
 		pr_perror("Unable to set %s state to %s", freezer_cgroup, state);
-		close(fd);
-		return -1;
+		err = -errno;
+		goto close_fd;
 	}
+
+	/* We should wait while state is updated in reality */
+	while (tries--) {
+		char cstate[16];
+		ssize_t bytes;
+
+		bytes = read(fd, cstate, sizeof(cstate));
+		if (bytes < 0) {
+			pr_perror("failed to read %s state", freezer_cgroup);
+			err = -errno;
+			goto close_fd;
+		}
+		if (!strcmp(state, cstate))
+			break;
+		usleep(100 * 1000);
+	}
+	err = 0;
+	if (tries < 0)
+		err = -EPERM;
+close_fd:
 	close(fd);
-	return 0;
+	return err;
 }
 
 int thaw_cgroup(const struct freeze_cgroup_s *fg)
