@@ -106,7 +106,7 @@ static int freezer_open_state(const char *freezer_cgroup)
 
 static int freezer_set_state(const char *freezer_cgroup, const char *state)
 {
-	int fd, err, tries = 5;
+	int fd, err, tries = 10;
 
 	fd = freezer_open_state(freezer_cgroup);
 	if (fd < 0)
@@ -118,10 +118,16 @@ static int freezer_set_state(const char *freezer_cgroup, const char *state)
 		goto close_fd;
 	}
 
+	close(fd);
+
 	/* We should wait while state is updated in reality */
 	while (tries--) {
 		char cstate[16];
 		ssize_t bytes;
+
+		fd = freezer_open_state(freezer_cgroup);
+		if (fd < 0)
+			return fd;
 
 		bytes = read(fd, cstate, sizeof(cstate));
 		if (bytes < 0) {
@@ -130,8 +136,11 @@ static int freezer_set_state(const char *freezer_cgroup, const char *state)
 			goto close_fd;
 		}
 		cstate[bytes-1] = '\0';
+
 		if (!strcmp(state, cstate))
 			break;
+
+		close(fd);
 		usleep(100 * 1000);
 	}
 	err = 0;
