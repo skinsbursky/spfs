@@ -129,6 +129,7 @@ static int freezer_set_state(const char *freezer_cgroup, const char *state)
 			err = -errno;
 			goto close_fd;
 		}
+		cstate[bytes-1] = '\0';
 		if (!strcmp(state, cstate))
 			break;
 		usleep(100 * 1000);
