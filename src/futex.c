@@ -29,5 +29,8 @@ int futex_wait(int *addr, int val, const struct timespec *timeout)
 
 int futex_wake(int *addr)
 {
-	return futex_op(addr, FUTEX_WAKE, INT_MAX, NULL, NULL, 0);
+	int err;
+
+	err = futex_op(addr, FUTEX_WAKE, INT_MAX, NULL, NULL, 0);
+	return err < 0 ? err : 0;
 }
