@@ -21,11 +21,14 @@ bin_spfs_SOURCES =		spfs/main.c			\
 				src/util.c			\
 				src/log.c			\
 				src/socket.c			\
+				src/futex.c			\
 								\
 				include/log.h			\
 				include/socket.h		\
 				include/list.h			\
-				include/util.h
+				include/util.h			\
+				include/futex.h
+
 
 bin_spfs_client_SOURCES =	client/main.c			\
 								\

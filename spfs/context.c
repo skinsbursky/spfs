@@ -5,14 +5,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
-#include <linux/futex.h>
-#include <syscall.h>
 
 #include "include/util.h"
-#include "context.h"
 #include "include/log.h"
 #include "include/socket.h"
+#include "include/futex.h"
+
 #include "interface.h"
+#include "context.h"
 
 #define UNIX_SEQPACKET
 
@@ -65,8 +65,7 @@ int wait_mode_change(int current_mode)
 {
 	int err;
 
-	err = syscall(SYS_futex, &get_context()->wm->mode, FUTEX_WAIT,
-		      current_mode, NULL, NULL, 0);
+	err = futex_wait(&get_context()->wm->mode, current_mode, NULL);
 	if (err)
 		return err;
 	return -ERESTARTSYS;
@@ -74,7 +73,7 @@ int wait_mode_change(int current_mode)
 
 static int wake_mode_waiters(struct work_mode_s *wm)
 {
-	return syscall(SYS_futex, &wm->mode, FUTEX_WAKE, INT_MAX, NULL, NULL, 0);
+	return futex_wake(&wm->mode);
 }
 
 static int create_work_mode(spfs_mode_t mode, const char *path, struct work_mode_s **wm)
