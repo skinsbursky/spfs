@@ -225,7 +225,7 @@ static int spfs_freeze_and_lock(struct spfs_info_s *info)
 				(void) unlock_cgroup(fg);
 		}
 	}
-	return 0;
+	return err;
 }
 
 static int spfs_thaw_and_unlock(struct spfs_info_s *info)
