@@ -18,6 +18,12 @@ struct spfs_bindmount {
 	char			*path;
 };
 
+typedef enum {
+	SPFS_REPLACE_MODE_HOLD,
+	SPFS_REPLACE_MODE_RELEASE,
+	SPFS_REPLACE_MODE_MAX
+} spfs_replace_mode_t;
+
 struct spfs_info_s {
 	struct mount_info_s	mnt;
 	long			ns_pid;
@@ -34,6 +40,7 @@ struct spfs_info_s {
 	struct shared_list	mountpaths;
 	struct list_head	processes;
 	const char		*ovz_id;
+	spfs_replace_mode_t	mode __attribute__((aligned(sizeof(int))));
 };
 
 int create_spfs_info(const char *id, const char *mountpoint,
@@ -56,5 +63,7 @@ int replace_spfs(int sock, struct spfs_info_s *info,
 
 int spfs_prepare_env(struct spfs_info_s *info, const char *proxy_dir);
 int spfs_cleanup_env(struct spfs_info_s *info);
+
+int spfs_apply_replace_mode(struct spfs_info_s *info, spfs_replace_mode_t mode);
 
 #endif

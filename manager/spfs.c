@@ -7,6 +7,7 @@
 #include "include/log.h"
 #include "include/util.h"
 #include "include/socket.h"
+#include "include/futex.h"
 
 #include "spfs.h"
 #include "context.h"
@@ -88,6 +89,8 @@ int create_spfs_info(const char *id, const char *mountpoint,
 
 	INIT_LIST_HEAD(&info->mnt.list);
 	INIT_LIST_HEAD(&info->processes);
+
+	info->mode = SPFS_REPLACE_MODE_HOLD;
 
 	*i = info;
 
@@ -576,6 +579,17 @@ int replace_spfs(int sock, struct spfs_info_s *info,
 
 	(void) send_status(sock, 0);
 
+	if (info->mode == SPFS_REPLACE_MODE_HOLD) {
+		pr_info("waiting while spfs %s replace is on hold...\n",
+				info->mnt.id);
+		err = futex_wait((int *)&info->mode, SPFS_REPLACE_MODE_HOLD, NULL);
+		if (err) {
+			pr_err("failed to wait replace is released\n");
+			return err;
+		}
+		pr_info("spfs %s replace was released\n", info->mnt.id);
+	}
+
 	mnt = xsprintf("%s/%s", info->work_dir, fstype);
 	if (!mnt) {
 		pr_err("failed to allocate\n");
@@ -595,5 +609,19 @@ int replace_spfs(int sock, struct spfs_info_s *info,
 
 free_mnt:
 	free(mnt);
+	return err;
+}
+
+int spfs_apply_replace_mode(struct spfs_info_s *info, spfs_replace_mode_t mode)
+{
+	int err = 0;
+
+	if (info->mode != mode) {
+		info->mode = mode;
+		err = futex_wake((int *)&info->mode);
+		if (err)
+			pr_err("failed to wake info %s replace waiters\n",
+					info->mnt.id);
+	}
 	return err;
 }

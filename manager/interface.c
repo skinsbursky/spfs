@@ -426,6 +426,39 @@ static int process_mode_cmd(int sock, struct spfs_manager_context_s *ctx,
 	return change_spfs_mode(ctx, info, mode, opt_array[2].value);
 }
 
+static int process_replace_mode_all(int sock, struct spfs_manager_context_s *ctx,
+				    unsigned mode)
+{
+	int err;
+	struct mount_info_s *mnt;
+	struct spfs_info_s *info;
+
+	err = lock_shared_list(ctx->spfs_mounts);
+	if (err)
+		return err;
+
+	list_for_each_entry(mnt, &ctx->spfs_mounts->list, list) {
+		info = container_of(mnt, struct spfs_info_s, mnt);
+
+		err = spfs_apply_replace_mode(info, mode);
+		if (err)
+			break;
+	}
+
+	unlock_shared_list(ctx->spfs_mounts);
+
+	return err;
+}
+
+static int get_replace_mode(const char *mode)
+{
+	if (!strcmp(mode, "hold"))
+		return SPFS_REPLACE_MODE_HOLD;
+	else if (!strcmp(mode, "release"))
+		return SPFS_REPLACE_MODE_RELEASE;
+	return -EINVAL;
+}
+
 static int process_replace_cmd(int sock, struct spfs_manager_context_s *ctx,
 			       char *options, size_t size)
 {
@@ -436,11 +469,14 @@ static int process_replace_cmd(int sock, struct spfs_manager_context_s *ctx,
 		[3] = { "flags=", NULL },
 		[4] = { "freeze_cgroup=", NULL },
 		[5] = { "bindmounts=", NULL },
+		[6] = { "mode=", NULL },
+		[7] = { "all", NULL, true },
 		{ NULL, NULL },
 	};
 	struct spfs_info_s *info;
 	void *opts = NULL;
 	int err;
+	spfs_replace_mode_t mode = SPFS_REPLACE_MODE_HOLD;
 
 	if (size > strlen(options) + 1)
 		opts = options + strlen(options) + 1;
@@ -450,6 +486,17 @@ static int process_replace_cmd(int sock, struct spfs_manager_context_s *ctx,
 		pr_err("failed to parse options for replace command\n");
 		return -EINVAL;
 	}
+
+	if (opt_array[6].value) {
+		mode = get_replace_mode(opt_array[6].value);
+		if (mode < 0) {
+			pr_err("mode is invalid: %s\n", opt_array[6].value);
+			return -EINVAL;
+		}
+	}
+
+	if (opt_array[7].value)
+		return process_replace_mode_all(sock, ctx, mode);
 
 	if (opt_array[0].value == NULL) {
 		pr_err("mount id wasn't provided\n");
@@ -504,6 +551,10 @@ static int process_replace_cmd(int sock, struct spfs_manager_context_s *ctx,
 		if (err)
 			return err;
 	}
+
+	err = spfs_apply_replace_mode(info, mode);
+	if (err)
+		return err;
 
 	return replace_spfs(sock, info, opt_array[1].value, opt_array[2].value,
 			     opt_array[3].value, opts);
