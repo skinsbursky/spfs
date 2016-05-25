@@ -279,6 +279,7 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 	};
 	struct spfs_info_s *info;
 	int err;
+	long ns_pid = -1;
 
 	err = parse_cmd_options(opt_array, options);
 	if (err) {
@@ -316,82 +317,21 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 		return -EINVAL;
 	}
 
-	err = -ENOMEM;
-
-	info = shm_alloc(sizeof(*info));
-	if (!info) {
-		pr_err("failed to allocate\n");
-		return -ENOMEM;
-	}
-
-	err = init_mount_info(&info->mnt, opt_array[0].value, opt_array[6].value);
-	if (err)
-		return err;
-
 	if (opt_array[1].value) {
-		err = xatol(opt_array[1].value, &info->ns_pid);
+		err = xatol(opt_array[1].value, &ns_pid);
 		if (err) {
 			pr_err("failed to convert pid: %s\n", opt_array[1].value);
 			return err;
 		}
-
-		info->ns_list = shm_xsprintf(opt_array[2].value);
-		if (!info->ns_list) {
-			pr_perror("failed to allocate string\n");
-			return -ENOMEM;
-		}
 	}
 
-	if (opt_array[3].value) {
-		info->root = shm_xsprintf(opt_array[3].value);
-		if (!info->root) {
-			pr_perror("failed to allocate string\n");
-			return -ENOMEM;
-		}
-
-		if (stat(info->root, &info->root_stat)) {
-			pr_perror("failed to stat %s", info->root);
-			return -errno;
-		}
-	} else {
-		info->root = shm_alloc(1);
-		if (!info->root) {
-			pr_perror("failed to allocate string\n");
-			return -ENOMEM;
-		}
-		info->root[0] = '\0';
-	}
-
-	/*
-	 * SPFS work dir is placed to the root mount.
-	 * Would be nice to have it somewhere in /run/..., but in case of CRIU,
-	 * /run can not be mounted yet. Thus, our directory can be overmounted
-	 * after creation.
-	 */
-	info->work_dir = shm_xsprintf("/.spfs-%s", info->mnt.id);
-	if (!info->work_dir) {
-		pr_perror("failed to allocate string\n");
-		return -ENOMEM;
-	}
-
-	info->socket_path = shm_xsprintf("spfs-%s.sock", info->mnt.id);
-	if (!info->socket_path) {
-		pr_perror("failed to allocate string\n");
-		return -ENOMEM;
-	}
-
-	err = init_shared_list(&info->mountpaths);
-	if (err)
-		return err;
-
-	err = spfs_add_mount_paths(info, info->mnt.mountpoint);
+	err = create_spfs_info(opt_array[0].value, opt_array[6].value,
+				ns_pid, opt_array[2].value, opt_array[3].value,
+				&info);
 	if (err)
 		return err;
 
 	info->ovz_id = ctx->ovz_id;
-
-	INIT_LIST_HEAD(&info->mnt.list);
-	INIT_LIST_HEAD(&info->processes);
 
 	/* TODO: should we add mounpoint _after_ mount? */
 	err = add_spfs_info(ctx->spfs_mounts, info);

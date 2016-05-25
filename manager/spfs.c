@@ -14,6 +14,86 @@
 #include "replace.h"
 #include "cgroup.h"
 
+int create_spfs_info(const char *id, const char *mountpoint,
+		     pid_t ns_pid, const char *ns_list, const char *root,
+		     struct spfs_info_s **i)
+{
+	struct spfs_info_s *info;
+	int err = -ENOMEM;
+
+	info = shm_alloc(sizeof(*info));
+	if (!info) {
+		pr_err("failed to allocate\n");
+		return -ENOMEM;
+	}
+
+	err = init_mount_info(&info->mnt, id, mountpoint);
+	if (err)
+		return err;
+
+	if (ns_pid > 0) {
+		info->ns_pid = ns_pid;
+		info->ns_list = shm_xsprintf(ns_list);
+		if (!info->ns_list) {
+			pr_perror("failed to allocate string\n");
+			return -ENOMEM;
+		}
+	}
+
+	if (root) {
+		info->root = shm_xsprintf(root);
+		if (!info->root) {
+			pr_perror("failed to allocate string\n");
+			return -ENOMEM;
+		}
+
+		if (stat(info->root, &info->root_stat)) {
+			pr_perror("failed to stat %s", info->root);
+			return -errno;
+		}
+	} else {
+		info->root = shm_alloc(1);
+		if (!info->root) {
+			pr_perror("failed to allocate string\n");
+			return -ENOMEM;
+		}
+		info->root[0] = '\0';
+	}
+
+	/*
+	 * SPFS work dir is placed to the root mount.
+	 * Would be nice to have it somewhere in /run/..., but in case of CRIU,
+	 * /run can not be mounted yet. Thus, our directory can be overmounted
+	 * after creation.
+	 */
+	info->work_dir = shm_xsprintf("/.spfs-%s", info->mnt.id);
+	if (!info->work_dir) {
+		pr_perror("failed to allocate string\n");
+		return -ENOMEM;
+	}
+
+	info->socket_path = shm_xsprintf("spfs-%s.sock", info->mnt.id);
+	if (!info->socket_path) {
+		pr_perror("failed to allocate string\n");
+		return -ENOMEM;
+	}
+
+	err = init_shared_list(&info->mountpaths);
+	if (err)
+		return err;
+
+	err = spfs_add_mount_paths(info, info->mnt.mountpoint);
+	if (err)
+		return err;
+
+	INIT_LIST_HEAD(&info->mnt.list);
+	INIT_LIST_HEAD(&info->processes);
+
+	*i = info;
+
+	return 0;
+}
+
 static int enter_spfs_context(const struct spfs_info_s *info);
 
 #define ct_run(func, info, ...)							\

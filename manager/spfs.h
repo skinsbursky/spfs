@@ -36,6 +36,10 @@ struct spfs_info_s {
 	const char		*ovz_id;
 };
 
+int create_spfs_info(const char *id, const char *mountpoint,
+		     pid_t ns_pid, const char *ns_list, const char *root,
+		     struct spfs_info_s **i);
+
 struct spfs_info_s *find_spfs_by_id(struct shared_list *mounts, const char *id);
 struct spfs_info_s *find_spfs_by_pid(struct shared_list *mounts, pid_t pid);
 int add_spfs_info(struct shared_list *mounts, struct spfs_info_s *info);
