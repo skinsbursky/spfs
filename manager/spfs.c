@@ -470,6 +470,17 @@ static int do_replace_one_spfs(const char *source, const char *target)
 	return 0;
 }
 
+static int umount_target(const char *mnt)
+{
+	pr_debug("Unmounting %s\n", mnt);
+
+	if (umount2(mnt, MNT_DETACH)) {
+		pr_perror("failed to umount %s", mnt);
+		return -1;
+	}
+	return 0;
+}
+
 static int do_replace_mounts(struct spfs_info_s *info, const char *source)
 {
 	int err;
@@ -503,6 +514,8 @@ static int do_replace_mounts(struct spfs_info_s *info, const char *source)
 	}
 
 	err = spfs_send_mode(info, SPFS_PROXY_MODE, mnt->mountpoint);
+	if (!err)
+		(void) umount_target(source);
 
 unlock_shared_list:
 	(void) unlock_shared_list(&info->mountpaths);
@@ -534,17 +547,6 @@ static int do_replace_spfs(struct spfs_info_s *info, const char *source)
 	res = spfs_thaw_and_unlock(info);
 
 	return err ? err : res;
-}
-
-static int umount_target(const struct spfs_info_s *info, const char *mnt)
-{
-	pr_debug("Unmounting %s\n", mnt);
-
-	if (umount2(mnt, MNT_DETACH)) {
-		pr_perror("failed to umount %s", mnt);
-		return -1;
-	}
-	return 0;
 }
 
 static int do_mount_target(struct spfs_info_s *info,
@@ -602,10 +604,6 @@ int replace_spfs(int sock, struct spfs_info_s *info,
 		goto free_mnt;
 
 	err = do_replace_spfs(info, mnt);
-	if (err)
-		goto free_mnt;
-
-	(void) ct_run(umount_target, info, mnt);
 
 free_mnt:
 	free(mnt);
