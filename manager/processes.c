@@ -461,7 +461,7 @@ static int get_target_fd(pid_t pid, int fd,
 	if (flags < 0)
 		return flags;
 
-	err = add_fd_to_tree(pid, fd, &rfd);
+	err = collect_fd(pid, fd, &rfd);
 	if (err) {
 		pr_err("failed to add /proc/%d/fd/%d to tree\n", pid, fd);
 		return err;

@@ -51,7 +51,7 @@ static int compare_fds(const void *a, const void *b)
 	_exit(EXIT_FAILURE);
 }
 
-int add_fd_to_tree(pid_t pid, int fd, struct replace_fd **rfd)
+int collect_fd(pid_t pid, int fd, struct replace_fd **rfd)
 {
 	struct replace_fd *new_fd, **found_fd;
 	int err = -ENOMEM;

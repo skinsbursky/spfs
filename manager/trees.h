@@ -9,6 +9,6 @@ struct replace_fd {
 	bool shared;
 };
 
-int add_fd_to_tree(pid_t pid, int fd, struct replace_fd **rfd);
+int collect_fd(pid_t pid, int fd, struct replace_fd **rfd);
 
 #endif
