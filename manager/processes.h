@@ -1,6 +1,8 @@
 #ifndef __SPFS_MANAGER_PROCESSES_H_
 #define __SPFS_MANAGER_PROCESSES_H_
 
+#include "include/list.h"
+
 struct mount_info_s;
 
 int get_pids_list(const char *tasks_file, char **list);
