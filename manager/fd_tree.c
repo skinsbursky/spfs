@@ -23,7 +23,7 @@ enum kcmp_type {
 	KCMP_TYPES,
 };
 
-static void *root = NULL;
+static void *fd_tree_root = NULL;
 
 static int compare_fds(const void *a, const void *b)
 {
@@ -66,7 +66,7 @@ int add_fd_to_tree(pid_t pid, int fd, struct replace_fd **rfd)
 	new_fd->shared = false;
 	new_fd->file_obj = NULL;
 
-	found_fd = tsearch(new_fd, &root, compare_fds);
+	found_fd = tsearch(new_fd, &fd_tree_root, compare_fds);
 	if (!found_fd) {
 		pr_err("failed to add new fd object to the tree\n");
 		goto free_new_fd;
