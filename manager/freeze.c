@@ -106,7 +106,7 @@ static int freezer_open_state(const char *freezer_cgroup)
 
 static int freezer_set_state(const char *freezer_cgroup, const char *state)
 {
-	int fd, err, tries = 10;
+	int fd, err, tries = 100;
 
 	fd = freezer_open_state(freezer_cgroup);
 	if (fd < 0)
@@ -144,8 +144,11 @@ static int freezer_set_state(const char *freezer_cgroup, const char *state)
 		usleep(100 * 1000);
 	}
 	err = 0;
-	if (tries < 0)
-		err = -EPERM;
+	if (tries < 0) {
+		pr_err("timed out to set state %s to freezer cgroup %s\n",
+				state, freezer_cgroup);
+		err = -ETIMEDOUT;
+	}
 close_fd:
 	close(fd);
 	return err;
