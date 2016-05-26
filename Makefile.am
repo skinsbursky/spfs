@@ -51,7 +51,7 @@ bin_spfs_manager_SOURCES =	manager/main.c			\
 				manager/freeze.c		\
 				manager/swapfd.c		\
 				manager/swap.c			\
-				manager/fd_tree.c		\
+				manager/trees.c			\
 				manager/processes.c		\
 				manager/cgroup.c		\
 				manager/mount.c			\
@@ -63,7 +63,7 @@ bin_spfs_manager_SOURCES =	manager/main.c			\
 				manager/freeze.h		\
 				manager/swapfd.h		\
 				manager/swap.h			\
-				manager/fd_tree.h		\
+				manager/trees.h			\
 				manager/processes.h		\
 				manager/cgroup.h		\
 				manager/mount.h			\

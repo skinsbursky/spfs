@@ -9,9 +9,7 @@
 #include "include/util.h"
 
 #include "swap.h"
-#include "spfs.h"
 #include "processes.h"
-#include "fd_tree.h"
 #include "swapfd.h"
 
 #if 0

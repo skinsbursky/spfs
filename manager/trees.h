@@ -1,5 +1,5 @@
-#ifndef __SPFS_MANAGER_FD_TREE_H_
-#define __SPFS_MANAGER_FD_TREE_H_
+#ifndef __SPFS_MANAGER_TREES_H_
+#define __SPFS_MANAGER_TREES_H_
 
 struct replace_fd {
 	pid_t pid;

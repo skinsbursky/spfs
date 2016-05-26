@@ -11,7 +11,7 @@
 #include "include/shm.h"
 
 #include "spfs.h"
-#include "fd_tree.h"
+#include "trees.h"
 #include "swapfd.h"
 #include "processes.h"
 

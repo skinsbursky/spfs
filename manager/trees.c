@@ -9,7 +9,7 @@
 #include "include/list.h"
 #include "include/log.h"
 
-#include "fd_tree.h"
+#include "trees.h"
 
 enum kcmp_type {
 	KCMP_FILE,
