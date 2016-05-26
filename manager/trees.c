@@ -25,12 +25,11 @@ enum kcmp_type {
 
 static void *fd_tree_root = NULL;
 
-static int compare_fds(const void *a, const void *b)
+static int kcmp(int type, pid_t pid1, pid_t pid2, unsigned long idx1, unsigned long idx2)
 {
-	const struct replace_fd *f = a, *s = b;
 	int ret;
 
-	ret = syscall(SYS_kcmp, f->pid, s->pid, KCMP_FILE, f->fd, s->fd);
+	ret = syscall(SYS_kcmp, pid1, pid2, type, idx1, idx2);
 
 	switch (ret) {
 		case 0:
@@ -39,16 +38,25 @@ static int compare_fds(const void *a, const void *b)
 			return -1;
 		case 2:
 			return 1;
+		case -1:
+			pr_perror("kcmp (type: %d, pid1: %d, pid2: %d, "
+				  "idx1: %ld, idx2: %ld) failed",
+				  type, pid1, pid2, idx1, idx2);
+			break;
+		default:
+			pr_perror("kcmp (type: %d, pid1: %d, pid2: %d, "
+				  "idx1: %ld, idx2: %ld) returned %d\n",
+				  type, pid1, pid2, idx1, idx2);
+			break;
 	}
-
-	if (ret < 0)
-		pr_err("failed to compare /proc/%d/fd/%d with /proc/%d/fd/%d: %s\n",
-			f->pid, f->fd, s->pid, s->fd, strerror(-ret));
-	else
-		pr_err("failed to compare /proc/%d/fd/%d with "
-			"/proc/%d/fd/%d: ordering information is unavailable\n",
-			f->pid, f->fd, s->pid, s->fd);
 	_exit(EXIT_FAILURE);
+}
+
+static int compare_fds(const void *a, const void *b)
+{
+	const struct replace_fd *f = a, *s = b;
+
+	return kcmp(KCMP_FILE, f->pid, s->pid, f->fd, s->fd);
 }
 
 int collect_fd(pid_t pid, int fd, struct replace_fd **rfd)
