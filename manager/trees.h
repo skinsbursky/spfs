@@ -13,4 +13,6 @@ int collect_fd(pid_t pid, int fd, struct replace_fd **rfd);
 int collect_fd_table(pid_t pid, bool *exists);
 int collect_fs_struct(pid_t pid, bool *exists);
 
+int collect_map_fd(int fd, const char *path, mode_t mode, int *map_fd);
+
 #endif

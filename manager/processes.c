@@ -626,23 +626,23 @@ static int collect_process_open_fds(struct process_info *p,
 	return iterate_dir_name(dpath, p, collect_process_fd, pc, "collect_process_fd");
 }
 
-static int collect_map_fd(struct process_info *p,
-			  unsigned long start, unsigned long end,
-			  mode_t mode, const char *path)
+static int collect_map_file(struct process_info *p,
+			    unsigned long start, unsigned long end,
+			    mode_t mode, const char *path)
 {
-	int map_fd, err;
+	int fd, err;
 
 	pr_debug("Collecting /proc/%d/map_files/%lx-%lx\n", p->pid, start, end);
 
-	map_fd = open(path, mode);
-	if (map_fd < 0) {
+	fd = open(path, mode);
+	if (fd < 0) {
 		pr_perror("failed to open %s", path);
 		return -errno;
 	}
 
-	err = process_add_mapping(p, map_fd, start, end);
+	err = process_add_mapping(p, fd, start, end);
 	if (err)
-		close(map_fd);
+		close(fd);
 	return err;
 }
 
@@ -721,8 +721,8 @@ static int collect_process_map_fds(struct process_info *p,
 		if (err)
 			goto close_fmap;
 
-		err = collect_map_fd(p, start, end,
-				     map_open_mode(r, w, prot), path);
+		err = collect_map_file(p, start, end,
+				       map_open_mode(r, w, prot), path);
 		if (err)
 			goto close_fmap;
 	}

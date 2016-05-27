@@ -26,6 +26,7 @@ enum kcmp_type {
 static void *fd_tree_root = NULL;
 static void *fd_table_tree_root = NULL;
 static void *fs_struct_tree_root = NULL;
+static void *map_fd_tree_root = NULL;
 
 static int kcmp(int type, pid_t pid1, pid_t pid2, unsigned long idx1, unsigned long idx2)
 {
@@ -175,5 +176,64 @@ free_new_fs:
 		*exists = true;
 	} else
 		*exists = false;
+	return err;
+}
+
+struct map_fd_s {
+	int map_fd;
+	char *path;
+	mode_t mode;
+};
+
+static int compare_map_fd(const void *a, const void *b)
+{
+	const struct map_fd_s *f = a, *s = b;
+	int ret;
+
+	ret = strcmp(f->path, s->path);
+	if (ret)
+		return ret;
+	if (f->mode < s->mode)
+		return -1;
+	else if (f->mode > s->mode)
+		return 1;
+	return 0;
+}
+
+int collect_map_fd(int fd, const char *path, mode_t mode, int *map_fd)
+{
+	struct map_fd_s *new_map_fd, **found_map_fd;
+	int err = -ENOMEM;
+
+	new_map_fd = malloc(sizeof(*new_map_fd));
+	if (!new_map_fd) {
+		pr_err("failed to allocate\n");
+		return -ENOMEM;
+	}
+	new_map_fd->path = strdup(path);
+	if (!new_map_fd->path) {
+		pr_err("failed to allocate\n");
+		goto free_new_map_fd;
+	}
+	new_map_fd->map_fd = fd;
+	new_map_fd->mode = mode;
+
+	found_map_fd = tsearch(new_map_fd, &map_fd_tree_root, compare_map_fd);
+	if (!found_map_fd) {
+		pr_err("failed to add new map fd object to the tree\n");
+		goto free_new_map_fd_map_fd;
+	}
+
+	*map_fd = (*found_map_fd)->map_fd;
+	err = 0;
+
+	if (*found_map_fd == new_map_fd)
+		goto exit;
+
+free_new_map_fd_map_fd:
+	free(new_map_fd->path);
+free_new_map_fd:
+	free(new_map_fd);
+exit:
 	return err;
 }
