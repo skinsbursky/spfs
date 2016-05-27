@@ -630,7 +630,7 @@ static int collect_map_file(struct process_info *p,
 			    unsigned long start, unsigned long end,
 			    mode_t mode, const char *path)
 {
-	int fd, err;
+	int fd, map_fd = -1, err;
 
 	pr_debug("Collecting /proc/%d/map_files/%lx-%lx\n", p->pid, start, end);
 
@@ -640,8 +640,16 @@ static int collect_map_file(struct process_info *p,
 		return -errno;
 	}
 
-	err = process_add_mapping(p, fd, start, end);
-	if (err)
+	err = collect_map_fd(fd, path, mode, &map_fd);
+	if (err) {
+		pr_err("failed to collect map fd for path %s\n", path);
+		goto close_fd;
+	}
+
+	err = process_add_mapping(p, map_fd, start, end);
+
+close_fd:
+	if ((fd != map_fd) || err)
 		close(fd);
 	return err;
 }
