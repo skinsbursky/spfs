@@ -25,6 +25,7 @@ enum kcmp_type {
 
 static void *fd_tree_root = NULL;
 static void *fd_table_tree_root = NULL;
+static void *fs_struct_tree_root = NULL;
 
 static int kcmp(int type, pid_t pid1, pid_t pid2, unsigned long idx1, unsigned long idx2)
 {
@@ -129,6 +130,48 @@ free_new_fdt:
 		pr_info("process %d shares fd table with process %d\n", pid,
 				(*found_fdt)->pid);
 		free(new_fdt);
+		*exists = true;
+	} else
+		*exists = false;
+	return err;
+}
+
+struct fs_struct_s {
+	pid_t pid;
+};
+
+static int compare_fs_struct(const void *a, const void *b)
+{
+	const struct fs_struct_s *f = a, *s = b;
+
+	return kcmp(KCMP_FS, f->pid, s->pid, 0, 0);
+}
+
+int collect_fs_struct(pid_t pid, bool *exists)
+{
+	struct fs_struct_s *new_fs, **found_fs;
+	int err = -ENOMEM;
+
+	new_fs = malloc(sizeof(*new_fs));
+	if (!new_fs) {
+		pr_err("failed to allocate\n");
+		return -ENOMEM;
+	}
+	new_fs->pid = pid;
+
+	found_fs = tsearch(new_fs, &fs_struct_tree_root, compare_fs_struct);
+	if (!found_fs) {
+		pr_err("failed to add new fs object to the tree\n");
+		goto free_new_fs;
+	}
+
+	err = 0;
+
+free_new_fs:
+	if (*found_fs != new_fs) {
+		pr_info("process %d shares fs struct with process %d\n", pid,
+				(*found_fs)->pid);
+		free(new_fs);
 		*exists = true;
 	} else
 		*exists = false;
