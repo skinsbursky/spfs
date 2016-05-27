@@ -389,19 +389,12 @@ static int create_file_obj(const char *path, unsigned flags, struct replace_fd *
 	return rfd->file_obj ? 0 : -EPERM;
 }
 
-static int get_target_path(const char *link,
-			   const char *source_mnt, const char *target_mnt,
-			   char *path, size_t size)
+static int fixup_source_path(const char *source_path,
+			     const char *source_mnt, const char *target_mnt,
+			     char *path, size_t size)
 {
-	char source_path[PATH_MAX], *sp = source_path;
+	const char *sp = source_path;
 	ssize_t bytes;
-
-	bytes = readlink(link, source_path, PATH_MAX - 1);
-	if (bytes < 0) {
-		pr_perror("failed to read link %s\n", link);
-		return -errno;
-	}
-	source_path[bytes] = '\0';
 
 	if (source_mnt) {
 		size_t len = strlen(source_mnt);
@@ -419,8 +412,29 @@ static int get_target_path(const char *link,
 		pr_err("target path is too long (%ld > %ld)\n",	bytes, size);
 		return -ENOMEM;
 	}
-	pr_debug("%s --> %s\n", link, path);
+	pr_debug("%s --> %s\n", source_path, path);
 	return 0;
+}
+
+static int get_link_path(const char *link,
+			 const char *source_mnt, const char *target_mnt,
+			 char *path, size_t size)
+{
+	char source_path[PATH_MAX];
+	ssize_t bytes;
+	int err;
+
+	bytes = readlink(link, source_path, PATH_MAX - 1);
+	if (bytes < 0) {
+		pr_perror("failed to read link %s\n", link);
+		return -errno;
+	}
+	source_path[bytes] = '\0';
+
+	err = fixup_source_path(source_path, source_mnt, target_mnt, path, size);
+	if (!err)
+		pr_debug("%s --> %s\n", link, path);
+	return err;
 }
 
 static int open_target_fd(struct replace_fd *rfd, unsigned flags,
@@ -433,7 +447,7 @@ static int open_target_fd(struct replace_fd *rfd, unsigned flags,
 
 	snprintf(link, PATH_MAX, "/proc/%d/fd/%d", rfd->pid, rfd->fd);
 
-	err = get_target_path(link, source_mnt, target_mnt, path, sizeof(path));
+	err = get_link_path(link, source_mnt, target_mnt, path, sizeof(path));
 	if (err)
 		return err;
 
@@ -646,7 +660,7 @@ static int collect_map_fd(struct process_info *p, int dir,
 	if (err)
 		return err;
 
-	err = get_target_path(link, pc->source_mnt, pc->target_mnt, path, sizeof(path));
+	err = get_link_path(link, pc->source_mnt, pc->target_mnt, path, sizeof(path));
 	if (err)
 		return err;
 
@@ -735,7 +749,7 @@ static int open_process_env(struct process_info *p,
 	int err, fd;
 
 	snprintf(link, PATH_MAX, "/proc/%d/%s", p->pid, dentry);
-	err = get_target_path(link, pc->source_mnt, pc->target_mnt, path, sizeof(path));
+	err = get_link_path(link, pc->source_mnt, pc->target_mnt, path, sizeof(path));
 	if (err)
 		return err;
 
