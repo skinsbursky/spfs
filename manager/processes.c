@@ -259,7 +259,7 @@ int iterate_pids_list_name(const char *pids_list, void *data,
 		}
 
 		if (pid_is_kthread(p)) {
-			pr_debug("Skipping kthread %d\n", pid);
+			pr_debug("Skipping kthread %s\n", pid);
 			continue;
 		}
 
