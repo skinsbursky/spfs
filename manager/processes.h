@@ -69,6 +69,11 @@ struct process_info {
 	int pid;
 	int fds_nr;
 	int maps_nr;
+	int exe_fd;
+	struct process_fs {
+		int cwd_fd;
+		int root_fd;
+	} fs;
 	union {
 		struct process_env {
 			int exe_fd;

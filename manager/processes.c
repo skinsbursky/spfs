@@ -811,6 +811,9 @@ static int collect_one_process(pid_t pid, void *data)
 	p->env.exe_fd = -1;
 	p->env.cwd_fd = -1;
 	p->env.root_fd = -1;
+	p->exe_fd = -1;
+	p->fs.cwd_fd = -1;
+	p->fs.root_fd = -1;
 	INIT_LIST_HEAD(&p->fds);
 	INIT_LIST_HEAD(&p->maps);
 

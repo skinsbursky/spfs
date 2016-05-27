@@ -230,21 +230,21 @@ static int do_swap_process_resources(struct process_info *p)
 		se.naddr = p->maps_nr;
 	}
 
-	if (p->env.exe_fd >= 0) {
+	if (p->exe_fd >= 0) {
 		pr_debug("/proc/%d/fd/%d --> /proc/%d/exe\n",
-				getpid(), p->env.exe_fd, p->pid);
-		se.exe_fd = p->env.exe_fd;
+				getpid(), p->exe_fd, p->pid);
+		se.exe_fd = p->exe_fd;
 	}
 
-	if (p->env.cwd_fd >= 0) {
+	if (p->fs.cwd_fd >= 0) {
 		pr_debug("/proc/%d/fd/%d --> /proc/%d/cwd\n",
-				getpid(), p->env.cwd_fd, p->pid);
-		se.cwd_fd = p->env.cwd_fd;
+				getpid(), p->fs.cwd_fd, p->pid);
+		se.cwd_fd = p->fs.cwd_fd;
 	}
 
-	if (p->env.root_fd >= 0) {
+	if (p->fs.root_fd >= 0) {
 		pr_debug("/proc/%d/fd/%d --> /proc/%d/root\n",
-				getpid(), p->env.root_fd, p->pid);
+				getpid(), p->fs.root_fd, p->pid);
 	}
 
 	se.pid = p->pid;
