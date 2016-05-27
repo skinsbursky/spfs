@@ -752,12 +752,24 @@ static int collect_process_fs(struct process_info *p,
 			       int dir)
 {
 	bool mnt_cwd, mnt_root;
+	int err;
+	bool exists;
 
 	mnt_cwd = is_mnt_file(dir, "cwd", pc->source_mnt, pc->src_dev);
 	mnt_root = is_mnt_file(dir, "root", pc->source_mnt, pc->src_dev);
 
 	if (!mnt_cwd && ! mnt_root)
 		return 0;
+
+	err = collect_fs_struct(p->pid, &exists);
+	if (err) {
+		pr_err("failed to collect process %d fs\n", p->pid);
+		return err;
+	}
+	if (exists) {
+		pr_info("ignoring process %d fs\n", p->pid);
+		return 0;
+	}
 
 	if (mnt_cwd) {
 		pr_debug("Collecting /proc/%d/cwd\n", p->pid);
