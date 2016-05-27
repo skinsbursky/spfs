@@ -725,17 +725,78 @@ static int collect_process_map_fds(struct process_info *p,
 	return iterate_dir_name(dpath, p, collect_map_fd, pc, "collect_map_fd");
 }
 
+static int open_process_env(struct process_info *p,
+			    struct processes_collection_s *pc,
+			    const char *dentry)
+{
+	char path[PATH_MAX];
+	char link[PATH_MAX];
+
+	int err, fd;
+
+	snprintf(link, PATH_MAX, "/proc/%d/%s", p->pid, dentry);
+	err = get_target_path(link, pc->source_mnt, pc->target_mnt, path, sizeof(path));
+	if (err)
+		return err;
+
+	fd = open(path, O_RDONLY);
+	if (fd < 0) {
+		pr_perror("failed to open %s", path);
+		return -errno;
+	}
+	return fd;
+}
+
+static int collect_process_fs(struct process_info *p,
+			       struct processes_collection_s *pc,
+			       int dir)
+{
+	bool mnt_cwd, mnt_root;
+
+	mnt_cwd = is_mnt_file(dir, "cwd", pc->source_mnt, pc->src_dev);
+	mnt_root = is_mnt_file(dir, "root", pc->source_mnt, pc->src_dev);
+
+	if (!mnt_cwd && ! mnt_root)
+		return 0;
+
+	if (mnt_cwd) {
+		pr_debug("Collecting /proc/%d/cwd\n", p->pid);
+
+		p->fs.cwd_fd = open_process_env(p, pc, "cwd");
+		if (p->fs.cwd_fd < 0)
+			return p->fs.cwd_fd;
+	}
+
+	if (mnt_root) {
+		pr_debug("Collecting /proc/%d/root\n", p->pid);
+
+		p->fs.root_fd = open_process_env(p, pc, "root");
+		if (p->fs.root_fd < 0)
+			return p->fs.root_fd;
+	}
+	return 0;
+}
+
+static int collect_process_exe(struct process_info *p,
+			       struct processes_collection_s *pc,
+			       int dir)
+{
+	if (!is_mnt_file(dir, "exe", pc->source_mnt, pc->src_dev))
+		return 0;
+
+	pr_debug("Collecting /proc/%d/exe\n", p->pid);
+
+	p->exe_fd = open_process_env(p, pc, "exe");
+	if (p->exe_fd < 0)
+		return p->exe_fd;
+	return 0;
+}
+
 static int collect_process_env(struct process_info *p,
 			       struct processes_collection_s *pc)
 {
-	int dir, err, *env = p->env_array;
+	int dir, err;
 	char path[PATH_MAX];
-	char *env_vars[] = {
-		"exe",
-		"cwd",
-		"root",
-		NULL
-	}, **var;
 
 	snprintf(path, PATH_MAX, "/proc/%d", p->pid);
 	dir = open(path, O_RDONLY | O_DIRECTORY);
@@ -744,32 +805,13 @@ static int collect_process_env(struct process_info *p,
 		return -errno;
 	}
 
-	/* TODO: exec, root and cwd can be shared */
+	err = collect_process_exe(p, pc, dir);
+	if (err)
+		goto close_dir;
 
-	var = env_vars;
-	while(*var) {
-		char *dentry = *var++;
-		char link[PATH_MAX];
+	err = collect_process_fs(p, pc, dir);
 
-		if (!is_mnt_file(dir, dentry, pc->source_mnt, pc->src_dev))
-			continue;
-
-		pr_debug("Collecting /proc/%d/%s\n", p->pid, dentry);
-
-		snprintf(link, PATH_MAX, "/proc/%d/%s", p->pid, dentry);
-		err = get_target_path(link, pc->source_mnt, pc->target_mnt, path, sizeof(path));
-		if (err)
-			break;
-
-		*env = open(path, O_RDONLY);
-		if (*env < 0) {
-			pr_perror("failed to open %s", path);
-			err = -errno;
-			break;
-		}
-		env++;
-	}
-
+close_dir:
 	close(dir);
 	return err;
 }
@@ -808,9 +850,6 @@ static int collect_one_process(pid_t pid, void *data)
 	p->pid = pid;
 	p->fds_nr = 0;
 	p->maps_nr = 0;
-	p->env.exe_fd = -1;
-	p->env.cwd_fd = -1;
-	p->env.root_fd = -1;
 	p->exe_fd = -1;
 	p->fs.cwd_fd = -1;
 	p->fs.root_fd = -1;

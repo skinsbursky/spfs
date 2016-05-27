@@ -74,14 +74,6 @@ struct process_info {
 		int cwd_fd;
 		int root_fd;
 	} fs;
-	union {
-		struct process_env {
-			int exe_fd;
-			int cwd_fd;
-			int root_fd;
-		} env;
-		int env_array[3];
-	};
 	struct list_head fds;
 	struct list_head maps;
 };
