@@ -574,109 +574,6 @@ static int collect_process_fd(struct process_info *p, int dir,
 	return process_add_fd(p, source_fd, target_fd);
 }
 
-static int get_map_range(const char *map_file, off_t *start, off_t *end)
-{
-	int ret;
-
-	ret = sscanf(map_file, "%lx-%lx", start, end);
-	if (ret != 2) {
-		pr_err("failed to parse map file %s\n", map_file);
-		return -EINVAL;
-	}
-	return 0;
-}
-
-static int get_map_mode(pid_t pid, const char *map_file, mode_t *mode)
-{
-	char str[PATH_MAX];
-	FILE *fmap;
-	int err = -ENOENT;
-	unsigned long map_start;
-
-	if (sscanf(map_file, "%lx-%*x", &map_start) != 1) {
-		pr_err("failed to parse %s\n", str);
-		return -EINVAL;
-	}
-
-	snprintf(str, PATH_MAX, "/proc/%d/maps", pid);
-
-	fmap = fopen(str, "r");
-	if (!fmap) {
-		pr_perror("failed to open %s", str);
-		return -errno;
-	}
-
-	while (fgets(str, sizeof(str), fmap)) {
-		unsigned long start;
-		char r, w, p;
-		int ret;
-
-		ret = sscanf(str, "%lx-%*x %c%c%*c%c", &start, &r, &w, &p);
-		if (ret != 4) {
-			pr_err("failed to parse '%s': %d\n", str, ret);
-			err = -EINVAL;
-			goto close_fmap;
-		}
-
-		if (map_start != start)
-			continue;
-
-		if ((w == 'w') && (p == 's')) {
-			if (r == 'r')
-				*mode = O_RDWR;
-			else
-				*mode = O_WRONLY;
-		} else
-			*mode = O_RDONLY;
-
-		err = 0;
-		break;
-	}
-	if (err)
-		pr_err("failed to find map %s in /proc/%d/maps\n", map_file, pid);
-close_fmap:
-	fclose(fmap);
-	return err;
-}
-
-static int collect_map_fd(struct process_info *p, int dir,
-			  const char *map_file, const void *data)
-{
-	char link[PATH_MAX];
-	char path[PATH_MAX];
-	off_t start, end;
-	int map_fd, err;
-	const struct processes_collection_s *pc = data;
-	mode_t mode = O_RDONLY;
-
-	if (!is_mnt_file(dir, map_file, pc->source_mnt, pc->src_dev))
-		return 0;
-
-	snprintf(link, PATH_MAX, "/proc/%d/map_files/%s", p->pid, map_file);
-
-	pr_debug("Collecting %s\n", link);
-
-	err = get_map_range(map_file, &start, &end);
-	if (err)
-		return err;
-
-	err = get_link_path(link, pc->source_mnt, pc->target_mnt, path, sizeof(path));
-	if (err)
-		return err;
-
-	err = get_map_mode(p->pid, map_file, &mode);
-	if (err)
-		return err;
-
-	map_fd = open(path, mode);
-	if (map_fd < 0) {
-		pr_perror("failed to open %s", path);
-		return -errno;
-	}
-
-	return process_add_mapping(p, map_fd, start, end);
-}
-
 static int iterate_dir_name(const char *dpath, struct process_info *p,
 		    int (*actor)(struct process_info *p, int dir,
 				 const char *fd, const void *data),
@@ -729,14 +626,113 @@ static int collect_process_open_fds(struct process_info *p,
 	return iterate_dir_name(dpath, p, collect_process_fd, pc, "collect_process_fd");
 }
 
+static int collect_map_fd(struct process_info *p,
+			  unsigned long start, unsigned long end,
+			  mode_t mode, const char *path)
+{
+	int map_fd, err;
+
+	pr_debug("Collecting /proc/%d/map_files/%lx-%lx\n", p->pid, start, end);
+
+	map_fd = open(path, mode);
+	if (map_fd < 0) {
+		pr_perror("failed to open %s", path);
+		return -errno;
+	}
+
+	err = process_add_mapping(p, map_fd, start, end);
+	if (err)
+		close(map_fd);
+	return err;
+}
+
+static mode_t map_open_mode(char r, char w, char p)
+{
+	if ((w == 'w') && (p == 's')) {
+		if (r == 'r')
+			return O_RDWR;
+		return O_WRONLY;
+	}
+	/* Private write mapping have to be opened with O_RDONLY, because it
+	 * can be an executable, which is used already (opened via spfs) and in
+	 * this case system won't allow to open it in write mode.
+	 */
+	return O_RDONLY;
+}
+
+static bool is_mnt_map(int dir, unsigned long start, unsigned long end,
+		       struct processes_collection_s *pc)
+{
+	char path[PATH_MAX];
+
+	snprintf(path, PATH_MAX, "%lx-%lx", start, end);
+	return is_mnt_file(dir, path, pc->source_mnt, pc->src_dev);
+}
+
 static int collect_process_map_fds(struct process_info *p,
 				   struct processes_collection_s *pc)
 {
-	char dpath[PATH_MAX];
+	char map[PATH_MAX];
+	FILE *fmap;
+	int err = -ENOENT;
+	int dir;
 
-	/* TODO rework to use /proc/pid/maps instead. */
-	snprintf(dpath, PATH_MAX, "/proc/%d/map_files", p->pid);
-	return iterate_dir_name(dpath, p, collect_map_fd, pc, "collect_map_fd");
+	snprintf(map, PATH_MAX, "/proc/%d/map_files", p->pid);
+	dir = open(map, O_RDONLY | O_DIRECTORY);
+	if (dir < 0) {
+		pr_perror("failed to open %s", map);
+		return -errno;
+	}
+
+	snprintf(map, PATH_MAX, "/proc/%d/maps", p->pid);
+	fmap = fopen(map, "r");
+	if (!fmap) {
+		pr_perror("failed to open %s", map);
+		err = -errno;
+		goto close_dir;
+	}
+
+
+	while (fgets(map, sizeof(map), fmap)) {
+		char path[PATH_MAX];
+		unsigned long start, end;
+		char r, w, prot;
+		int ret, path_off;
+		char *map_file;
+
+		map[strlen(map)-1] = '\0';
+
+		ret = sscanf(map, "%lx-%lx %c%c%*c%c %*x %*x:%*x %*u %n",
+				&start, &end, &r, &w, &prot, &path_off);
+		if (ret != 5) {
+			pr_err("failed to parse '%s': %d\n", map, ret);
+			err = -EINVAL;
+			goto close_fmap;
+		}
+
+		if (!is_mnt_map(dir, start, end, pc))
+			continue;
+
+		map_file = map + path_off;
+
+		err = fixup_source_path(map_file,
+					pc->source_mnt, pc->target_mnt,
+					path, sizeof(path));
+		if (err)
+			goto close_fmap;
+
+		err = collect_map_fd(p, start, end,
+				     map_open_mode(r, w, prot), path);
+		if (err)
+			goto close_fmap;
+	}
+	err = 0;
+close_fmap:
+	fclose(fmap);
+close_dir:
+	close(dir);
+	return err;
+
 }
 
 static int open_process_env(struct process_info *p,
