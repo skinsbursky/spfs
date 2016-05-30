@@ -283,25 +283,6 @@ static int get_link_path(const char *link,
 	return fixup_source_path(source_path, source_mnt, target_mnt, path, size);
 }
 
-static int get_target_fd(struct replace_fd *rfd, unsigned flags, const char *path)
-{
-	int err;
-
-	if (!rfd->file_obj) {
-		/* TODO it makes sense to create file objects (open files) only
-		 * shared files here.
-		 * Private files can be opened by the process itself */
-		err = create_file_obj(path, flags, NULL, &rfd->file_obj);
-		if (err) {
-			pr_err("failed to open file object for /proc/%d/fd/%d\n",
-					rfd->pid, rfd->fd);
-			return err;
-		}
-	}
-
-	return get_file_obj_fd(rfd->file_obj, flags);
-}
-
 static int process_add_fd(struct process_info *p, int source_fd, int target_fd)
 {
 	struct process_fd *pfd;
@@ -374,7 +355,19 @@ static int collect_process_fd(struct process_info *p, int dir,
 	if (err)
 		return err;
 
-	target_fd = get_target_fd(rfd, flags, path);
+	if (!rfd->file_obj) {
+		/* TODO it makes sense to create file objects (open files) only
+		 * shared files here.
+		 * Private files can be opened by the process itself */
+		err = create_file_obj(path, flags, link, &rfd->file_obj);
+		if (err) {
+			pr_err("failed to open file object for /proc/%d/fd/%d\n",
+					rfd->pid, rfd->fd);
+			return err;
+		}
+	}
+
+	target_fd = get_file_obj_fd(rfd->file_obj, flags);
 	if (target_fd < 0)
 		return target_fd;
 
