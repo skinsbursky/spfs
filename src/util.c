@@ -170,22 +170,15 @@ int create_dir(const char *fmt, ...)
 		return -ENOMEM;
 	}
 
-	pr_debug("creating directory %s\n", p);
-
+	err = -ENOMEM;
 	while ((d = strsep(&p, "/")) != NULL) {
 		cp = xstrcat(cp, "%s/", d);
-		if (!cp) {
-			err = -ENOMEM;
+		if (!cp)
 			goto err;
-		}
 
-		err = mkdir(cp, 0777);
-		if (!err) {
-			pr_debug("created dir: '%s'\n", cp);
-			continue;
-		}
-		if (errno != EEXIST) {
+		if (mkdir(cp, 0777) && (errno != EEXIST)) {
 			pr_perror("failed to mkdir %s", cp);
+			err = -errno;
 			goto err;
 		}
 	}
