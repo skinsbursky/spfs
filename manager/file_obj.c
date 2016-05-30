@@ -41,6 +41,51 @@ typedef struct fobj_ops_s {
 	int (*open)(const char *path, unsigned flags, const char *parent);
 } fobj_ops_t;
 
+static int open_fifo_fd(const char *path, unsigned flags)
+{
+	int fifo_rw, fd;
+	int err = 0;
+
+	fifo_rw = open(path, O_RDWR);
+	if (fifo_rw < 0) {
+		pr_perror("failed to open %s in read/write mode", path);
+		return -errno;
+	}
+
+	switch (flags & O_ACCMODE) {
+		case O_RDWR:
+			return fifo_rw;
+		case O_RDONLY:
+		case O_WRONLY:
+			break;
+		default:
+			pr_err("unknown access mode: 0%o\n", flags & O_ACCMODE);
+			err = -EINVAL;
+			goto close_fifo_rw;
+	}
+
+	fd = open(path, flags);
+	if (fd < 0) {
+		pr_perror("failed to open %s with 0%o flags", path, flags);
+		err = -errno;
+	}
+
+close_fifo_rw:
+	close(fifo_rw);
+	return err ? err : fd;
+}
+
+static int fifo_file_open(const char *path, unsigned flags, const char *parent)
+{
+	int fd;
+
+	fd = open_fifo_fd(path, flags);
+	if (fd < 0)
+		return fd;
+
+	return fd;
+}
+
 typedef struct file_obj_s {
 	int		fd;
 	fobj_ops_t	*ops;
@@ -65,6 +110,9 @@ fobj_ops_t fobj_ops[] = {
 	},
 	[FTYPE_DIR] = {
 		.open = reg_file_open,
+	},
+	[FTYPE_FIFO] = {
+		.open = fifo_file_open,
 	},
 };
 
@@ -105,9 +153,9 @@ static int get_file_ops(const char *path, fobj_ops_t **ops)
 	switch (type) {
 		case FTYPE_REG:
 		case FTYPE_DIR:
+		case FTYPE_FIFO:
 			*ops = &fobj_ops[type];
 			return 0;
-		case FTYPE_FIFO:
 		case FTYPE_SOCK:
 		case FTYPE_LINK:
 		case FTYPE_CHR:
