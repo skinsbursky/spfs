@@ -15,6 +15,7 @@
 #include "trees.h"
 #include "swapfd.h"
 #include "processes.h"
+#include "file_obj.h"
 
 struct processes_collection_s {
 	struct list_head	*collection;
@@ -239,47 +240,6 @@ static int get_fd_flags(pid_t pid, int fd)
 	return flags;
 }
 
-static void *fifo_file_obj(const char *path, unsigned flags, struct replace_fd *rfd)
-{
-	pr_err("fifo is not supported yet\n");
-	return NULL;
-}
-
-static void *reg_file_obj(const char *path, unsigned flags, struct replace_fd *rfd)
-{
-	int fd;
-
-	fd = open(path, flags);
-	if (fd < 0) {
-		pr_perror("failed to open %s", path);
-		return NULL;
-	}
-	return (void *)(long)fd;
-}
-
-static int create_file_obj(const char *path, unsigned flags, struct replace_fd *rfd)
-{
-	/* TODO move these actors to tree creation and place them on replace_fd
-	 * structure */
-	switch (rfd->mode & S_IFMT) {
-		case S_IFDIR:
-		case S_IFREG:
-			rfd->file_obj = reg_file_obj(path, flags, rfd);
-			break;
-		case S_IFIFO:
-			rfd->file_obj = fifo_file_obj(path, flags, rfd);
-		case S_IFSOCK:
-		case S_IFLNK:
-		case S_IFBLK:
-		case S_IFCHR:
-			return -ENOTSUP;
-		default:
-			pr_err("unknown file mode: 0%o\n", rfd->mode & S_IFMT);
-			return -EINVAL;
-	}
-	return rfd->file_obj ? 0 : -EPERM;
-}
-
 static int fixup_source_path(const char *source_path,
 			     const char *source_mnt, const char *target_mnt,
 			     char *path, size_t size)
@@ -323,29 +283,15 @@ static int get_link_path(const char *link,
 	return fixup_source_path(source_path, source_mnt, target_mnt, path, size);
 }
 
-static int open_target_fd(struct replace_fd *rfd, unsigned flags, const char *path)
-{
-	struct stat st;
-
-	if (stat(path, &st)) {
-		pr_perror("failed to stat %s", path);
-		return -errno;
-	}
-
-	rfd->mode = st.st_mode;
-
-	/* TODO it makes sense to open only shared files here.
-	 * Private files can be opened by the process itself */
-
-	return create_file_obj(path, flags, rfd);
-}
-
 static int get_target_fd(struct replace_fd *rfd, unsigned flags, const char *path)
 {
 	int err;
 
 	if (!rfd->file_obj) {
-		err = open_target_fd(rfd, flags, path);
+		/* TODO it makes sense to create file objects (open files) only
+		 * shared files here.
+		 * Private files can be opened by the process itself */
+		err = create_file_obj(path, flags, NULL, &rfd->file_obj);
 		if (err) {
 			pr_err("failed to open file object for /proc/%d/fd/%d\n",
 					rfd->pid, rfd->fd);
@@ -353,21 +299,7 @@ static int get_target_fd(struct replace_fd *rfd, unsigned flags, const char *pat
 		}
 	}
 
-	switch (rfd->mode & S_IFMT) {
-		case S_IFDIR:
-		case S_IFREG:
-			return (long)rfd->file_obj;
-		case S_IFIFO:
-		case S_IFSOCK:
-		case S_IFLNK:
-		case S_IFBLK:
-		case S_IFCHR:
-			break;
-		default:
-			pr_err("unknown file mode: 0%o\n", rfd->mode & S_IFMT);
-			return -EINVAL;
-	}
-	return -ENOTSUP;
+	return get_file_obj_fd(rfd->file_obj, flags);
 }
 
 static int process_add_fd(struct process_info *p, int source_fd, int target_fd)
