@@ -432,19 +432,9 @@ static int get_link_path(const char *link,
 	return err;
 }
 
-static int open_target_fd(struct replace_fd *rfd, unsigned flags,
-			  const char *source_mnt, const char *target_mnt)
+static int open_target_fd(struct replace_fd *rfd, unsigned flags, const char *path)
 {
-	char link[PATH_MAX];
-	char path[PATH_MAX];
 	struct stat st;
-	int err;
-
-	snprintf(link, PATH_MAX, "/proc/%d/fd/%d", rfd->pid, rfd->fd);
-
-	err = get_link_path(link, source_mnt, target_mnt, path, sizeof(path));
-	if (err)
-		return err;
 
 	if (stat(path, &st)) {
 		pr_perror("failed to stat %s", path);
@@ -459,25 +449,12 @@ static int open_target_fd(struct replace_fd *rfd, unsigned flags,
 	return create_file_obj(path, flags, rfd);
 }
 
-static int get_target_fd(pid_t pid, int fd,
-			 const char *source_mnt, const char *target_mnt)
+static int get_target_fd(struct replace_fd *rfd, unsigned flags, const char *path)
 {
 	int err;
-	struct replace_fd *rfd;
-	int flags;
-
-	flags = get_fd_flags(pid, fd);
-	if (flags < 0)
-		return flags;
-
-	err = collect_fd(pid, fd, &rfd);
-	if (err) {
-		pr_err("failed to add /proc/%d/fd/%d to tree\n", pid, fd);
-		return err;
-	}
 
 	if (!rfd->file_obj) {
-		err = open_target_fd(rfd, flags, source_mnt, target_mnt);
+		err = open_target_fd(rfd, flags, path);
 		if (err) {
 			pr_err("failed to open file object for /proc/%d/fd/%d\n",
 					rfd->pid, rfd->fd);
@@ -549,6 +526,10 @@ static int collect_process_fd(struct process_info *p, int dir,
 {
 	int err, source_fd, target_fd;
 	const struct processes_collection_s *pc = data;
+	int flags;
+	struct replace_fd *rfd;
+	char link[PATH_MAX];
+	char path[PATH_MAX];
 
 	if (!is_mnt_file(dir, process_fd, pc->source_mnt, pc->src_dev))
 		return 0;
@@ -561,8 +542,22 @@ static int collect_process_fd(struct process_info *p, int dir,
 		return err;
 	}
 
-	target_fd = get_target_fd(p->pid, source_fd,
-				  pc->source_mnt, pc->target_mnt);
+	flags = get_fd_flags(p->pid, source_fd);
+	if (flags < 0)
+		return flags;
+
+	err = collect_fd(p->pid, source_fd, &rfd);
+	if (err) {
+		pr_err("failed to add /proc/%d/fd/%d to tree\n", p->pid, source_fd);
+		return err;
+	}
+
+	snprintf(link, PATH_MAX, "/proc/%d/fd/%d", rfd->pid, rfd->fd);
+	err = get_link_path(link, pc->source_mnt, pc->target_mnt, path, sizeof(path));
+	if (err)
+		return err;
+
+	target_fd = get_target_fd(rfd, flags, path);
 	if (target_fd < 0)
 		return target_fd;
 
