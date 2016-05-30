@@ -16,7 +16,6 @@ static inline pid_t gettid(void)
 
 extern const char *__progname;
 
-int print_on_level_va(unsigned int level, const char *format, va_list args);
 int print_on_level(unsigned int level, const char *format, ...);
 
 #define print_with_header(verbosity, fmt, ...)			\

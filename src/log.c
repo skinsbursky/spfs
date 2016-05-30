@@ -33,7 +33,7 @@ static char *print_time(char *buf, size_t size)
 	return buf;
 }
 
-int print_on_level_va(unsigned int level, const char *format, va_list args)
+static int print_on_level_va(unsigned int level, const char *format, va_list args)
 {
 	int saved_errno = errno, res;
 	FILE *out = (stream) ? stream : stdout;
