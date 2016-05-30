@@ -1,28 +1,13 @@
-#include <errno.h>
 #include <stdlib.h>
-#include <limits.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/mount.h>
-#include <fcntl.h>
-#include <signal.h>
 
 #include "include/util.h"
 #include "include/log.h"
-#include "include/socket.h"
-#include "include/shm.h"
+#include "include/namespaces.h"
 
-#include "spfs/context.h"
-
-#include "context.h"
-#include "interface.h"
 #include "replace.h"
-#include "spfs.h"
 #include "freeze.h"
 #include "swap.h"
-#include "swapfd.h"
 #include "processes.h"
-#include "cgroup.h"
 
 static int do_replace_resources(struct freeze_cgroup_s *fg,
 				const char *source_mnt,

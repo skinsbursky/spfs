@@ -76,6 +76,7 @@ bin_spfs_manager_SOURCES =	manager/main.c			\
 				src/ptrace.c			\
 				src/pie-util-fd.c		\
 				src/futex.c			\
+				src/namespaces.c		\
 								\
 				spfs/interface.h		\
 				spfs/context.h			\
@@ -88,6 +89,7 @@ bin_spfs_manager_SOURCES =	manager/main.c			\
 				include/ptrace.h		\
 				include/pie-util-fd.h		\
 				include/util.h			\
+				include/namespaces.h		\
 				include/futex.h
 
 bin_swapfd_SOURCES =		main.c				\
