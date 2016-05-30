@@ -106,7 +106,18 @@ static int compare_fd_tables(const void *a, const void *b)
 	return kcmp(KCMP_FILES, f->pid, s->pid, 0, 0);
 }
 
-int collect_fd_table(pid_t pid, bool *exists)
+bool fd_table_exists(pid_t pid)
+{
+	struct fd_table_s fdt = {
+		.pid = pid,
+	};
+
+	if (tfind(&fdt, &fd_table_tree_root, compare_fd_tables))
+		return true;
+	return false;
+}
+
+int collect_fd_table(pid_t pid)
 {
 	struct fd_table_s *new_fdt, **found_fdt;
 	int err = -ENOMEM;
@@ -131,9 +142,7 @@ free_new_fdt:
 		pr_info("process %d shares fd table with process %d\n", pid,
 				(*found_fdt)->pid);
 		free(new_fdt);
-		*exists = true;
-	} else
-		*exists = false;
+	}
 	return err;
 }
 

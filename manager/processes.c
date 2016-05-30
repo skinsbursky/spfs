@@ -850,19 +850,20 @@ static int collect_process_fd_table(struct process_info *p,
 			            struct processes_collection_s *pc)
 {
 	int err;
-	bool exists;
 
-	err = collect_fd_table(p->pid, &exists);
-	if (err) {
-		pr_err("failed to collect process %d fd table\n", p->pid);
-		return err;
-	}
-	if (exists) {
+	if (fd_table_exists(p->pid)) {
 		pr_info("ignoring process %d fd table\n", p->pid);
 		return 0;
 	}
 
-	return collect_process_open_fds(p, pc);
+	err = collect_process_open_fds(p, pc);
+	if (err)
+		return err;
+
+	if (p->fds_nr)
+		err = collect_fd_table(p->pid);
+
+	return err;
 }
 
 static int collect_one_process(pid_t pid, void *data)
