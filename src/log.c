@@ -37,17 +37,11 @@ static int print_on_level_va(unsigned int level, const char *format, va_list arg
 {
 	int saved_errno = errno, res;
 	FILE *out = (stream) ? stream : stdout;
-	char buffer[4096];
-	char time[64];
 
 	if (level > log_level)
 		return 0;
 
-	snprintf(buffer, sizeof(buffer), "%s  %s",
-			print_time(time, sizeof(time)) ? time : "(none)",
-			format);
-
-	res = vfprintf(out, buffer, args);
+	res = vfprintf(out, format, args);
 
 	errno -= saved_errno;
 	return res;
@@ -60,6 +54,23 @@ int print_on_level(unsigned int loglevel, const char *format, ...)
 
 	va_start(params, format);
 	res = print_on_level_va(loglevel, format, params);
+	va_end(params);
+	return res;
+}
+
+int print_on_level_ts(unsigned int loglevel, const char *format, ...)
+{
+	char buffer[4096];
+	char time[64];
+	va_list params;
+	int res;
+
+	snprintf(buffer, sizeof(buffer), "%s  %s",
+			print_time(time, sizeof(time)) ? time : "(none)",
+			format);
+
+	va_start(params, format);
+	res = print_on_level_va(loglevel, buffer, params);
 	va_end(params);
 	return res;
 }

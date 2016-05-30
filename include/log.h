@@ -16,13 +16,14 @@ static inline pid_t gettid(void)
 
 extern const char *__progname;
 
-int print_on_level(unsigned int level, const char *format, ...);
+int print_on_level(unsigned int loglevel, const char *format, ...);
+int print_on_level_ts(unsigned int level, const char *format, ...);
 
 #define print_with_header(verbosity, fmt, ...)			\
 ({								\
 	char *v = #verbosity;					\
 								\
-	print_on_level(LOG_ ## verbosity,			\
+	print_on_level_ts(LOG_ ## verbosity,			\
 			"%s(%d): %s%*s: "fmt,			\
 			__progname, gettid(), v,		\
 			7 - strlen(v), "",			\
