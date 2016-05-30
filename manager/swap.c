@@ -184,7 +184,7 @@ static int do_swap_process_resources(struct process_info *p)
 		.cwd_fd = -1,
 	};
 
-	pr_debug("Replacing process %d resources (%d)\n", p->pid, p->fds_nr);
+	pr_debug("Swapping process %d resources:\n", p->pid);
 
 	if (p->fds_nr) {
 		int *s, *d;
@@ -199,7 +199,7 @@ static int do_swap_process_resources(struct process_info *p)
 		s = se.src_fd;
 		d = se.dst_fd;
 		list_for_each_entry(pfd, &p->fds, list) {
-			pr_debug("/proc/%d/fd/%d --> /proc/%d/fd/%d\n",
+			pr_debug("\t/proc/%d/fd/%d --> /proc/%d/fd/%d\n",
 					getpid(), pfd->target_fd,
 					p->pid, pfd->source_fd);
 			*s++ = pfd->source_fd;
@@ -222,7 +222,7 @@ static int do_swap_process_resources(struct process_info *p)
 		m = se.addr_fd;
 		ma = se.addr;
 		list_for_each_entry(mfd, &p->maps, list) {
-			pr_debug("/proc/%d/fd/%d --> /proc/%d/map_files/%ld-%ld\n",
+			pr_debug("\t/proc/%d/fd/%d --> /proc/%d/map_files/%ld-%ld\n",
 					getpid(), mfd->map_fd, p->pid, mfd->start, mfd->end);
 			*m++ = mfd->map_fd;
 			*ma++ = mfd->start;
@@ -231,19 +231,19 @@ static int do_swap_process_resources(struct process_info *p)
 	}
 
 	if (p->exe_fd >= 0) {
-		pr_debug("/proc/%d/fd/%d --> /proc/%d/exe\n",
+		pr_debug("\t/proc/%d/fd/%d --> /proc/%d/exe\n",
 				getpid(), p->exe_fd, p->pid);
 		se.exe_fd = p->exe_fd;
 	}
 
 	if (p->fs.cwd_fd >= 0) {
-		pr_debug("/proc/%d/fd/%d --> /proc/%d/cwd\n",
+		pr_debug("\t/proc/%d/fd/%d --> /proc/%d/cwd\n",
 				getpid(), p->fs.cwd_fd, p->pid);
 		se.cwd_fd = p->fs.cwd_fd;
 	}
 
 	if (p->fs.root_fd >= 0) {
-		pr_debug("/proc/%d/fd/%d --> /proc/%d/root\n",
+		pr_debug("\t/proc/%d/fd/%d --> /proc/%d/root\n",
 				getpid(), p->fs.root_fd, p->pid);
 	}
 
@@ -262,6 +262,8 @@ free:
 int do_swap_resources(const struct list_head *processes)
 {
 	struct process_info *p;
+
+	pr_debug("Swapping resources:\n");
 
 	list_for_each_entry(p, processes, list) {
 		if (do_swap_process_resources(p))

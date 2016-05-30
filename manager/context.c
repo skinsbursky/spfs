@@ -95,8 +95,6 @@ int join_namespaces(int pid, const char *namespaces)
 		err = join_one_namespace(pid, ns);
 		if (err)
 			goto free_ns_list;
-
-		pr_debug("joined %s namespace of process %d\n", ns, pid);
 	}
 
 free_ns_list:

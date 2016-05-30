@@ -133,13 +133,15 @@ static int seize_one_process(const struct process_info *p)
 		pr_err("failed to seize process %d\n", p->pid);
 		return -EPERM;
 	}
-	pr_debug("seized process %d\n", p->pid);
+	pr_debug("\t%d seized\n", p->pid);
 	return 0;
 }
 
 int seize_processes(struct list_head *processes)
 {
 	const struct process_info *p;
+
+	pr_debug("Seizing processes...\n");
 
 	list_for_each_entry(p, processes, list) {
 		if (seize_one_process(p))
@@ -176,7 +178,6 @@ static int attach_to_process(const struct process_info *p)
 		pr_err("failed to attach to process %d\n", p->pid);
 		return -1;
 	}
-	pr_debug("attached to process %d\n", p->pid);
 	return 0;
 }
 
@@ -329,7 +330,6 @@ static int get_fd_flags(pid_t pid, int fd)
 	}
 
 	while (fgets(buf, 64, fdinfo) != NULL) {
-		pr_debug("fdinfo string: %s", buf);
 		if (strncmp(buf, "flags", strlen("flags")))
 			continue;
 		if (sscanf(buf, "flags:\t%o", &flags) != 1) {
@@ -407,7 +407,6 @@ static int fixup_source_path(const char *source_path,
 		pr_err("target path is too long (%ld > %ld)\n",	bytes, size);
 		return -ENOMEM;
 	}
-	pr_debug("%s --> %s\n", source_path, path);
 	return 0;
 }
 
@@ -417,7 +416,6 @@ static int get_link_path(const char *link,
 {
 	char source_path[PATH_MAX];
 	ssize_t bytes;
-	int err;
 
 	bytes = readlink(link, source_path, PATH_MAX - 1);
 	if (bytes < 0) {
@@ -426,10 +424,7 @@ static int get_link_path(const char *link,
 	}
 	source_path[bytes] = '\0';
 
-	err = fixup_source_path(source_path, source_mnt, target_mnt, path, size);
-	if (!err)
-		pr_debug("%s --> %s\n", link, path);
-	return err;
+	return fixup_source_path(source_path, source_mnt, target_mnt, path, size);
 }
 
 static int open_target_fd(struct replace_fd *rfd, unsigned flags, const char *path)
@@ -494,8 +489,6 @@ static int process_add_fd(struct process_info *p, int source_fd, int target_fd)
 	list_add_tail(&pfd->list, &p->fds);
 	p->fds_nr++;
 
-	pr_debug("Added replace fd: /proc/%d/fd/%d --> /proc/%d/fd/%d\n",
-			getpid(), pfd->source_fd, p->pid, pfd->target_fd);
 	return 0;
 }
 
@@ -516,8 +509,6 @@ static int process_add_mapping(struct process_info *p, int map_fd,
 	list_add_tail(&mfd->list, &p->maps);
 	p->maps_nr++;
 
-	pr_debug("Added replace mapping: /proc/%d/fd/%d (%lx-%lx)\n",
-			getpid(), mfd->map_fd, mfd->start, mfd->end);
 	return 0;
 }
 
@@ -533,8 +524,6 @@ static int collect_process_fd(struct process_info *p, int dir,
 
 	if (!is_mnt_file(dir, process_fd, pc->source_mnt, pc->src_dev))
 		return 0;
-
-	pr_debug("Collecting /proc/%d/fd/%s\n", p->pid, process_fd);
 
 	err = xatol(process_fd, (long *)&source_fd);
 	if (err) {
@@ -560,6 +549,9 @@ static int collect_process_fd(struct process_info *p, int dir,
 	target_fd = get_target_fd(rfd, flags, path);
 	if (target_fd < 0)
 		return target_fd;
+
+	pr_debug("\t/proc/%d/fd/%d ---> %s (fd: %d)\n",
+			p->pid, source_fd, path, target_fd);
 
 	return process_add_fd(p, source_fd, target_fd);
 }
@@ -622,8 +614,6 @@ static int collect_map_file(struct process_info *p,
 {
 	int fd, map_fd = -1, err;
 
-	pr_debug("Collecting /proc/%d/map_files/%lx-%lx\n", p->pid, start, end);
-
 	fd = open(path, mode);
 	if (fd < 0) {
 		pr_perror("failed to open %s", path);
@@ -635,6 +625,9 @@ static int collect_map_file(struct process_info *p,
 		pr_err("failed to collect map fd for path %s\n", path);
 		goto close_fd;
 	}
+
+	pr_debug("\t/proc/%d/map_files/%lx-%lx ---> %s (fd: %d)\n",
+			p->pid, start, end, path, map_fd);
 
 	err = process_add_mapping(p, map_fd, start, end);
 
@@ -667,8 +660,8 @@ static bool is_mnt_map(int dir, unsigned long start, unsigned long end,
 	return is_mnt_file(dir, path, pc->source_mnt, pc->src_dev);
 }
 
-static int collect_process_map_fds(struct process_info *p,
-				   struct processes_collection_s *pc)
+static int collect_process_maps(struct process_info *p,
+				struct processes_collection_s *pc)
 {
 	char map[PATH_MAX];
 	FILE *fmap;
@@ -739,7 +732,6 @@ static int open_process_env(struct process_info *p,
 {
 	char path[PATH_MAX];
 	char link[PATH_MAX];
-
 	int err, fd;
 
 	snprintf(link, PATH_MAX, "/proc/%d/%s", p->pid, dentry);
@@ -752,6 +744,9 @@ static int open_process_env(struct process_info *p,
 		pr_perror("failed to open %s", path);
 		return -errno;
 	}
+
+	pr_debug("\t/proc/%d/%s ---> %s (fd %d)\n", p->pid, dentry, path, fd);
+
 	return fd;
 }
 
@@ -780,16 +775,12 @@ static int collect_process_fs(struct process_info *p,
 	}
 
 	if (mnt_cwd) {
-		pr_debug("Collecting /proc/%d/cwd\n", p->pid);
-
 		p->fs.cwd_fd = open_process_env(p, pc, "cwd");
 		if (p->fs.cwd_fd < 0)
 			return p->fs.cwd_fd;
 	}
 
 	if (mnt_root) {
-		pr_debug("Collecting /proc/%d/root\n", p->pid);
-
 		p->fs.root_fd = open_process_env(p, pc, "root");
 		if (p->fs.root_fd < 0)
 			return p->fs.root_fd;
@@ -804,11 +795,10 @@ static int collect_process_exe(struct process_info *p,
 	if (!is_mnt_file(dir, "exe", pc->source_mnt, pc->src_dev))
 		return 0;
 
-	pr_debug("Collecting /proc/%d/exe\n", p->pid);
-
 	p->exe_fd = open_process_env(p, pc, "exe");
 	if (p->exe_fd < 0)
 		return p->exe_fd;
+
 	return 0;
 }
 
@@ -836,13 +826,13 @@ close_dir:
 	return err;
 }
 
-static int collect_process_fd_table(struct process_info *p,
-			            struct processes_collection_s *pc)
+static int collect_process_fds(struct process_info *p,
+			       struct processes_collection_s *pc)
 {
 	int err;
 
 	if (fd_table_exists(p->pid)) {
-		pr_info("ignoring process %d fd table\n", p->pid);
+		pr_info("\t/proc/%d/fd ---> ignoring (shared)\n", p->pid);
 		return 0;
 	}
 
@@ -863,9 +853,11 @@ static int collect_one_process(pid_t pid, void *data)
 	struct process_info *p;
 
 	if (pid_is_kthread(pid)) {
-		pr_debug("Skipping kthread %d\n", pid);
+		pr_debug("Process %d: kthread, skipping\n", pid);
 		return 0;
 	}
+
+	pr_debug("Process %d: examining...\n", pid);
 
 	p = malloc(sizeof(*p));
 	if (!p) {
@@ -886,11 +878,11 @@ static int collect_one_process(pid_t pid, void *data)
 	if (err)
 		goto free_p;
 
-	err = collect_process_fd_table(p, pc);
+	err = collect_process_fds(p, pc);
 	if (err)
 		goto free_p;
 
-	err = collect_process_map_fds(p, pc);
+	err = collect_process_maps(p, pc);
 	if (err)
 		goto free_p;
 
@@ -901,7 +893,6 @@ static int collect_one_process(pid_t pid, void *data)
 	if (err)
 		goto free_p;
 	list_add_tail(&p->list, pc->collection);
-	pr_debug("collected process %d\n", pid);
 	return 0;
 
 free_p:
