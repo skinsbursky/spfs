@@ -846,6 +846,21 @@ static int collect_process_fds(struct process_info *p,
 	return err;
 }
 
+static bool process_needs_replace(struct process_info *p)
+{
+	if (p->fds_nr)
+		return true;
+	if (p->maps_nr)
+		return true;
+	if (p->exe_fd != -1)
+		return true;
+	if (p->fs.cwd_fd != -1)
+		return true;
+	if (p->fs.root_fd != -1)
+		return true;
+	return false;
+}
+
 static int collect_one_process(pid_t pid, void *data)
 {
 	int err;
@@ -886,12 +901,13 @@ static int collect_one_process(pid_t pid, void *data)
 	if (err)
 		goto free_p;
 
-	if ((p->fds_nr + p->maps_nr) == 0)
+	if (!process_needs_replace(p))
 		goto free_p;
 
 	err = attach_to_process(p);
 	if (err)
 		goto free_p;
+
 	list_add_tail(&p->list, pc->collection);
 	return 0;
 
