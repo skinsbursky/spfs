@@ -258,11 +258,6 @@ int iterate_pids_list_name(const char *pids_list, void *data,
 			break;
 		}
 
-		if (pid_is_kthread(p)) {
-			pr_debug("Skipping kthread %s\n", pid);
-			continue;
-		}
-
 		err = actor(p, data);
 		if (err) {
 			pr_err("actor %s failed for pid %d\n", actor_name, p);
@@ -871,6 +866,11 @@ static int collect_one_process(pid_t pid, void *data)
 	int err;
 	struct processes_collection_s *pc = data;
 	struct process_info *p;
+
+	if (pid_is_kthread(pid)) {
+		pr_debug("Skipping kthread %d\n", pid);
+		return 0;
+	}
 
 	p = malloc(sizeof(*p));
 	if (!p) {
