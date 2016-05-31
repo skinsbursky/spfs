@@ -371,8 +371,8 @@ static int collect_process_fd(struct process_info *p, int dir,
 	if (target_fd < 0)
 		return target_fd;
 
-	pr_debug("\t/proc/%d/fd/%d ---> %s (fd: %d)\n",
-			p->pid, source_fd, path, target_fd);
+	pr_debug("\t/proc/%d/fd/%d ---> %s (fd: %d, flags: 0%o)\n",
+			p->pid, source_fd, path, target_fd, flags);
 
 	return process_add_fd(p, source_fd, target_fd);
 }
