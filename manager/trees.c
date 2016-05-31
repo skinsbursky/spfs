@@ -246,3 +246,41 @@ free_new_map_fd:
 exit:
 	return err;
 }
+
+static int compare_paths(const void *a, const void *b)
+{
+	const char *f = a, *s = b;
+
+	return strcmp(f, s);
+}
+
+static int collect_path(const char *path, void **root)
+{
+	char *p;
+	const char **fp;
+
+	p = strdup(path);
+	if (!p) {
+		pr_err("failed to duplicate string\n");
+		free(p);
+		return -ENOMEM;
+	}
+
+	fp = tsearch(p, root, compare_paths);
+	if (!fp) {
+		pr_err("failed to add new path object to the tree\n");
+		return -ENOMEM;
+	}
+
+	if (*fp == p)
+		return 0;
+
+	return -EEXIST;
+}
+
+int collect_fifo(const char *path)
+{
+	static void *fifo_tree_root = NULL;
+
+	return collect_path(path, &fifo_tree_root);
+}
