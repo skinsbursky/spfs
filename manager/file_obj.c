@@ -48,8 +48,6 @@ static int fifo_file_fill(const char *source, unsigned fd)
 	int source_fd, err = 0;
 	ssize_t bytes;
 
-	/* TODO: CHECK THAT FIFO WASN"T RESTORED!!!! */
-
 	snprintf(path, PATH_MAX, "/proc/%d/fd/%d", getpid(), fd);
 
 	fifo = open(path, O_RDWR);
@@ -128,7 +126,17 @@ static int fifo_file_open(const char *path, unsigned flags, const char *parent)
 	if (fd < 0)
 		return fd;
 
-	err = fifo_file_fill(parent, fd);
+	err = collect_fifo(path);
+	switch (err) {
+		case -EEXIST:
+			err = 0;
+			break;
+		case 0:
+			err = fifo_file_fill(parent, fd);
+			break;
+		default:
+			close(fd);
+	}
 
 	return err ? err : fd;
 }
