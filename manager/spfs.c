@@ -335,7 +335,7 @@ static int prepare_mount_env_ct(struct spfs_info_s *info, const char *proxy_dir)
 		return err;
 
 	if (mount("spfs-manager", info->work_dir, "tmpfs", 0, "size=1m")) {
-		pr_err("failed to mount tmpfs to %s", info->work_dir);
+		pr_perror("failed to mount tmpfs to %s", info->work_dir);
 		err = -errno;
 		goto rm_info_dir;
 	}
