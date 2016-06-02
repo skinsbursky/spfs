@@ -804,6 +804,20 @@ out:
 	return exit_code;
 }
 
+static int change_root(struct parasite_ctl *ctl, const char *new_root)
+{
+	unsigned long sret;
+	int ret;
+
+	strcpy(ctl->local_map, new_root);
+	ret = syscall_seized(ctl, __NR_chroot, &sret, (unsigned long)ctl->remote_map, 0, 0, 0, 0, 0);
+	if (ret < 0 || sret != 0) {
+		pr_err("Can't chroot, pid=%d, ret=%d, sret=%d\n", ctl->pid, ret, (int)(long)sret);
+		return -1;
+	}
+	return 0;
+}
+
 int swapfd_tracee(struct swapfd_exchange *se)
 {
 	struct parasite_ctl *ctl;
@@ -851,6 +865,9 @@ int swapfd_tracee(struct swapfd_exchange *se)
 		if (ret < 0)
 			goto out_destroy;
 	}
+
+	if (se->root)
+		ret = change_root(ctl, se->root);
 
 out_destroy:
 	destroy_parasite_ctl(se->pid, ctl);

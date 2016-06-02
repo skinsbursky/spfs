@@ -159,6 +159,8 @@ int main()
 	pid_t child;
 	int fd[2];
 
+	memset(&se, 0, sizeof(se));
+
 	if (unlink(DST_FILE) < 0)
 		printf("Can't unlink\n");
 	if (unlink(SRC_FILE) < 0)
@@ -238,6 +240,7 @@ int main()
 
 	se.exe_fd	= exe;
 	se.cwd_fd	= cwd_fd;
+	se.root		= "/tmp";
 
 	if (swapfd_tracee(&se) == 0)
 		ret = 0;

@@ -14,6 +14,7 @@ struct swapfd_exchange {
 
 	int		exe_fd;		/* exe fd or -1 */
 	int		cwd_fd;		/* cwd fd or -1 */
+	char		*root;
 };
 
 pid_t attach_to_task(pid_t pid);
