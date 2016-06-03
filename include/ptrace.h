@@ -94,8 +94,8 @@ struct thread_ctx {
 struct parasite_ctl {
 	void			*remote_map;
 	void			*local_map;
-	struct sockaddr_un	addr;
-	socklen_t		addrlen;
+	struct sockaddr_un	remote_addr;
+	socklen_t		remote_addrlen;
 	int			remote_sockfd;
 	int			local_sockfd;
 	unsigned		map_length;

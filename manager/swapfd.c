@@ -30,6 +30,7 @@
 #include "swapfd.h"
 
 #define MMAP_SIZE (PATH_MAX + BUILTIN_SYSCALL_SIZE)
+#define MAX_BIND_ATTEMPTS	1000
 
 struct map_struct {
 	struct list_head list;
@@ -297,10 +298,10 @@ static int set_dgram_socket(struct parasite_ctl *ctl)
 
 	memset(addr, 0, sizeof(*addr));
 	addr->sun_family = AF_UNIX;
-	len = sprintf(addr->sun_path + 1, "SWAPFD-%d-", ctl->pid) + 1;
+	len = sprintf(addr->sun_path + 1, "SWAPFD-remote-%d-", ctl->pid) + 1;
 	addr->sun_path[0] = '\0';
 
-	for (i = 0; i < 1000; i++) {
+	for (i = 0; i < MAX_BIND_ATTEMPTS; i++) {
 		len2 = sprintf(addr->sun_path + len, "%x", i);
 		ret = syscall_seized(ctl, __NR_bind, &sret,
 				     fd, (unsigned long)ctl->remote_map,
@@ -320,9 +321,9 @@ static int set_dgram_socket(struct parasite_ctl *ctl)
 			break;
 		}
 
-		memcpy(&ctl->addr, addr, sizeof(*addr));
-		ctl->addrlen = len + len2 + sizeof(addr->sun_family);
-		pr_debug("Set socket %s\n", addr->sun_path);
+		memcpy(&ctl->remote_addr, addr, sizeof(*addr));
+		ctl->remote_addrlen = len + len2 + sizeof(addr->sun_family);
+		pr_debug("Set socket %s\n", addr->sun_path + 1);
 
 		return 0;
 	}
@@ -490,7 +491,7 @@ static int get_fd_mode(FILE *fp, long long int *pos, mode_t *mode)
 
 static int send_dst_fd(struct parasite_ctl *ctl, int fd)
 {
-	return send_fd(ctl->local_sockfd, &ctl->addr, ctl->addrlen, fd);
+	return send_fd(ctl->local_sockfd, &ctl->remote_addr, ctl->remote_addrlen, fd);
 }
 
 /* Receive next fd from receive queue of remote_sockfd */
