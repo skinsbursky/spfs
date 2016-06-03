@@ -13,6 +13,7 @@
 
 #include "manager/swapfd.h"
 #include "include/ptrace.h"
+#include "include/pie-util-fd.h"
 
 #define SRC_FILE "src.txt"
 #define SRC_FILE2 "src2.txt"
@@ -156,6 +157,7 @@ int main()
 	unsigned long addr = 0x12345678;
 	unsigned size = sizeof(addr);
 	struct swapfd_exchange se;
+	struct parasite_ctl *ctl;
 	pid_t child;
 	int fd[2];
 
@@ -242,8 +244,14 @@ int main()
 	se.cwd_fd	= cwd_fd;
 	se.root		= "/tmp";
 
-	if (swapfd_tracee(&se) == 0)
+	ret = set_parasite_ctl(se.pid, &ctl);
+	if (ret < 0)
+		goto out_detach;
+
+	if (swapfd_tracee(ctl, &se) == 0)
 		ret = 0;
+
+	destroy_parasite_ctl(se.pid, ctl);
 out_detach:
 	detach_from_task(child);
 	/* Exit point */

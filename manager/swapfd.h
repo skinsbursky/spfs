@@ -17,9 +17,13 @@ struct swapfd_exchange {
 	char		*root;
 };
 
+struct parasite_ctl;
+
 pid_t attach_to_task(pid_t pid);
 int detach_from_task(pid_t pid);
 int wait_task_seized(pid_t pid);
-int swapfd_tracee(struct swapfd_exchange *se);
+int swapfd_tracee(struct parasite_ctl *ctl, struct swapfd_exchange *se);
+int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl);
+void destroy_parasite_ctl(pid_t pid, struct parasite_ctl *ctl);
 
 #endif

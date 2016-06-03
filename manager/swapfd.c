@@ -258,8 +258,6 @@ static int move_mappings(struct parasite_ctl *ctl, unsigned long src_addr, int s
 	return 0;
 }
 
-static void destroy_parasite_ctl(pid_t pid, struct parasite_ctl *ctl);
-
 static void destroy_dgram_socket(struct parasite_ctl *ctl)
 {
 	unsigned long sret;
@@ -351,7 +349,7 @@ destroy:
 	return -1;
 }
 
-static int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl)
+int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl)
 {
 	char path[] = "/proc/XXXXXXXXXX/fd/XXXXXXXXXX";
 	void *addr, *where;
@@ -463,7 +461,7 @@ err_free:
 	return -1;
 }
 
-static void destroy_parasite_ctl(pid_t pid, struct parasite_ctl *ctl)
+void destroy_parasite_ctl(pid_t pid, struct parasite_ctl *ctl)
 {
 	unsigned long sret;
 	int ret;
@@ -826,60 +824,52 @@ static int change_root(struct parasite_ctl *ctl, const char *new_root)
 	return 0;
 }
 
-int swapfd_tracee(struct swapfd_exchange *se)
+int swapfd_tracee(struct parasite_ctl *ctl, struct swapfd_exchange *se)
 {
-	struct parasite_ctl *ctl;
 	int i, ret;
-
-	ret = set_parasite_ctl(se->pid, &ctl);
-	if (ret < 0)
-		goto out_ret;
 
 	for (i = 0; i < se->naddr; i++) {
 		ret = send_fd(ctl, false, se->addr_fd[i]);
 		if (ret < 0)
-			goto out_destroy;
+			goto out;
 
 		ret = changemap(ctl, se->addr[i]);
 		if (ret < 0)
-			goto out_destroy;
+			goto out;
 	}
 
 	for (i = 0; i < se->nfd; i++) {
 		ret = send_fd(ctl, false, se->dst_fd[i]);
 		if (ret)
-			goto out_destroy;
+			goto out;
 		ret = changefd(ctl, se->pid, se->src_fd[i], se->dst_fd[i]);
 		if (ret < 0)
-			goto out_destroy;
+			goto out;
 	}
 
 	if (se->exe_fd >= 0) {
 		ret = send_fd(ctl, false, se->exe_fd);
 		if (ret < 0)
-			goto out_destroy;
+			goto out;
 
 		ret = change_exe(ctl);
 		if (ret < 0)
-			goto out_destroy;
+			goto out;
 	}
 
 	if (se->cwd_fd >= 0) {
 		ret = send_fd(ctl, false, se->cwd_fd);
 		if (ret < 0)
-			goto out_destroy;
+			goto out;
 
 		ret = change_cwd(ctl);
 		if (ret < 0)
-			goto out_destroy;
+			goto out;
 	}
 
 	if (se->root)
 		ret = change_root(ctl, se->root);
-
-out_destroy:
-	destroy_parasite_ctl(se->pid, ctl);
-out_ret:
+out:
 	return ret;
 }
 
