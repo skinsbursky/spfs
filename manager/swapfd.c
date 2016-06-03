@@ -507,18 +507,12 @@ static int get_fd_mode(FILE *fp, long long int *pos, mode_t *mode)
 	return ret;
 }
 
-/* Receive next fd from receive queue of remote_sockfd */
-static int get_next_fd(struct parasite_ctl *ctl)
-{
-	return recv_fd(ctl);
-}
-
 static int change_exe(struct parasite_ctl *ctl)
 {
 	unsigned long sret;
 	int exe_fd, ret;
 
-	exe_fd = get_next_fd(ctl);
+	exe_fd = recv_fd(ctl, true);
 	if (exe_fd < 0) {
 		pr_err("Can't receive exe fd\n");
 		return -1;
@@ -544,7 +538,7 @@ static int change_cwd(struct parasite_ctl *ctl)
 	unsigned long sret;
 	int cwd_fd, ret;
 
-	cwd_fd = get_next_fd(ctl);
+	cwd_fd = recv_fd(ctl, true);
 	if (cwd_fd < 0) {
 		pr_err("Can't receive exe fd\n");
 		return -1;
@@ -567,7 +561,7 @@ static int change_cwd(struct parasite_ctl *ctl)
 
 static int changemap(struct parasite_ctl *ctl, unsigned long addr)
 {
-	int fd = get_next_fd(ctl);
+	int fd = recv_fd(ctl, true);
 	unsigned long sret;
 	int ret;
 
@@ -765,7 +759,7 @@ static int changefd(struct parasite_ctl *ctl, pid_t pid, int src_fd, int dst_fd)
 		goto out;
 	}
 
-	new_fd = get_next_fd(ctl);
+	new_fd = recv_fd(ctl, true);
 	if (new_fd < 0) {
 		pr_err("Can't receive fd\n");
 		exit_code = -1;

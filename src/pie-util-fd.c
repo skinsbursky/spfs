@@ -147,15 +147,21 @@ int send_fds(struct parasite_ctl *ctl, bool seized, int *fds, int nr_fds, bool w
 	return 0;
 }
 
-int recv_fds(struct parasite_ctl *ctl, int *fds, int nr_fds, struct fd_opts *opts)
+int recv_fds(struct parasite_ctl *ctl, bool seized, int *fds, int nr_fds, struct fd_opts *opts)
 {
-	struct scm_fdset *fdset = (void *)ctl->local_map;
-	struct scm_fdset *rfdset = (void *)ctl->remote_map;
+	struct scm_fdset *fdset, *rfdset;
 	struct cmsghdr *cmsg;
 	unsigned long sret;
 	int *cmsg_data;
 	int ret;
 	int i, min_fd;
+
+	if (seized) {
+		fdset = (void *)ctl->local_map;
+		rfdset = (void *)ctl->remote_map;
+	} else {
+		return -1;
+	}
 
 	cmsg_data = scm_fdset_init(fdset, rfdset, NULL, 0, opts != NULL);
 	for (i = 0; i < nr_fds; i += min_fd) {
