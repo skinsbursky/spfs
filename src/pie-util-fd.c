@@ -73,14 +73,23 @@ static int *scm_fdset_init(struct scm_fdset *fdset, struct scm_fdset *rfdset,
 	return (int *)CMSG_DATA(cmsg);
 }
 
-int send_fds(int sock, struct sockaddr_un *saddr, int len,
-		int *fds, int nr_fds, bool with_flags)
+int send_fds(struct parasite_ctl *ctl, bool seized, int *fds, int nr_fds, bool with_flags)
 {
+	int i, min_fd, ret, sock;
+	struct sockaddr_un *addr;
 	struct scm_fdset fdset;
+	socklen_t addrlen;
 	int *cmsg_data;
-	int i, min_fd, ret;
 
-	cmsg_data = scm_fdset_init(&fdset, &fdset, saddr, len, with_flags);
+	if (seized)
+		return -1;
+	else {
+		sock = ctl->local_sockfd;
+		addr = &ctl->remote_addr;
+		addrlen = ctl->remote_addrlen;
+	}
+
+	cmsg_data = scm_fdset_init(&fdset, &fdset, addr, addrlen, with_flags);
 	for (i = 0; i < nr_fds; i += min_fd) {
 		min_fd = min(CR_SCM_MAX_FD, nr_fds - i);
 		scm_fdset_init_chunk(&fdset, &fdset, min_fd);

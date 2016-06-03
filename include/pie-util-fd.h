@@ -12,13 +12,12 @@ struct fd_opts {
 	} fown;
 };
 
-extern int send_fds(int sock, struct sockaddr_un *saddr, int saddr_len,
-		    int *fds, int nr_fds, bool with_flags);
+extern int send_fds(struct parasite_ctl *ctl, bool seized, int *fds, int nr_fds, bool with_flags);
 extern int recv_fds(struct parasite_ctl *ctl, int *fds, int nr_fds, struct fd_opts *opts);
 
-static inline int send_fd(int sock, struct sockaddr_un *saddr, int saddr_len, int fd)
+static inline int send_fd(struct parasite_ctl *ctl, bool seized, int fd)
 {
-	return send_fds(sock, saddr, saddr_len, &fd, 1, false);
+	return send_fds(ctl, seized, &fd, 1, false);
 }
 
 static inline int recv_fd(struct parasite_ctl *ctl)
