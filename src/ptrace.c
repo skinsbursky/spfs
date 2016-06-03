@@ -1,5 +1,6 @@
 #include <sys/resource.h>
 #include <sys/ptrace.h>
+#include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/mman.h>
@@ -311,4 +312,34 @@ void *mmap_seized(struct parasite_ctl *ctl,
 	}
 
 	return (void *)map;
+}
+
+ssize_t sendmsg_seized(struct parasite_ctl *ctl, int sockfd, const struct msghdr *msg, int flags)
+{
+	unsigned long sret;
+	int ret;
+
+	ret = syscall_seized(ctl, __NR_sendmsg, &sret, sockfd,
+			     (unsigned long)msg, flags, 0, 0, 0);
+	if (ret < 0 || (int)(long)sret < 0) {
+		pr_err("sendmsg_seized: %d %d\n", ret, (int)(long)sret);
+		return -1;
+	}
+
+	return (ssize_t)sret;	
+}
+
+ssize_t recvmsg_seized(struct parasite_ctl *ctl, int sockfd, struct msghdr *msg, int flags)
+{
+	unsigned long sret;
+	int ret;
+
+	ret = syscall_seized(ctl, __NR_recvmsg, &sret, sockfd,
+			     (unsigned long)msg, flags, 0, 0, 0);
+	if (ret < 0 || (int)(long)sret < 0) {
+		pr_err("recvmsg_seized: %d %d\n", ret, (int)(long)sret);
+		return -1;
+	}
+
+	return (ssize_t)sret;	
 }

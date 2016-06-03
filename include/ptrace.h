@@ -1,6 +1,7 @@
 #ifndef __SPFS_PTRACE_H__
 #define __SPFS_PTRACE_H__
 
+#include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/user.h>
 #include <sys/un.h>
@@ -129,4 +130,8 @@ void *mmap_seized(struct parasite_ctl *ctl,
 		  void *addr, size_t length, int prot,
 		  int flags, int fd, off_t offset);
 
+ssize_t sendmsg_seized(struct parasite_ctl *ctl, int sockfd,
+		       const struct msghdr *msg, int flags);
+ssize_t recvmsg_seized(struct parasite_ctl *ctl, int sockfd,
+		       struct msghdr *msg, int flags);
 #endif

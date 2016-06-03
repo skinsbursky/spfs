@@ -151,7 +151,6 @@ int recv_fds(struct parasite_ctl *ctl, bool seized, int *fds, int nr_fds, struct
 {
 	struct scm_fdset *fdset, *rfdset;
 	struct cmsghdr *cmsg;
-	unsigned long sret;
 	int *cmsg_data;
 	int ret;
 	int i, min_fd;
@@ -168,13 +167,9 @@ int recv_fds(struct parasite_ctl *ctl, bool seized, int *fds, int nr_fds, struct
 		min_fd = min(CR_SCM_MAX_FD, nr_fds - i);
 		scm_fdset_init_chunk(fdset, rfdset, min_fd);
 
-		ret = syscall_seized(ctl, __NR_recvmsg, &sret,
-				     ctl->remote_sockfd, (unsigned long)&rfdset->hdr,
-				     0, 0, 0, 0);
-		if (ret < 0 || (int)(long)sret < 0) {
-			pr_err("Can't receive sock\n");
+		ret = recvmsg_seized(ctl, ctl->remote_sockfd, &rfdset->hdr, 0);
+		if (ret < 0)
 			return -1;
-		}
 
 		cmsg = __CMSG_FIRSTHDR(&fdset->msg_buf, fdset->hdr.msg_controllen);
 		if (!cmsg || cmsg->cmsg_type != SCM_RIGHTS) {
