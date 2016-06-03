@@ -105,6 +105,7 @@ static int exec_spfs(int pipe, const struct spfs_info_s *info, char *mode,
 	sprintf(wpipe, "%d", pipe);
 
 	options = exec_options(0, "spfs", "-vvvv", "-f", "--single-user",
+				"-o", "no_remote_lock",
 				"--mode", mode,
 				"--socket-path", socket_path,
 				"--ready-fd", wpipe,
