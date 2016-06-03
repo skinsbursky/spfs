@@ -75,24 +75,31 @@ static int *scm_fdset_init(struct scm_fdset *fdset, struct scm_fdset *rfdset,
 
 int send_fds(struct parasite_ctl *ctl, bool seized, int *fds, int nr_fds, bool with_flags)
 {
+	struct scm_fdset *fdset, *rfdset;
 	int i, min_fd, ret, sock;
 	struct sockaddr_un *addr;
-	struct scm_fdset fdset;
 	socklen_t addrlen;
 	int *cmsg_data;
 
-	if (seized)
-		return -1;
-	else {
+	fdset = ctl->local_map;
+	if (seized) {
+		rfdset = ctl->remote_map;
+		sock = ctl->remote_sockfd;
+		addrlen = ctl->local_addrlen;
+		addr = ctl->local_map + sizeof(*fdset);
+		memcpy(addr, &ctl->local_addr, addrlen);
+		addr = ctl->remote_map + sizeof(*fdset);
+	} else {
+		rfdset = fdset;
 		sock = ctl->local_sockfd;
-		addr = &ctl->remote_addr;
 		addrlen = ctl->remote_addrlen;
+		addr = &ctl->remote_addr;
 	}
 
-	cmsg_data = scm_fdset_init(&fdset, &fdset, addr, addrlen, with_flags);
+	cmsg_data = scm_fdset_init(fdset, rfdset, addr, addrlen, with_flags);
 	for (i = 0; i < nr_fds; i += min_fd) {
 		min_fd = min(CR_SCM_MAX_FD, nr_fds - i);
-		scm_fdset_init_chunk(&fdset, &fdset, min_fd);
+		scm_fdset_init_chunk(fdset, rfdset, min_fd);
 		memcpy(cmsg_data, &fds[i], sizeof(int) * min_fd);
 
 		if (with_flags) {
@@ -100,7 +107,7 @@ int send_fds(struct parasite_ctl *ctl, bool seized, int *fds, int nr_fds, bool w
 
 			for (j = 0; j < min_fd; j++) {
 				int flags, fd = fds[i + j];
-				struct fd_opts *p = fdset.opts + j;
+				struct fd_opts *p = fdset->opts + j;
 				struct f_owner_ex owner_ex;
 				u32 v[2];
 
@@ -139,9 +146,14 @@ int send_fds(struct parasite_ctl *ctl, bool seized, int *fds, int nr_fds, bool w
 			}
 		}
 
-		ret = sendmsg(sock, &fdset.hdr, 0);
-		if (ret <= 0)
+		if (seized)
+			ret = sendmsg_seized(ctl, sock, &rfdset->hdr, 0);
+		else
+			ret = sendmsg(sock, &fdset->hdr, 0);
+		if (ret <= 0) {
+			pr_err("sendmsg: %d%s\n", ret, seized ? "(seized)" : "\0");
 			return ret ? : -1;
+		}
 	}
 
 	return 0;
@@ -155,21 +167,26 @@ int recv_fds(struct parasite_ctl *ctl, bool seized, int *fds, int nr_fds, struct
 	int ret;
 	int i, min_fd;
 
-	if (seized) {
-		fdset = (void *)ctl->local_map;
-		rfdset = (void *)ctl->remote_map;
-	} else {
-		return -1;
-	}
+	fdset = ctl->local_map;
+	if (seized)
+		rfdset = ctl->remote_map;
+	else
+		rfdset = fdset;
 
 	cmsg_data = scm_fdset_init(fdset, rfdset, NULL, 0, opts != NULL);
 	for (i = 0; i < nr_fds; i += min_fd) {
 		min_fd = min(CR_SCM_MAX_FD, nr_fds - i);
 		scm_fdset_init_chunk(fdset, rfdset, min_fd);
 
-		ret = recvmsg_seized(ctl, ctl->remote_sockfd, &rfdset->hdr, 0);
-		if (ret < 0)
+		if (seized)
+			ret = recvmsg_seized(ctl, ctl->remote_sockfd, &rfdset->hdr, 0);
+		else
+			ret = recvmsg(ctl->local_sockfd, &fdset->hdr, 0);
+
+		if (ret < 0) {
+			pr_err("recvmsg: %d%s\n", ret, seized ? "(seized)" : "\0");
 			return -1;
+		}
 
 		cmsg = __CMSG_FIRSTHDR(&fdset->msg_buf, fdset->hdr.msg_controllen);
 		if (!cmsg || cmsg->cmsg_type != SCM_RIGHTS) {
