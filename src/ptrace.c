@@ -298,8 +298,10 @@ void *mmap_seized(struct parasite_ctl *ctl,
 
 	err = syscall_seized(ctl, __NR_mmap, &map,
 			(unsigned long)addr, length, prot, flags, fd, offset);
-	if (err < 0)
+	if (err < 0) {
+		pr_err("Seized mmap call failed: %d\n", err);
 		return NULL;
+	}
 
 	if (IS_ERR_VALUE(map)) {
 		if (map == -EACCES && (prot & PROT_WRITE) && (prot & PROT_EXEC))

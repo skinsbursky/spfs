@@ -227,12 +227,11 @@ static int move_mappings(struct parasite_ctl *ctl, unsigned long src_addr, int s
 
 		pr_debug("mmap to replace %lx: len=%lx, prot=%x, flags=%x, off=%lx\n",
 			 map->start, length, prot, flags, map->pgoff);
-		ret = syscall_seized(ctl, __NR_mmap, &sret, 0, length, prot, flags, dst_fd, map->pgoff);
-		if (ret || IS_ERR_VALUE(sret)) {
-			pr_err("Can't mmap: ret=%d, sret=%d\n", ret, (int)(long)sret);
+		addr = (unsigned long)mmap_seized(ctl, 0, length, prot, flags, dst_fd, map->pgoff);
+		if (!addr) {
+			pr_err("mmap failed\n");
 			return -1;
 		}
-		addr = sret;
 
 		if (flags & MAP_PRIVATE) {
 			ret = copy_private_content(ctl, addr, map->start, length);
