@@ -286,12 +286,13 @@ static int set_dgram_socket(struct parasite_ctl *ctl)
 	struct sockaddr_un *addr = (void *)ctl->local_map;
 	int fd, ret, i, len, len2, err;
 	unsigned long sret;
+	socklen_t addrlen;
 
 	ret = syscall_seized(ctl, __NR_socket, &sret,
 			     AF_UNIX, SOCK_DGRAM, 0, 0, 0, 0);
 	fd = (int)(long)sret;
 	if (ret < 0 || fd < 0) {
-		pr_err("Can't create dgram socket: %d %d", ret, fd);
+		pr_err("Can't create remote sock: %d %d", ret, fd);
 		return -1;
 	}
 	ctl->remote_sockfd = fd;
@@ -303,32 +304,50 @@ static int set_dgram_socket(struct parasite_ctl *ctl)
 
 	for (i = 0; i < MAX_BIND_ATTEMPTS; i++) {
 		len2 = sprintf(addr->sun_path + len, "%x", i);
+		addrlen = sizeof(addr->sun_family) + len + len2;
+
 		ret = syscall_seized(ctl, __NR_bind, &sret,
 				     fd, (unsigned long)ctl->remote_map,
-				     len + len2 + sizeof(addr->sun_family),
+				     addrlen,
 				     0, 0, 0);
 		err = (int)(long)sret;
-		if (err == -EADDRINUSE)
+		if (!ret && err == -EADDRINUSE)
 			continue;
 		if (ret < 0 || err < 0) {
-			pr_err("Can't bind: %d %d\n", ret, err);
-			break;
-		}
-
-		ctl->local_sockfd = socket(AF_UNIX, SOCK_DGRAM, 0);
-		if (ctl->local_sockfd < 0) {
-			pr_perror("Can't create local sock", errno);
-			break;
+			pr_err("Can't bind remote: %d %d\n", ret, err);
+			goto destroy;
 		}
 
 		memcpy(&ctl->remote_addr, addr, sizeof(*addr));
-		ctl->remote_addrlen = len + len2 + sizeof(addr->sun_family);
-		pr_debug("Set socket %s\n", addr->sun_path + 1);
-
-		return 0;
+		ctl->remote_addrlen = addrlen;
+		pr_debug("Set remote sock %s\n", addr->sun_path + 1);
+		break;
 	}
 
-	pr_err("Can't set dgram sockets\n");
+	fd = ctl->local_sockfd = socket(AF_UNIX, SOCK_DGRAM, 0);
+	if (fd < 0) {
+		pr_perror("Can't create local sock");
+		goto destroy;
+	}
+
+	len = sprintf(addr->sun_path + 1, "SWAPFD-local-%d-", ctl->pid) + 1;
+
+	for (i = 0; i < MAX_BIND_ATTEMPTS; i++) {
+		len2 = sprintf(addr->sun_path + len, "%x", i);
+		addrlen = sizeof(addr->sun_family) + len + len2;
+
+		ret = bind(fd, addr, addrlen);
+		if (ret < 0 && errno == -EADDRINUSE)
+			continue;
+		if (ret < 0) {
+			pr_perror("Can't bind local");
+			goto destroy;
+		}
+		memcpy(&ctl->local_addr, addr, sizeof(*addr));
+		ctl->local_addrlen = addrlen;
+		return 0;
+	}
+destroy:
 	destroy_dgram_socket(ctl);
 	return -1;
 }
