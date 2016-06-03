@@ -48,7 +48,7 @@ struct process_info {
 	int exe_fd;
 	struct process_fs {
 		int cwd_fd;
-		int root_fd;
+		char *root;
 	} fs;
 	struct list_head fds;
 	struct list_head maps;

@@ -547,16 +547,24 @@ close_dir:
 
 }
 
+static int get_process_env(struct process_info *p,
+			   struct processes_collection_s *pc,
+			   const char *dentry, char *path, size_t size)
+{
+	char link[PATH_MAX];
+
+	snprintf(link, PATH_MAX, "/proc/%d/%s", p->pid, dentry);
+	return get_link_path(link, pc->source_mnt, pc->target_mnt, path, size);
+}
+
 static int open_process_env(struct process_info *p,
 			    struct processes_collection_s *pc,
 			    const char *dentry)
 {
 	char path[PATH_MAX];
-	char link[PATH_MAX];
 	int err, fd;
 
-	snprintf(link, PATH_MAX, "/proc/%d/%s", p->pid, dentry);
-	err = get_link_path(link, pc->source_mnt, pc->target_mnt, path, sizeof(path));
+	err = get_process_env(p, pc, dentry, path, sizeof(path));
 	if (err)
 		return err;
 
@@ -602,9 +610,15 @@ static int collect_process_fs(struct process_info *p,
 	}
 
 	if (mnt_root) {
-		p->fs.root_fd = open_process_env(p, pc, "root");
-		if (p->fs.root_fd < 0)
-			return p->fs.root_fd;
+		char path[PATH_MAX];
+
+		err = get_process_env(p, pc, "root", path, sizeof(path));
+		if (err)
+			return err;
+
+		p->fs.root= strdup(path);
+		if (!p->fs.root)
+			return -ENOMEM;
 	}
 	return 0;
 }
@@ -677,7 +691,7 @@ static bool process_needs_replace(struct process_info *p)
 		return true;
 	if (p->fs.cwd_fd != -1)
 		return true;
-	if (p->fs.root_fd != -1)
+	if (p->fs.root)
 		return true;
 	return false;
 }
@@ -706,7 +720,7 @@ static int collect_one_process(pid_t pid, void *data)
 	p->maps_nr = 0;
 	p->exe_fd = -1;
 	p->fs.cwd_fd = -1;
-	p->fs.root_fd = -1;
+	p->fs.root = NULL;
 	INIT_LIST_HEAD(&p->fds);
 	INIT_LIST_HEAD(&p->maps);
 

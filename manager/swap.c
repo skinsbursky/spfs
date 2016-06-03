@@ -243,20 +243,27 @@ static int do_swap_process_resources(struct process_info *p)
 		se.cwd_fd = p->fs.cwd_fd;
 	}
 
-	if (p->fs.root_fd >= 0) {
-		pr_debug("\t/proc/%d/fd/%d --> /proc/%d/root\n",
-				getpid(), p->fs.root_fd, p->pid);
+	if (p->fs.root) {
+		pr_debug("\t%s --> /proc/%d/root\n", p->fs.root, p->pid);
+		se.root.cwd_fd = open("/", O_PATH);
+		if (se.root.cwd_fd < 0) {
+			pr_perror("failed to open /");
+			goto free;
+		}
+		se.root.path = p->fs.root + 1;
 	}
 
 	se.pid = p->pid;
 
 	err = set_parasite_ctl(se.pid, &ctl);
 	if (err < 0)
-		goto free;
+		goto close_root_cwd;
 
 	err = swapfd_tracee(ctl, &se);
 
 	destroy_parasite_ctl(se.pid, ctl);
+close_root_cwd:
+	close(se.root.cwd_fd);
 free:
 	free(se.src_fd);
 	free(se.dst_fd);
