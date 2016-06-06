@@ -523,15 +523,9 @@ static int change_exe(struct parasite_ctl *ctl, int exe_fd)
 	return 0;
 }
 
-static int change_cwd(struct parasite_ctl *ctl)
+static int change_cwd(struct parasite_ctl *ctl, int cwd_fd)
 {
-	int cwd_fd, ret;
-
-	cwd_fd = recv_fd(ctl, true);
-	if (cwd_fd < 0) {
-		pr_err("Can't receive exe fd\n");
-		return -1;
-	}
+	int ret;
 
 	ret = fchdir_seized(ctl, cwd_fd);
 	if (ret < 0) {
@@ -882,11 +876,11 @@ int swapfd_tracee(struct parasite_ctl *ctl, struct swapfd_exchange *se)
 	}
 
 	if (se->cwd_fd >= 0 && se->cwd_fd != se->root.cwd_fd) {
-		ret = send_fd(ctl, false, se->cwd_fd);
+		ret = remote_fd = transfer_local_fd(ctl, se->cwd_fd);
 		if (ret < 0)
 			goto out;
 
-		ret = change_cwd(ctl);
+		ret = change_cwd(ctl, remote_fd);
 		if (ret < 0)
 			goto out;
 	}
