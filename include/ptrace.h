@@ -134,4 +134,6 @@ ssize_t sendmsg_seized(struct parasite_ctl *ctl, int sockfd,
 		       const struct msghdr *msg, int flags);
 ssize_t recvmsg_seized(struct parasite_ctl *ctl, int sockfd,
 		       struct msghdr *msg, int flags);
+
+int close_seized(struct parasite_ctl *ctl, int fd);
 #endif

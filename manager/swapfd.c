@@ -260,7 +260,6 @@ static int move_mappings(struct parasite_ctl *ctl, unsigned long src_addr, int s
 
 static void destroy_dgram_socket(struct parasite_ctl *ctl)
 {
-	unsigned long sret;
 	int ret;
 
 	if (ctl->local_sockfd >= 0) {
@@ -271,9 +270,8 @@ static void destroy_dgram_socket(struct parasite_ctl *ctl)
 	if (ctl->remote_sockfd < 0)
 		return;
 
-	ret = syscall_seized(ctl, __NR_close, &sret,
-			     ctl->remote_sockfd, 0, 0, 0, 0, 0);
-	if (ret || sret)
+	ret = close_seized(ctl, ctl->remote_sockfd);
+	if (ret)
 		pr_err("Can't destroy dgram socket\n");
 	else
 		ctl->remote_sockfd = -1;
@@ -394,7 +392,7 @@ int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl)
 	if (ptrace_poke_area(pid, orig_code, where, sizeof(orig_code))) {
 		fd = (int)(long)sret;
 		if (fd >= 0)
-			syscall_seized(ctl, __NR_close, &sret, fd, 0, 0, 0, 0, 0);
+			close_seized(ctl, fd);
 		pr_err("Can't restore memfd args (pid: %d)\n", pid);
 		goto err_free;
 	}
@@ -434,7 +432,7 @@ int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl)
 		goto err_curef;
 	}
 
-	syscall_seized(ctl, __NR_close, &sret, fd, 0, 0, 0, 0, 0);
+	close_seized(ctl, fd);
 	close(lfd);
 	/*
 	 * Use allocated memory for syscall number, because task's mappings
@@ -454,7 +452,7 @@ int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl)
 err_curef:
 	close(lfd);
 err_cure:
-	syscall_seized(ctl, __NR_close, &sret, fd, 0, 0, 0, 0, 0);
+	close_seized(ctl, fd);
 err_free:
 	free_mappings(ctl);
 	free(ctl);
@@ -522,8 +520,8 @@ static int change_exe(struct parasite_ctl *ctl)
 		return -1;
 	}
 
-	ret = syscall_seized(ctl, __NR_close, &sret, exe_fd, 0, 0, 0, 0, 0);
-	if (ret < 0 || sret != 0) {
+	ret = close_seized(ctl, exe_fd);
+	if (ret < 0) {
 		pr_err("Can't close temporary exe_fd=%d, pid=%d\n", exe_fd, ctl->pid);
 		return -1;
 	}
@@ -548,8 +546,8 @@ static int change_cwd(struct parasite_ctl *ctl)
 		return -1;
 	}
 
-	ret = syscall_seized(ctl, __NR_close, &sret, cwd_fd, 0, 0, 0, 0, 0);
-	if (ret < 0 || sret != 0) {
+	ret = close_seized(ctl, cwd_fd);
+	if (ret < 0) {
 		pr_err("Can't close temporary cwd_fd=%d, pid=%d\n", cwd_fd, ctl->pid);
 		return -1;
 	}
@@ -560,7 +558,6 @@ static int change_cwd(struct parasite_ctl *ctl)
 static int changemap(struct parasite_ctl *ctl, unsigned long addr)
 {
 	int fd = recv_fd(ctl, true);
-	unsigned long sret;
 	int ret;
 
 	if (fd < 0) {
@@ -574,8 +571,8 @@ static int changemap(struct parasite_ctl *ctl, unsigned long addr)
 		return -1;
 	}
 
-	ret = syscall_seized(ctl, __NR_close, &sret, fd, 0, 0, 0, 0, 0);
-	if (ret < 0 || sret != 0) {
+	ret = close_seized(ctl, fd);
+	if (ret < 0) {
 		pr_err("Can't close temporary fd=%d, pid=%d\n", fd, ctl->pid);
 		return -1;
 	}
@@ -775,8 +772,8 @@ static int changefd(struct parasite_ctl *ctl, pid_t pid, int src_fd, int dst_fd)
 		exit_code = -1;
 	}
 
-	ret = syscall_seized(ctl, __NR_close, &sret, new_fd, 0, 0, 0, 0, 0);
-	if (ret < 0 || sret != 0) {
+	ret = close_seized(ctl, new_fd);
+	if (ret < 0) {
 		pr_err("Can't close temporary fd, pid=%d\n", pid);
 		exit_code = -1;
 	}
