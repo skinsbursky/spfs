@@ -13,8 +13,11 @@ struct swapfd_exchange {
 	int		nfd;		/* Number of replaced fds */
 
 	int		exe_fd;		/* exe fd or -1 */
+	struct {
+		int		cwd_fd;	/* cwd fd or -1 */
+		char		*path;	/* path for chroot */
+	} root;
 	int		cwd_fd;		/* cwd fd or -1 */
-	char		*root;
 };
 
 struct parasite_ctl;

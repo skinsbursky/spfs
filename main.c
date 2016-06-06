@@ -242,7 +242,10 @@ int main()
 
 	se.exe_fd	= exe;
 	se.cwd_fd	= cwd_fd;
-	se.root		= "/tmp";
+	se.root.cwd_fd	= open("/", O_PATH);
+	se.root.path	= "tmp";
+	if (se.root.cwd_fd < 0)
+		perror("Open /");
 
 	ret = set_parasite_ctl(se.pid, &ctl);
 	if (ret < 0)

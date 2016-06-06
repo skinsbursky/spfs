@@ -776,17 +776,63 @@ out:
 	return exit_code;
 }
 
-static int change_root(struct parasite_ctl *ctl, const char *new_root)
+static int change_root(struct parasite_ctl *ctl, int cwd_fd, const char *root, bool restore_cwd)
 {
 	unsigned long sret;
-	int ret;
+	int old_cwd_fd, ret;
 
-	strcpy(ctl->local_map, new_root);
+	if (cwd_fd == -1)
+		restore_cwd = false;
+	if (restore_cwd) {
+		/* Save old cwd */
+		strcpy(ctl->local_map, ".");
+		ret = syscall_seized(ctl, __NR_open, &sret, (unsigned long)ctl->remote_map,
+				     O_PATH, 0, 0, 0, 0);
+		old_cwd_fd = (int)(long)sret;
+		if (ret < 0 || old_cwd_fd < 0) {
+			pr_err("Can't open: pid=%d ret=%d sret=%d\n", ctl->pid, ret, old_cwd_fd);
+			return -1;
+		}
+	}
+
+	if (cwd_fd != -1) {
+		ret = fchdir_seized(ctl, cwd_fd);
+		if (ret < 0) {
+			pr_err("Can't fchdir to temporary cwd: pid=%d\n", ctl->pid);
+			return -1;
+		}
+	}
+
+	strcpy(ctl->local_map, root);
 	ret = syscall_seized(ctl, __NR_chroot, &sret, (unsigned long)ctl->remote_map, 0, 0, 0, 0, 0);
 	if (ret < 0 || sret != 0) {
 		pr_err("Can't chroot, pid=%d, ret=%d, sret=%d\n", ctl->pid, ret, (int)(long)sret);
 		return -1;
 	}
+
+	if (restore_cwd) {
+		/* Restore old cwd */
+		ret = fchdir_seized(ctl, old_cwd_fd);
+		if (ret < 0) {
+			pr_err("Can't restore old cwd: pid=%d\n", ctl->pid);
+			return -1;
+		}
+
+		ret = close_seized(ctl, old_cwd_fd);
+		if (ret < 0) {
+			pr_err("Can't close old_cwd_fd=%d, pid=%d\n", old_cwd_fd, ctl->pid);
+			return -1;
+		}
+	}
+
+	if (cwd_fd != -1) {
+		ret = close_seized(ctl, cwd_fd);
+		if (ret < 0) {
+			pr_err("Can't close cwd_fd=%d, pid=%d\n", cwd_fd, ctl->pid);
+			return -1;
+		}
+	}
+
 	return 0;
 }
 
@@ -823,7 +869,19 @@ int swapfd_tracee(struct parasite_ctl *ctl, struct swapfd_exchange *se)
 			goto out;
 	}
 
-	if (se->cwd_fd >= 0) {
+	if (se->root.path) {
+		remote_fd = -1;
+		if (se->root.cwd_fd >= 0) {
+			ret = remote_fd = transfer_local_fd(ctl, se->root.cwd_fd);
+			if (ret < 0)
+				goto out;
+		}
+		ret = change_root(ctl, remote_fd, se->root.path, se->cwd_fd == -1);
+		if (ret < 0)
+			goto out;
+	}
+
+	if (se->cwd_fd >= 0 && se->cwd_fd != se->root.cwd_fd) {
 		ret = send_fd(ctl, false, se->cwd_fd);
 		if (ret < 0)
 			goto out;
@@ -832,9 +890,6 @@ int swapfd_tracee(struct parasite_ctl *ctl, struct swapfd_exchange *se)
 		if (ret < 0)
 			goto out;
 	}
-
-	if (se->root)
-		ret = change_root(ctl, se->root);
 out:
 	return ret;
 }
