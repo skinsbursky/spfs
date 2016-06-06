@@ -356,3 +356,16 @@ int close_seized(struct parasite_ctl *ctl, int fd)
 	}
 	return 0;
 }
+
+int fchdir_seized(struct parasite_ctl *ctl, int fd)
+{
+	unsigned long sret;
+	int err;
+
+	err = syscall_seized(ctl, __NR_fchdir, &sret, fd, 0, 0, 0, 0, 0);
+	if (err || sret) {
+		pr_err("fchdir: %d %d\n", err, (int)(long)sret);
+		return -1;
+	}
+	return 0;
+}

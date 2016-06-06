@@ -531,7 +531,6 @@ static int change_exe(struct parasite_ctl *ctl)
 
 static int change_cwd(struct parasite_ctl *ctl)
 {
-	unsigned long sret;
 	int cwd_fd, ret;
 
 	cwd_fd = recv_fd(ctl, true);
@@ -540,9 +539,9 @@ static int change_cwd(struct parasite_ctl *ctl)
 		return -1;
 	}
 
-	ret = syscall_seized(ctl, __NR_fchdir, &sret, cwd_fd, 0, 0, 0, 0, 0);
-	if (ret < 0 || sret != 0) {
-		pr_err("Can't fchdir pid=%d, ret=%d, sret=%d\n", ctl->pid, ret, (int)(long)sret);
+	ret = fchdir_seized(ctl, cwd_fd);
+	if (ret < 0) {
+		pr_err("Can't fchdir pid=%d\n", ctl->pid);
 		return -1;
 	}
 
