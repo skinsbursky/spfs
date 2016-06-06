@@ -503,16 +503,10 @@ static int get_fd_mode(FILE *fp, long long int *pos, mode_t *mode)
 	return ret;
 }
 
-static int change_exe(struct parasite_ctl *ctl)
+static int change_exe(struct parasite_ctl *ctl, int exe_fd)
 {
 	unsigned long sret;
-	int exe_fd, ret;
-
-	exe_fd = recv_fd(ctl, true);
-	if (exe_fd < 0) {
-		pr_err("Can't receive exe fd\n");
-		return -1;
-	}
+	int ret;
 
 	ret = syscall_seized(ctl, __NR_prctl, &sret, PR_SET_MM, PR_SET_MM_EXE_FILE, exe_fd, 0, 0, 0);
 	if (ret < 0 || sret != 0) {
@@ -554,25 +548,18 @@ static int change_cwd(struct parasite_ctl *ctl)
 	return 0;
 }
 
-static int changemap(struct parasite_ctl *ctl, unsigned long addr)
+static int changemap(struct parasite_ctl *ctl, unsigned long addr, int dst_fd)
 {
-	int fd = recv_fd(ctl, true);
 	int ret;
 
-	if (fd < 0) {
-		pr_err("Can't receive new fd\n");
-		return -1;
-	}
-	pr_debug("Received fd=%d\n", fd);
-
-	if (move_mappings(ctl, addr, -1, fd) < 0) {
+	if (move_mappings(ctl, addr, -1, dst_fd) < 0) {
 		pr_err("Can't move mapping on addr %lx\n", addr);
 		return -1;
 	}
 
-	ret = close_seized(ctl, fd);
+	ret = close_seized(ctl, dst_fd);
 	if (ret < 0) {
-		pr_err("Can't close temporary fd=%d, pid=%d\n", fd, ctl->pid);
+		pr_err("Can't close temporary fd=%d, pid=%d\n", dst_fd, ctl->pid);
 		return -1;
 	}
 
@@ -724,16 +711,8 @@ static int changefd(struct parasite_ctl *ctl, pid_t pid, int src_fd, int dst_fd)
 	long long int f_pos;
 	unsigned long sret;
 	mode_t mode;
-	int new_fd, ret = 0, exit_code = 0;
+	int ret = 0, exit_code = 0;
 	struct lock head = {.next = NULL,}, *ptr;
-	bool need_lseek;
-	struct stat st;
-
-	if (fstat(dst_fd, &st) < 0) {
-		pr_perror("Can't stat on dst_fd");
-		return -1;
-	}
-	need_lseek = (st.st_mode & (S_IFREG | S_IFBLK | S_IFDIR)) != 0;
 
 	sprintf(fdinfo, "/proc/%d/fdinfo/%d", pid, src_fd);
 	fp = fopen(fdinfo, "r");
@@ -753,31 +732,22 @@ static int changefd(struct parasite_ctl *ctl, pid_t pid, int src_fd, int dst_fd)
 		goto out;
 	}
 
-	new_fd = recv_fd(ctl, true);
-	if (new_fd < 0) {
-		pr_err("Can't receive fd\n");
-		exit_code = -1;
-		goto out;
-	}
-
-	pr_debug("Received fd=%d\n", new_fd);
-
-	if (move_mappings(ctl, ~0UL, src_fd, new_fd) < 0)
+	if (move_mappings(ctl, ~0UL, src_fd, dst_fd) < 0)
 		return -1;
 
-	ret = syscall_seized(ctl, __NR_dup2, &sret, new_fd, src_fd, 0, 0, 0, 0);
+	ret = syscall_seized(ctl, __NR_dup2, &sret, dst_fd, src_fd, 0, 0, 0, 0);
 	if (ret < 0 || ((int)(long)sret) < 0) {
-		pr_err("Can't dup2(%d, %d). pid=%d\n", new_fd, src_fd, pid);
+		pr_err("Can't dup2(%d, %d). pid=%d\n", dst_fd, src_fd, pid);
 		exit_code = -1;
 	}
 
-	ret = close_seized(ctl, new_fd);
+	ret = close_seized(ctl, dst_fd);
 	if (ret < 0) {
 		pr_err("Can't close temporary fd, pid=%d\n", pid);
 		exit_code = -1;
 	}
 
-	if (exit_code == 0 && need_lseek) {
+	if (exit_code == 0 && f_pos != 0) {
 		ret = syscall_seized(ctl, __NR_lseek, &sret, src_fd, f_pos, SEEK_SET, 0, 0, 0);
 		if (ret < 0 || ((int)(long)sret) < 0) {
 			pr_err("Can't lseek pid=%d, fd=%d, ret=%d, sret=%d\n",
@@ -822,33 +792,33 @@ static int change_root(struct parasite_ctl *ctl, const char *new_root)
 
 int swapfd_tracee(struct parasite_ctl *ctl, struct swapfd_exchange *se)
 {
-	int i, ret;
+	int i, remote_fd, ret;
 
 	for (i = 0; i < se->naddr; i++) {
-		ret = send_fd(ctl, false, se->addr_fd[i]);
-		if (ret < 0)
+		ret = remote_fd = transfer_local_fd(ctl, se->addr_fd[i]);
+		if (remote_fd < 0)
 			goto out;
 
-		ret = changemap(ctl, se->addr[i]);
+		ret = changemap(ctl, se->addr[i], remote_fd);
 		if (ret < 0)
 			goto out;
 	}
 
 	for (i = 0; i < se->nfd; i++) {
-		ret = send_fd(ctl, false, se->dst_fd[i]);
-		if (ret)
+		ret = remote_fd = transfer_local_fd(ctl, se->dst_fd[i]);
+		if (ret < 0)
 			goto out;
-		ret = changefd(ctl, se->pid, se->src_fd[i], se->dst_fd[i]);
+		ret = changefd(ctl, se->pid, se->src_fd[i], remote_fd);
 		if (ret < 0)
 			goto out;
 	}
 
 	if (se->exe_fd >= 0) {
-		ret = send_fd(ctl, false, se->exe_fd);
+		ret = remote_fd = transfer_local_fd(ctl, se->exe_fd);
 		if (ret < 0)
 			goto out;
 
-		ret = change_exe(ctl);
+		ret = change_exe(ctl, remote_fd);
 		if (ret < 0)
 			goto out;
 	}
