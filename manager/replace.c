@@ -16,7 +16,7 @@ static int do_replace_resources(struct freeze_cgroup_s *fg,
 				int *ns_fds)
 {
 	char *pids;
-	int err;
+	int err, ret;
 	int freezer_state_fd;
 	LIST_HEAD(processes);
 
@@ -37,12 +37,7 @@ static int do_replace_resources(struct freeze_cgroup_s *fg,
 	if (err)
 		goto free_pids;
 
-	if (source_mnt)
-		err = examine_processes_by_mnt(pids, &processes,
-					       source_mnt, target_mnt);
-	else
-		err = examine_processes_by_dev(pids, &processes,
-					       src_dev, target_mnt);
+	err = collect_processes(pids, &processes);
 	if (err)
 		goto free_pids;
 
@@ -56,23 +51,30 @@ static int do_replace_resources(struct freeze_cgroup_s *fg,
 	err = write(freezer_state_fd, "THAWED", sizeof("THAWED"));
 	if (err != sizeof("THAWED")) {
 		pr_perror("Unable to thaw");
-		goto free_pids;
+		goto release_processes;
 	}
 	close(freezer_state_fd);
 
 	err = seize_processes(&processes);
 	if (err)
-		goto free_pids;
+		goto release_processes;
+
+	if (source_mnt)
+		err = examine_processes_by_mnt(&processes,
+					       source_mnt, target_mnt);
+	else
+		err = examine_processes_by_dev(&processes,
+					       src_dev, target_mnt);
+	if (err)
+		goto release_processes;
 
 	err = do_swap_resources(&processes);
-	if (err)
-		goto free_pids;
 
-	err = release_processes(&processes);
-
+release_processes:
+	ret = release_processes(&processes);
 free_pids:
 	free(pids);
-	return err;
+	return err ? err : ret;
 }
 
 int __replace_resources(struct freeze_cgroup_s *fg,

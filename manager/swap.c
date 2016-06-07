@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <stdbool.h>
 
 #include "include/log.h"
 #include "include/util.h"
@@ -272,6 +273,22 @@ free:
 	return err;
 }
 
+static bool process_needs_swap(struct process_info *p)
+{
+	if (p->fds_nr)
+		return true;
+	if (p->maps_nr)
+		return true;
+	if (p->exe_fd != -1)
+		return true;
+	if (p->fs.cwd_fd != -1)
+		return true;
+	if (p->fs.root)
+		return true;
+	return false;
+}
+
+
 int do_swap_resources(const struct list_head *processes)
 {
 	struct process_info *p;
@@ -279,6 +296,8 @@ int do_swap_resources(const struct list_head *processes)
 	pr_debug("Swapping resources:\n");
 
 	list_for_each_entry(p, processes, list) {
+		if (!process_needs_swap(p))
+			continue;
 		if (do_swap_process_resources(p))
 			pr_err("failed to swap resources for process %d\n", p->pid);
 	}

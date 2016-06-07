@@ -9,9 +9,10 @@ int get_pids_list(const char *tasks_file, char **list);
 
 int collect_processes(const char *pids, struct list_head *collection);
 
-int examine_processes_by_dev(const char *pids, struct list_head *collection,
+int examine_processes_by_dev(struct list_head *collection,
 			     dev_t src_dev, const char *target_mnt);
-int examine_processes_by_mnt(const char *pids, struct list_head *collection,
+
+int examine_processes_by_mnt(struct list_head *collection,
 			     const char *source_mnt, const char *target_mnt);
 
 int iterate_pids_list_name(const char *pids_list, void *data,

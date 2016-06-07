@@ -18,7 +18,6 @@
 #include "file_obj.h"
 
 struct mounts_info_s {
-	struct list_head	*collection;
 	dev_t			src_dev;
 	const char		*source_mnt;
 	const char		*target_mnt;
@@ -681,97 +680,54 @@ static int collect_process_fds(struct process_info *p,
 	return err;
 }
 
-static bool process_needs_replace(struct process_info *p)
-{
-	if (p->fds_nr)
-		return true;
-	if (p->maps_nr)
-		return true;
-	if (p->exe_fd != -1)
-		return true;
-	if (p->fs.cwd_fd != -1)
-		return true;
-	if (p->fs.root)
-		return true;
-	return false;
-}
-
-static int examine_one_process(pid_t pid, void *data)
+static int examine_one_process(struct process_info *p, struct mounts_info_s *mi)
 {
 	int err;
-	struct mounts_info_s *mi = data;
-	struct process_info *p;
 
-	if (pid_is_kthread(pid)) {
-		pr_debug("Process %d: kthread, skipping\n", pid);
-		return 0;
-	}
-
-	pr_debug("Process %d: examining...\n", pid);
-
-	p = malloc(sizeof(*p));
-	if (!p) {
-		pr_err("failed to allocate process\n");
-		return -ENOMEM;
-	}
-
-	p->pid = pid;
-	p->fds_nr = 0;
-	p->maps_nr = 0;
-	p->exe_fd = -1;
-	p->fs.cwd_fd = -1;
-	p->fs.root = NULL;
-	INIT_LIST_HEAD(&p->fds);
-	INIT_LIST_HEAD(&p->maps);
+	pr_debug("Process %d: examining...\n", p->pid);
 
 	err = collect_process_env(p, mi);
 	if (err)
-		goto free_p;
+		return err;
 
 	err = collect_process_fds(p, mi);
 	if (err)
-		goto free_p;
+		return err;
 
 	err = collect_process_maps(p, mi);
 	if (err)
-		goto free_p;
+		return err;
 
-	if (!process_needs_replace(p))
-		goto free_p;
-
-	err = attach_to_process(p);
-	if (err)
-		goto free_p;
-
-	list_add_tail(&p->list, mi->collection);
 	return 0;
-
-free_p:
-	free(p);
-	return err;
 }
 
-static int examine_processes(const char *pids, struct list_head *collection,
+static int examine_processes(struct list_head *collection,
 			     dev_t src_dev,
 			     const char *source_mnt, const char *target_mnt)
 {
 	struct mounts_info_s mi = {
-		.collection = collection,
 		.src_dev = src_dev,
 		.source_mnt = source_mnt,
 		.target_mnt = target_mnt,
 	};
+	struct process_info *p;
+	int err;
 
-	return iterate_pids_list(pids, &mi, examine_one_process);
+	list_for_each_entry(p, collection, list) {
+		err = examine_one_process(p, &mi);
+		if (err)
+			return err;
+	}
+	return 0;
 }
 
-int examine_processes_by_dev(const char *pids, struct list_head *collection,
+int examine_processes_by_dev(struct list_head *collection,
 			     dev_t src_dev, const char *target_mnt)
 {
-	return examine_processes(pids, collection, src_dev, NULL, target_mnt);
+	return examine_processes(collection, src_dev, NULL, target_mnt);
 }
 
-int examine_processes_by_mnt(const char *pids, struct list_head *collection,
+int examine_processes_by_mnt(struct list_head *collection,
 			     const char *source_mnt, const char *target_mnt)
 {
 	struct stat st;
@@ -781,7 +737,7 @@ int examine_processes_by_mnt(const char *pids, struct list_head *collection,
 		return -errno;
 	}
 
-	return examine_processes(pids, collection, st.st_dev, source_mnt, target_mnt);
+	return examine_processes(collection, st.st_dev, source_mnt, target_mnt);
 }
 
 static struct process_info *create_process_info(pid_t pid)
