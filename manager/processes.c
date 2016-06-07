@@ -515,20 +515,23 @@ static int collect_process_maps(struct process_info *p,
 
 	while (fgets(map, sizeof(map), fmap)) {
 		char path[PATH_MAX];
-		unsigned long start, end;
+		unsigned long start, end, ino;
 		char r, w, prot;
 		int ret, path_off;
 		char *map_file;
 
 		map[strlen(map)-1] = '\0';
 
-		ret = sscanf(map, "%lx-%lx %c%c%*c%c %*x %*x:%*x %*u %n",
-				&start, &end, &r, &w, &prot, &path_off);
-		if (ret != 5) {
+		ret = sscanf(map, "%lx-%lx %c%c%*c%c %*x %*x:%*x %lu %n",
+				&start, &end, &r, &w, &prot, &ino, &path_off);
+		if (ret != 6) {
 			pr_err("failed to parse '%s': %d\n", map, ret);
 			err = -EINVAL;
 			goto close_fmap;
 		}
+
+		if (!ino)
+			continue;
 
 		if (!is_mnt_map(dir, start, end, mi))
 			continue;
