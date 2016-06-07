@@ -86,7 +86,8 @@ static int attach_to_process(const struct process_info *p)
 	return 0;
 }
 
-static bool is_mnt_file(int dir, const char *dentry, const char *source_mnt, dev_t device)
+static bool is_mnt_file(struct process_info *p, int dir, const char *dentry,
+			const char *source_mnt, dev_t device)
 {
 	struct stat st;
 	char link[PATH_MAX];
@@ -339,7 +340,7 @@ static int collect_process_fd(struct process_info *p, int dir,
 	char link[PATH_MAX];
 	char path[PATH_MAX];
 
-	if (!is_mnt_file(dir, process_fd, mi->source_mnt, mi->src_dev))
+	if (!is_mnt_file(p, dir, process_fd, mi->source_mnt, mi->src_dev))
 		return 0;
 
 	err = xatol(process_fd, (long *)&source_fd);
@@ -480,13 +481,14 @@ static mode_t map_open_mode(char r, char w, char p)
 	return O_RDONLY;
 }
 
-static bool is_mnt_map(int dir, unsigned long start, unsigned long end,
+static bool is_mnt_map(struct process_info *p, int dir,
+		       unsigned long start, unsigned long end,
 		       struct mounts_info_s *mi)
 {
 	char path[PATH_MAX];
 
 	snprintf(path, PATH_MAX, "%lx-%lx", start, end);
-	return is_mnt_file(dir, path, mi->source_mnt, mi->src_dev);
+	return is_mnt_file(p, dir, path, mi->source_mnt, mi->src_dev);
 }
 
 static int collect_process_maps(struct process_info *p,
@@ -533,7 +535,7 @@ static int collect_process_maps(struct process_info *p,
 		if (!ino)
 			continue;
 
-		if (!is_mnt_map(dir, start, end, mi))
+		if (!is_mnt_map(p, dir, start, end, mi))
 			continue;
 
 		map_file = map + path_off;
@@ -598,8 +600,8 @@ static int collect_process_fs(struct process_info *p,
 	int err;
 	bool exists;
 
-	mnt_cwd = is_mnt_file(dir, "cwd", mi->source_mnt, mi->src_dev);
-	mnt_root = is_mnt_file(dir, "root", mi->source_mnt, mi->src_dev);
+	mnt_cwd = is_mnt_file(p, dir, "cwd", mi->source_mnt, mi->src_dev);
+	mnt_root = is_mnt_file(p, dir, "root", mi->source_mnt, mi->src_dev);
 
 	if (!mnt_cwd && ! mnt_root)
 		return 0;
@@ -638,7 +640,7 @@ static int collect_process_exe(struct process_info *p,
 			       struct mounts_info_s *mi,
 			       int dir)
 {
-	if (!is_mnt_file(dir, "exe", mi->source_mnt, mi->src_dev))
+	if (!is_mnt_file(p, dir, "exe", mi->source_mnt, mi->src_dev))
 		return 0;
 
 	p->exe_fd = open_process_env(p, mi, "exe");
