@@ -696,7 +696,7 @@ static bool process_needs_replace(struct process_info *p)
 	return false;
 }
 
-static int collect_one_process(pid_t pid, void *data)
+static int examine_one_process(pid_t pid, void *data)
 {
 	int err;
 	struct processes_collection_s *pc = data;
@@ -751,7 +751,7 @@ free_p:
 	return err;
 }
 
-static int collect_processes(const char *pids, struct list_head *collection,
+static int examine_processes(const char *pids, struct list_head *collection,
 			     dev_t src_dev,
 			     const char *source_mnt, const char *target_mnt)
 {
@@ -762,17 +762,17 @@ static int collect_processes(const char *pids, struct list_head *collection,
 		.target_mnt = target_mnt,
 	};
 
-	return iterate_pids_list(pids, &pc, collect_one_process);
+	return iterate_pids_list(pids, &pc, examine_one_process);
 }
 
-int collect_dev_processes(const char *pids, struct list_head *collection,
-			  dev_t src_dev, const char *target_mnt)
+int examine_processes_by_dev(const char *pids, struct list_head *collection,
+			     dev_t src_dev, const char *target_mnt)
 {
-	return collect_processes(pids, collection, src_dev, NULL, target_mnt);
+	return examine_processes(pids, collection, src_dev, NULL, target_mnt);
 }
 
-int collect_mnt_processes(const char *pids, struct list_head *collection,
-			  const char *source_mnt, const char *target_mnt)
+int examine_processes_by_mnt(const char *pids, struct list_head *collection,
+			     const char *source_mnt, const char *target_mnt)
 {
 	struct stat st;
 
@@ -781,5 +781,5 @@ int collect_mnt_processes(const char *pids, struct list_head *collection,
 		return -errno;
 	}
 
-	return collect_processes(pids, collection, st.st_dev, source_mnt, target_mnt);
+	return examine_processes(pids, collection, st.st_dev, source_mnt, target_mnt);
 }

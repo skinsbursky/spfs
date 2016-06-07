@@ -38,11 +38,11 @@ static int do_replace_resources(struct freeze_cgroup_s *fg,
 		goto free_pids;
 
 	if (source_mnt)
-		err = collect_mnt_processes(pids, &processes,
-					    source_mnt, target_mnt);
+		err = examine_processes_by_mnt(pids, &processes,
+					       source_mnt, target_mnt);
 	else
-		err = collect_dev_processes(pids, &processes,
-					    src_dev, target_mnt);
+		err = examine_processes_by_dev(pids, &processes,
+					       src_dev, target_mnt);
 	if (err)
 		goto free_pids;
 
