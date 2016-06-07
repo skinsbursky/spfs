@@ -783,3 +783,54 @@ int examine_processes_by_mnt(const char *pids, struct list_head *collection,
 
 	return examine_processes(pids, collection, st.st_dev, source_mnt, target_mnt);
 }
+
+static struct process_info *create_process_info(pid_t pid)
+{
+	struct process_info *p;
+
+	p = malloc(sizeof(*p));
+	if (!p) {
+		pr_err("failed to allocate process\n");
+		return NULL;
+	}
+
+	p->pid = pid;
+	p->fds_nr = 0;
+	p->maps_nr = 0;
+	p->exe_fd = -1;
+	p->fs.cwd_fd = -1;
+	p->fs.root = NULL;
+	INIT_LIST_HEAD(&p->fds);
+	INIT_LIST_HEAD(&p->maps);
+
+	return p;
+}
+
+static int collect_one_process(pid_t pid, void *data)
+{
+	struct process_info *p;
+	struct list_head *collection = data;
+
+	if (pid_is_kthread(pid)) {
+		pr_debug("Process %d: kthread, skipping\n", pid);
+		return 0;
+	}
+
+	p = create_process_info(pid);
+	if (!p)
+		return -ENOMEM;
+
+	if (attach_to_process(p) < 0) {
+		free(p);
+		return -EPERM;
+	}
+
+	list_add_tail(&p->list, collection);
+	return 0;
+}
+
+int collect_processes(const char *pids, struct list_head *collection)
+{
+	pr_debug("Collecting processes...\n");
+	return iterate_pids_list(pids, collection, collect_one_process);
+}
