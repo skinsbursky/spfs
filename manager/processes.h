@@ -43,6 +43,8 @@ struct process_map {
 	off_t end;
 };
 
+struct parasite_ctl;
+
 struct process_info {
 	struct list_head list;
 	int pid;
@@ -55,6 +57,7 @@ struct process_info {
 	} fs;
 	struct list_head fds;
 	struct list_head maps;
+	struct parasite_ctl *pctl;
 };
 
 #endif

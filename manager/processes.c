@@ -16,6 +16,7 @@
 #include "swapfd.h"
 #include "processes.h"
 #include "file_obj.h"
+#include "swapfd.h"
 
 struct mounts_info_s {
 	dev_t			src_dev;
@@ -23,19 +24,20 @@ struct mounts_info_s {
 	const char		*target_mnt;
 };
 
-static int seize_one_process(const struct process_info *p)
+static int seize_one_process(struct process_info *p)
 {
 	if (wait_task_seized(p->pid)) {
 		pr_err("failed to seize process %d\n", p->pid);
 		return -EPERM;
 	}
 	pr_debug("\t%d seized\n", p->pid);
-	return 0;
+
+	return set_parasite_ctl(p->pid, &p->pctl);
 }
 
 int seize_processes(struct list_head *processes)
 {
-	const struct process_info *p;
+	struct process_info *p;
 
 	pr_debug("Seizing processes...\n");
 
@@ -56,15 +58,22 @@ static int detach_from_process(const struct process_info *p)
 	return 0;
 }
 
+static void release_one_process(struct process_info *p)
+{
+	if (p->pctl)
+		(void) destroy_parasite_ctl(p->pid, p->pctl);
+	(void) detach_from_process(p);
+	list_del(&p->list);
+	free(p);
+}
+
 int release_processes(struct list_head *processes)
 {
 	struct process_info *p, *tmp;
 
-	list_for_each_entry_safe(p, tmp, processes, list) {
-		(void) detach_from_process(p);
-		list_del(&p->list);
-		free(p);
-	}
+	list_for_each_entry_safe(p, tmp, processes, list)
+		release_one_process(p);
+
 	return 0;
 }
 
@@ -756,6 +765,7 @@ static struct process_info *create_process_info(pid_t pid)
 	p->exe_fd = -1;
 	p->fs.cwd_fd = -1;
 	p->fs.root = NULL;
+	p->pctl = NULL;
 	INIT_LIST_HEAD(&p->fds);
 	INIT_LIST_HEAD(&p->maps);
 

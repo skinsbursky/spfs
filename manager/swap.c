@@ -184,7 +184,6 @@ static int do_swap_process_resources(struct process_info *p)
 		.exe_fd = -1,
 		.cwd_fd = -1,
 	};
-	struct parasite_ctl *ctl;
 
 	pr_debug("Swapping process %d resources:\n", p->pid);
 
@@ -256,14 +255,8 @@ static int do_swap_process_resources(struct process_info *p)
 
 	se.pid = p->pid;
 
-	err = set_parasite_ctl(se.pid, &ctl);
-	if (err < 0)
-		goto close_root_cwd;
+	err = swapfd_tracee(p->pctl, &se);
 
-	err = swapfd_tracee(ctl, &se);
-
-	destroy_parasite_ctl(se.pid, ctl);
-close_root_cwd:
 	close(se.root.cwd_fd);
 free:
 	free(se.src_fd);
