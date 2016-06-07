@@ -1,6 +1,10 @@
 #ifndef __SPFS_MANAGER_PID_UTIL_FD_H__
 #define __SPFS_MANAGER_PID_UTIL_FD_H__
 
+#include <stdbool.h>
+
+#include "include/ptrace.h"
+
 struct fd_opts {
 	char flags;
 	struct {
