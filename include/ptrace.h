@@ -9,12 +9,7 @@
 #include <stdint.h>
 #include "include/list.h"
 
-typedef _Bool bool;
 typedef uint32_t u32;
-enum {
-	false	= 0,
-	true	= 1
-};
 
 #define MAX_ERRNO       4095
 
