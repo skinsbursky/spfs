@@ -152,7 +152,7 @@ inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 		free(___fpath);							\
 	}									\
 	if (___err < 0)								\
-		pr_err("= %d (%s)\n", ___err, strerror(-___err));		\
+		pr_info("= %d (%s)\n", ___err, strerror(-___err));		\
 	else									\
 		pr_info("= %d\n", ___err);					\
 	___err;									\
