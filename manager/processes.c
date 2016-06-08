@@ -381,6 +381,23 @@ close_local_fd:
 	return err;
 }
 
+static int is_mnt_fd(const struct fd_info_s *fdi, const struct mounts_info_s *mi)
+{
+	/* First check, that link points to the desired mount (if any).
+	 * This is required to be able to switch between 2 different mounts
+	 * with the same superblock.
+	 */
+	if (mi->source_mnt) {
+		if (strncmp(fdi->path, mi->source_mnt, strlen(mi->source_mnt)))
+			return false;
+
+		if (fdi->path[strlen(mi->source_mnt)] != '/')
+			return false;
+	}
+
+	return fdi->st.st_dev == mi->src_dev;
+}
+
 static int collect_process_fd(struct process_info *p, int dir,
 			      const char *process_fd, const void *data)
 {
@@ -390,12 +407,22 @@ static int collect_process_fd(struct process_info *p, int dir,
 	char path[PATH_MAX];
 	struct fd_info_s fdi;
 
-	if (!is_mnt_file(p, dir, process_fd, mi->source_mnt, mi->src_dev))
-		return 0;
+	/* Fast path. In most of the cases opened file is accessible and
+	 * shouldn't be replaced.
+	 * Let's quickly check, whether it is so, and skip the fd copy and
+	 * other checks.
+	 */
+	if (fstatat(dir, process_fd, &fdi.st, 0) == 0) {
+		if (fdi.st.st_dev != mi->src_dev)
+			return 0;
+	}
 
 	err = get_fd_info(p, dir, process_fd, &fdi);
 	if (err)
 		return err;
+
+	if (!is_mnt_fd(&fdi, mi))
+		return 0;
 
 	err = collect_fd(p->pid, fdi.fd, &rfd);
 	if (err) {
