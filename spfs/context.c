@@ -205,9 +205,10 @@ int set_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode, const char *path
 			get_context()->wm = new_wm;
 		        pthread_mutex_unlock(&ctx->wm_lock);
 
-			wake_mode_waiters(cur_wm);
-
-			destroy_work_mode(cur_wm);
+			if (cur_wm) {
+				wake_mode_waiters(cur_wm);
+				destroy_work_mode(cur_wm);
+			}
 			break;
 		default:
 			pr_err("%s: unsupported mode: %d\n", mode);
