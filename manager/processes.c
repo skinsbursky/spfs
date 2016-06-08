@@ -90,7 +90,6 @@ static bool is_mnt_file(struct process_info *p, int dir, const char *dentry,
 			const char *source_mnt, dev_t device)
 {
 	struct stat st;
-	char link[PATH_MAX];
 	ssize_t bytes;
 
 	/* First check, that link points to the desired mount (if any).
@@ -98,9 +97,11 @@ static bool is_mnt_file(struct process_info *p, int dir, const char *dentry,
 	 * with the same superblock.
 	 */
 	if (source_mnt) {
+		char link[PATH_MAX];
+
 		bytes = readlinkat(dir, dentry, link, PATH_MAX - 1);
 		if (bytes < 0) {
-			pr_perror("failed to read link %s\n", dentry);
+			pr_perror("failed to read link %s", dentry);
 			return -errno;
 		}
 
