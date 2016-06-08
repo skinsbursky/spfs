@@ -337,3 +337,14 @@ char **exec_options(int dummy, ...)
 	return new;
 }
 
+bool unlinked_path(const char *path)
+{
+	const char *suffix = " (deleted)";
+
+	if (strlen(path) <= strlen(suffix))
+		return false;
+
+	if (!strcmp(path + (strlen(path) - strlen(suffix)), suffix))
+		return true;
+	return false;
+}

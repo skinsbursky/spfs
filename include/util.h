@@ -3,6 +3,7 @@
 
 #include <unistd.h>
 #include <stdarg.h>
+#include <stdbool.h>
 
 char *xvstrcat(char *str, const char *fmt, va_list args);
 extern char *xstrcat(char *str, const char *fmt, ...);
@@ -27,5 +28,7 @@ int secure_chroot(const char *root);
 
 char **exec_options(int dummy, ...);
 char **add_exec_options(char **options, ...);
+
+bool unlinked_path(const char *path);
 
 #endif
