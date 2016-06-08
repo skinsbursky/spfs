@@ -369,7 +369,14 @@ static int collect_process_fd(struct process_info *p, int dir,
 		/* TODO it makes sense to create file objects (open files) only
 		 * shared files here.
 		 * Private files can be opened by the process itself */
-		err = create_file_obj(path, flags, link, &rfd->file_obj);
+		struct stat st;
+
+		if (stat(path, &st)) {
+			pr_perror("failed to stat %s", path);
+			return -errno;
+		}
+
+		err = create_file_obj(path, flags, st.st_mode, link, &rfd->file_obj);
 		if (err) {
 			pr_err("failed to open file object for /proc/%d/fd/%d\n",
 					rfd->pid, rfd->fd);
