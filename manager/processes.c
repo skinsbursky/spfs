@@ -10,6 +10,7 @@
 #include "include/util.h"
 #include "include/shm.h"
 #include "include/namespaces.h"
+#include "include/pie-util-fd.h"
 
 #include "spfs.h"
 #include "trees.h"
@@ -331,6 +332,84 @@ static int process_add_mapping(struct process_info *p, int map_fd,
 	return 0;
 }
 
+static int copy_process_fd(struct process_info *p, int fd)
+{
+	int err;
+
+	err = send_fd(p->pctl, true, fd);
+	if (err < 0)
+		return -1;
+
+	return recv_fd(p->pctl, false);
+}
+
+struct fd_info_s {
+	int             fd;
+	struct stat     st;
+	unsigned        flags;
+	bool            unlinked;
+	char            path[PATH_MAX];
+};
+
+static int get_fd_info(struct process_info *p, int dir,
+		const char *process_fd, struct fd_info_s *fdi)
+{
+	int local_fd, err;
+	ssize_t bytes;
+	char link[PATH_MAX];
+	int fd_flags;
+
+	err = xatol(process_fd, (long *)&fdi->fd);
+	if (err) {
+		pr_err("failed to convert fd %s to number\n", process_fd);
+		return err;
+	}
+
+	local_fd = copy_process_fd(p, fdi->fd);
+	if (local_fd < 0) {
+		pr_err("failed to copy /proc/%d/fd/%d\n", p->pid, fdi->fd);
+		sleep(1000);
+		return local_fd;
+	}
+
+	if (fstat(local_fd, &fdi->st)) {
+		pr_perror("failed to stat fd %d", local_fd);
+		err = -errno;
+		goto close_local_fd;
+	}
+
+	fdi->flags = fcntl(local_fd, F_GETFL, NULL);
+	if (fdi->flags < 0) {
+		pr_perror("failed to get file flags for fd %d", local_fd);
+		err = -errno;
+		goto close_local_fd;
+	}
+
+	fd_flags = fcntl(local_fd, F_GETFD, NULL);
+	if (fd_flags < 0) {
+		pr_perror("failed to get fd flags for fd %d", local_fd);
+		err = -errno;
+		goto close_local_fd;
+	}
+	if (fd_flags)
+		fdi->flags |= O_CLOEXEC;
+
+	snprintf(link, PATH_MAX, "/proc/%d/fd/%d", p->pid, fdi->fd);
+	bytes = readlink(link, fdi->path, PATH_MAX - 1);
+	if (bytes < 0) {
+		pr_perror("failed to read link %s\n", link);
+		err = -errno;
+		goto close_local_fd;
+	}
+	fdi->path[bytes] = '\0';
+
+	fdi->unlinked = unlinked_path(fdi->path);
+
+close_local_fd:
+	close(local_fd);
+	return err;
+}
+
 static int collect_process_fd(struct process_info *p, int dir,
 			      const char *process_fd, const void *data)
 {
@@ -340,9 +419,14 @@ static int collect_process_fd(struct process_info *p, int dir,
 	struct replace_fd *rfd;
 	char link[PATH_MAX];
 	char path[PATH_MAX];
+	struct fd_info_s fdi;
 
 	if (!is_mnt_file(p, dir, process_fd, mi->source_mnt, mi->src_dev))
 		return 0;
+
+	err = get_fd_info(p, dir, process_fd, &fdi);
+	if (err)
+		return err;
 
 	err = xatol(process_fd, (long *)&source_fd);
 	if (err) {
