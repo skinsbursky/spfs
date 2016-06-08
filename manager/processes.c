@@ -222,35 +222,6 @@ free_pids_list:
 	goto close_fd;
 }
 
-static int get_fd_flags(pid_t pid, int fd)
-{
-	char path[PATH_MAX];
-	FILE *fdinfo;
-	char buf[64];
-	int flags = -ENOENT;
-
-	snprintf(path, PATH_MAX, "/proc/%d/fdinfo/%d", pid, fd);
-
-	fdinfo = fopen(path, "r");
-	if (!fdinfo) {
-		pr_perror("failed to open %s", path);
-		return -errno;
-	}
-
-	while (fgets(buf, 64, fdinfo) != NULL) {
-		if (strncmp(buf, "flags", strlen("flags")))
-			continue;
-		if (sscanf(buf, "flags:\t%o", &flags) != 1) {
-			pr_err("failed to sscanf '%s'\n", buf);
-			flags = -EINVAL;
-		}
-		break;
-	}
-	if (flags < 0)
-		pr_err("failed to get %s flags: %d\n", path, flags);
-	return flags;
-}
-
 static int fixup_source_path(const char *source_path,
 			     const char *source_mnt, const char *target_mnt,
 			     char *path, size_t size)
@@ -413,11 +384,9 @@ close_local_fd:
 static int collect_process_fd(struct process_info *p, int dir,
 			      const char *process_fd, const void *data)
 {
-	int err, source_fd, target_fd;
+	int err, target_fd;
 	const struct mounts_info_s *mi = data;
-	int flags;
 	struct replace_fd *rfd;
-	char link[PATH_MAX];
 	char path[PATH_MAX];
 	struct fd_info_s fdi;
 
@@ -428,24 +397,14 @@ static int collect_process_fd(struct process_info *p, int dir,
 	if (err)
 		return err;
 
-	err = xatol(process_fd, (long *)&source_fd);
+	err = collect_fd(p->pid, fdi.fd, &rfd);
 	if (err) {
-		pr_err("failed to convert fd %s to number\n", process_fd);
+		pr_err("failed to add /proc/%d/fd/%d to tree\n", p->pid, fdi.fd);
 		return err;
 	}
 
-	flags = get_fd_flags(p->pid, source_fd);
-	if (flags < 0)
-		return flags;
-
-	err = collect_fd(p->pid, source_fd, &rfd);
-	if (err) {
-		pr_err("failed to add /proc/%d/fd/%d to tree\n", p->pid, source_fd);
-		return err;
-	}
-
-	snprintf(link, PATH_MAX, "/proc/%d/fd/%d", rfd->pid, rfd->fd);
-	err = get_link_path(link, mi->source_mnt, mi->target_mnt, path, sizeof(path));
+	err = fixup_source_path(fdi.path, mi->source_mnt, mi->target_mnt,
+				path, sizeof(path));
 	if (err)
 		return err;
 
@@ -453,14 +412,8 @@ static int collect_process_fd(struct process_info *p, int dir,
 		/* TODO it makes sense to create file objects (open files) only
 		 * shared files here.
 		 * Private files can be opened by the process itself */
-		struct stat st;
-
-		if (stat(path, &st)) {
-			pr_perror("failed to stat %s", path);
-			return -errno;
-		}
-
-		err = create_file_obj(path, flags, st.st_mode, link, &rfd->file_obj);
+		err = create_file_obj(path, fdi.flags, fdi.st.st_mode,
+				      fdi.path, &rfd->file_obj);
 		if (err) {
 			pr_err("failed to open file object for /proc/%d/fd/%d\n",
 					rfd->pid, rfd->fd);
@@ -468,14 +421,14 @@ static int collect_process_fd(struct process_info *p, int dir,
 		}
 	}
 
-	target_fd = get_file_obj_fd(rfd->file_obj, flags);
+	target_fd = get_file_obj_fd(rfd->file_obj, fdi.flags);
 	if (target_fd < 0)
 		return target_fd;
 
 	pr_debug("\t/proc/%d/fd/%d ---> %s (fd: %d, flags: 0%o)\n",
-			p->pid, source_fd, path, target_fd, flags);
+			p->pid, fdi.fd, path, target_fd, fdi.flags);
 
-	return process_add_fd(p, source_fd, target_fd);
+	return process_add_fd(p, fdi.fd, target_fd);
 }
 
 static int iterate_dir_name(const char *dpath, struct process_info *p,
