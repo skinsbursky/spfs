@@ -14,9 +14,11 @@ bin_spfs_SOURCES =		spfs/main.c			\
 				spfs/stub.c			\
 				spfs/context.c			\
 				spfs/interface.c		\
+				spfs/xattr.c			\
 								\
 				spfs/interface.h		\
 				spfs/context.h			\
+				spfs/xattr.h			\
 								\
 				src/util.c			\
 				src/log.c			\
