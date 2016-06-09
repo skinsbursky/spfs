@@ -1,6 +1,8 @@
 #ifndef __SPFS_LIST_H__
 #define __SPFS_LIST_H__
 
+#include <libio.h>
+
 /*
  * Double linked lists.
  */
