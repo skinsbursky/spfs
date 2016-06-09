@@ -5,8 +5,10 @@
 #include <stdlib.h>
 
 #include "include/util.h"
-#include "context.h"
 #include "include/log.h"
+
+#include "context.h"
+#include "xattr.h"
 
 struct gateway_fh_s {
 	struct work_mode_s *wm;
@@ -313,12 +315,22 @@ static int gateway_symlink(const char *to, const char *from)
 
 static int gateway_rename(const char *from, const char *to)
 {
-	return GATEWAY_LINK_RESTARTABLE(rename, from, to);
+	int err;
+
+	err = GATEWAY_LINK_RESTARTABLE(rename, from, to);
+	if (!err)
+		(void) spfs_move_xattrs(from, to);
+	return err;
 }
 
 static int gateway_link(const char *from, const char *to)
 {
-	return GATEWAY_LINK_RESTARTABLE(link, from, to);
+	int err;
+
+	err = GATEWAY_LINK_RESTARTABLE(link, from, to);
+	if (!err)
+		(void) spfs_dup_xattrs(from, to);
+	return err;
 }
 
 static int gateway_chmod(const char *path, mode_t mode)
@@ -371,12 +383,16 @@ static int gateway_fsync(const char *path, int isdatasync,
 static int gateway_setxattr(const char *path, const char *name, const char *value,
 			    size_t size, int flags)
 {
+	if (is_spfs_xattr(name))
+		return spfs_setxattr(path, name, value, size, flags);
 	return GATEWAY_METHOD_RESTARTABLE(setxattr, path, name, value, size, flags);
 }
 
 static int gateway_getxattr(const char *path, const char *name, char *value,
 			    size_t size)
 {
+	if (is_spfs_xattr(name))
+		return spfs_getxattr(path, name, value, size);
 	return GATEWAY_METHOD_RESTARTABLE(getxattr, path, name, value, size);
 }
 
@@ -387,13 +403,20 @@ static int gateway_listxattr(const char *path, char *list, size_t size)
 
 static int gateway_removexattr(const char *path, const char *name)
 {
+	if (is_spfs_xattr(name))
+		return spfs_removexattr(path, name);
 	return GATEWAY_METHOD_RESTARTABLE(removexattr, path, name);
 }
 
 static int gateway_release(const char *path, struct fuse_file_info *fi)
 {
-	return GATEWAY_RELEASE(release, path, fi,
-			       fi);
+	int err;
+
+	err = GATEWAY_RELEASE(release, path, fi,
+			      fi);
+	if (!err)
+		(void) spfs_del_xattrs(path);
+	return err;
 }
 
 static int gateway_open(const char *path, struct fuse_file_info *fi)
