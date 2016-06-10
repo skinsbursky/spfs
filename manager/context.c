@@ -27,57 +27,6 @@
 
 static struct spfs_manager_context_s spfs_manager_context;
 
-static int get_namespace_type(const char *ns)
-{
-	if (!strcmp(ns, "user"))
-		return CLONE_NEWUSER;
-	if (!strcmp(ns, "mnt"))
-		return CLONE_NEWNS;
-	if (!strcmp(ns, "net"))
-		return CLONE_NEWNET;
-	if (!strcmp(ns, "pid"))
-		return CLONE_NEWPID;
-	if (!strcmp(ns, "uts"))
-		return CLONE_NEWPID;
-	if (!strcmp(ns, "ipc"))
-		return CLONE_NEWIPC;
-
-	pr_err("unknown namespace: %s\n", ns);
-	return -EINVAL;
-}
-
-int join_one_namespace(int pid, const char *ns)
-{
-	int ns_fd;
-	char *path;
-	int err = 0, ns_type;
-
-	ns_type = get_namespace_type(ns);
-	if (ns_type < 0)
-		return ns_type;
-
-	path = xsprintf("/proc/%d/ns/%s", pid, ns);
-	if (!path)
-		return -ENOMEM;
-
-	ns_fd = open(path, O_RDONLY);
-	if (ns_fd < 0) {
-		pr_perror("failed to open %s", path);
-		err = -errno;
-		goto free_path;
-	}
-
-	if (setns(ns_fd, ns_type) < 0) {
-		pr_perror("Can't switch %s ns", ns);
-		err = -errno;
-	}
-
-	close(ns_fd);
-free_path:
-	free(path);
-	return err;
-}
-
 static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)
 {
 	struct spfs_manager_context_s *ctx = &spfs_manager_context;
