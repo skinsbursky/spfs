@@ -93,9 +93,9 @@ static int parse_cmd_options(struct opt_array_s *array, char *options)
 	return 0;
 }
 
-static int exec_spfs(int pipe, const struct spfs_info_s *info, char *mode,
-		     char *proxy_dir, char *socket_path, char *log_path,
-		     char *mountpoint)
+static int exec_spfs(int pipe, const struct spfs_info_s *info, const char *mode,
+		     const char *proxy_dir, const char *socket_path, const char *log_path,
+		     const char *mountpoint)
 {
 	const char *spfs = FS_NAME;
 	char wpipe[16];
@@ -131,14 +131,13 @@ free_options:
 }
 
 static int mount_spfs(struct spfs_manager_context_s *ctx,
-		      struct spfs_info_s *info, char *mode,
-		      char *proxy_dir)
+		      struct spfs_info_s *info,
+		      const char *mode, const char *proxy_dir)
 {
-	char *cwd, *socket_path, *log_path, *mountpoint;
+	char *cwd, *socket_path, *log_path, *mountpoint, *dir;
 	int status = -ENOMEM, initpipe[2], timeout_ms = 5000;
 	struct pollfd pfd;
 	pid_t pid;
-	bool restore = !strcmp(mode, "restore");
 
 	if (pipe(initpipe)) {
 		pr_err("failed to create pipe\n");
@@ -163,16 +162,18 @@ static int mount_spfs(struct spfs_manager_context_s *ctx,
 	if (!log_path)
 		goto free_socket_path;
 
-	if (restore) {
+	if (strcmp(mode, "restore"))
+		dir = strdup(proxy_dir);
+	else {
 		mode = "proxy";
-		proxy_dir = xsprintf("%s/restore", info->work_dir);
-		if (!proxy_dir) {
-			pr_perror("failed to allocate\n");
-			goto free_log_path;
-		}
+		dir = xsprintf("%s/restore", info->work_dir);
+	}
+	if (!dir) {
+		pr_perror("failed to allocate\n");
+		goto free_log_path;
 	}
 
-	status = spfs_prepare_env(info, proxy_dir);
+	status = spfs_prepare_env(info, dir);
 	if (status)
 		goto free_proxy_dir;
 
@@ -185,7 +186,7 @@ static int mount_spfs(struct spfs_manager_context_s *ctx,
 		case 0:
 			close(initpipe[0]);
 			_exit(exec_spfs(initpipe[1], info, mode,
-					proxy_dir, socket_path, log_path,
+					dir, socket_path, log_path,
 					mountpoint));
 	}
 
@@ -240,8 +241,7 @@ repeat:
 	info->pid = pid;
 
 free_proxy_dir:
-	if (restore)
-		free(proxy_dir);
+	free(dir);
 free_log_path:
 	free(log_path);
 free_socket_path:
