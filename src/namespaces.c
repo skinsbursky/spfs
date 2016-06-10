@@ -23,7 +23,7 @@ int open_ns(pid_t pid, const char *ns_type)
 	char path[PATH_MAX];
 
 	snprintf(path, PATH_MAX, "/proc/%d/ns/%s", pid, ns_type);
-	fd = open(path, O_RDONLY);
+	fd = open(path, O_RDONLY | O_CLOEXEC);
 	if (fd < 0) {
 		pr_perror("failed to open %s", path);
 		return -errno;
