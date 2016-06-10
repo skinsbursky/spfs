@@ -551,16 +551,16 @@ static int do_replace_spfs(struct spfs_info_s *info, const char *source)
 	return err ? err : res;
 }
 
-static int do_mount_target(struct spfs_info_s *info,
+static int __do_mount_target(struct spfs_info_s *info,
 		const char *source, const char *target, const char *fstype,
-		const char *mountflags, const void *options)
+		long mflags, const void *options)
 {
-	int err;
-	long mflags;
+	int err, res;
 
-	err = xatol(mountflags, &mflags);
-	if (err)
-		return err;
+	res = join_spfs_context(info, NS_MNT_MASK | NS_NET_MASK |
+				      NS_USER_MASK | NS_UTS_MASK);
+	if (res)
+		return res;
 
 	err = create_dir(target);
 	if (err) {
@@ -568,19 +568,34 @@ static int do_mount_target(struct spfs_info_s *info,
 		return err;
 	}
 
-	err = ct_run(mount_loop, info, source, target, fstype, mflags, options);
-	if (err) {
-		if (rmdir(target))
-			pr_perror("failed to remove %s", target);
-		return err;
+	return mount_loop(source, target, fstype, mflags, options);
+}
+
+static int do_mount_target(struct spfs_info_s *info,
+		const char *source, const char *target, const char *fstype,
+		long mflags, const void *options)
+{
+	int err, status;
+	pid_t pid;
+
+	/* One may ask, why we fork here is pid nemespace is not required?
+	 * The reason is that we can't change UTS ns back, is nested UTS ns
+	 * doesn't have CAP_SYS_ADMIN (which is common).
+	 * While we want to keep current environment sane. */
+
+	pid = fork();
+	switch (pid) {
+		case -1:
+			pr_perror("failed to fork");
+			return -errno;
+		case 0:
+			_exit(__do_mount_target(info, source, target, fstype,
+						mflags, options));
 	}
 
-	err = spfs_send_mode(info, SPFS_PROXY_MODE, target);
-	if (err)
-		/*TODO: should umount the target ? */
-		return err;
+	err = collect_child(pid, &status, 0);
 
-	return 0;
+	return err ? err : status;
 }
 
 int replace_spfs(int sock, struct spfs_info_s *info,
@@ -589,6 +604,7 @@ int replace_spfs(int sock, struct spfs_info_s *info,
 {
 	char *mnt;
 	int err;
+	long mflags;
 
 	(void) send_status(sock, 0);
 
@@ -609,9 +625,17 @@ int replace_spfs(int sock, struct spfs_info_s *info,
 		return -ENOMEM;
 	}
 
-	err = do_mount_target(info, source, mnt,
-			fstype, mountflags, options);
+	err = xatol(mountflags, &mflags);
 	if (err)
+		goto free_mnt;
+
+	err = do_mount_target(info, source, mnt, fstype, mflags, options);
+	if (err)
+		goto free_mnt;
+
+	err = spfs_send_mode(info, SPFS_PROXY_MODE, mnt);
+	if (err)
+		/*TODO: should umount the target ? */
 		goto free_mnt;
 
 	err = do_replace_spfs(info, mnt);

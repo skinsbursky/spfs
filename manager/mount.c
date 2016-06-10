@@ -113,7 +113,7 @@ static int do_mount(const char *source, const char *mnt,
 	return -errno;
 }
 
-int mount_loop(void *data, const char *source, const char *mnt,
+int mount_loop(const char *source, const char *mnt,
 	       const char *fstype, unsigned long mountflags,
 	       const void *options)
 {
