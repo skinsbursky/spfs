@@ -180,19 +180,6 @@ int freeze_cgroup(const struct freeze_cgroup_s *fg)
 	return err;
 }
 
-int open_cgroup_state(const struct freeze_cgroup_s *fg)
-{
-	int fd;
-
-	fd = freezer_open_state(fg->path);
-	if (fd < 0)
-		pr_err("failed to open cgroup %s state\n", fg->path);
-	else
-		pr_debug("cgroup %s state was opened\n", fg->path);
-	return fd;
-
-}
-
 int cgroup_pids(const struct freeze_cgroup_s *fg, char **list)
 {
 	char *tasks_file;

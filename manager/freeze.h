@@ -21,8 +21,6 @@ int unlock_cgroup(struct freeze_cgroup_s *fg);
 int thaw_cgroup(const struct freeze_cgroup_s *fg);
 int freeze_cgroup(const struct freeze_cgroup_s *fg);
 
-int open_cgroup_state(const struct freeze_cgroup_s *fg);
-
 int cgroup_pids(const struct freeze_cgroup_s *fg, char **list);
 
 #endif
