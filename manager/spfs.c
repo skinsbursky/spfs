@@ -373,7 +373,7 @@ static int spfs_thaw_and_unlock(struct spfs_info_s *info)
 	return err;
 }
 
-static int prepare_mount_env_ct(struct spfs_info_s *info, const char *proxy_dir)
+static int __spfs_prepare_env(struct spfs_info_s *info, const char *proxy_dir)
 {
 	int err;
 
@@ -408,10 +408,20 @@ rm_info_dir:
 
 int spfs_prepare_env(struct spfs_info_s *info, const char *proxy_dir)
 {
-	return ct_run(prepare_mount_env_ct, info, proxy_dir);
+	int err, res;
+
+	res = join_spfs_context(info, NS_MNT_MASK);
+	if (res)
+		return res;
+
+	err = __spfs_prepare_env(info, proxy_dir);
+
+	res = set_namespaces(info->orig_ns_fds, NS_MNT_MASK);
+
+	return err ? err : res;
 }
 
-static int cleanup_mount_env_ct(struct spfs_info_s *info)
+static int __spfs_cleanup_env(struct spfs_info_s *info)
 {
 	if (umount2(info->work_dir, MNT_DETACH)) {
 		pr_perror("failed to umount %s", info->work_dir);
@@ -427,7 +437,17 @@ static int cleanup_mount_env_ct(struct spfs_info_s *info)
 
 int spfs_cleanup_env(struct spfs_info_s *info)
 {
-	return ct_run(cleanup_mount_env_ct, info);
+	int err, res;
+
+	res = join_spfs_context(info, NS_MNT_MASK);
+	if (res)
+		return res;
+
+	err = __spfs_cleanup_env(info);
+
+	res = set_namespaces(info->orig_ns_fds, NS_MNT_MASK);
+
+	return err ? err : res;
 }
 
 static int do_replace_one_spfs(const char *source, const char *target)
