@@ -22,4 +22,8 @@ void del_mount_info(struct shared_list *mounts, struct mount_info_s *info);
 int init_mount_info(struct mount_info_s *mnt, const char *id,
 		    const char *mountpoint);
 
+int mount_loop(void *data, const char *source, const char *mnt,
+	       const char *fstype, unsigned long mountflags,
+	       const void *options);
+
 #endif

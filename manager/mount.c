@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
+#include <sys/mount.h>
 
 #include "include/log.h"
 #include "include/shm.h"
@@ -90,4 +91,53 @@ int init_mount_info(struct mount_info_s *mnt, const char *id,
 		return -ENOMEM;
 	}
 	return 0;
+}
+
+static int do_mount(const char *source, const char *mnt,
+		    const char *fstype, unsigned long mountflags,
+		    const void *options)
+{
+	int err;
+
+	err = mount(source, mnt, fstype, mountflags, options);
+	if (!err)
+		return 0;
+
+	switch (errno) {
+		case EPROTONOSUPPORT:
+		case EPERM:
+			pr_warn("failed to mount %s to %s: %s\n", fstype, mnt,
+					strerror(errno));
+			return -EAGAIN;
+	}
+	return -errno;
+}
+
+int mount_loop(void *data, const char *source, const char *mnt,
+	       const char *fstype, unsigned long mountflags,
+	       const void *options)
+{
+	int err;
+	int timeout = 1;
+
+	pr_debug("trying to mount %s, source %s, flags %ld, options '%s' to %s\n",
+			fstype, source, mountflags, options, mnt);
+
+	while (1) {
+		err = do_mount(source, mnt, fstype, mountflags, options);
+		if (err != -EAGAIN)
+			break;
+
+		pr_warn("retrying in %d seconds\n", timeout);
+		sleep(timeout);
+
+		if (timeout < 32)
+			timeout <<= 1;
+	}
+
+	if (err)
+		pr_perror("failed to mount %s to %s", fstype, mnt);
+	else
+		pr_info("Successfully mounted %s to %s\n", fstype, mnt);
+	return err;
 }

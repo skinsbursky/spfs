@@ -407,71 +407,6 @@ int spfs_cleanup_env(struct spfs_info_s *info)
 	return ct_run(cleanup_mount_env_ct, info);
 }
 
-static int do_mount(const char *source, const char *mnt,
-		    const char *fstype, unsigned long mountflags,
-		    const void *options)
-{
-	int err;
-
-	err = mount(source, mnt, fstype, mountflags, options);
-	if (!err)
-		return 0;
-
-	switch (errno) {
-		case EPROTONOSUPPORT:
-		case EPERM:
-			pr_warn("failed to mount %s to %s: %s\n", fstype, mnt,
-					strerror(errno));
-			return -EAGAIN;
-	}
-	return -errno;
-}
-
-static int mount_loop(struct spfs_info_s *info,
-		      const char *source, const char *mnt,
-		      const char *fstype, unsigned long mountflags,
-		      const void *options)
-{
-	int err;
-	int timeout = 1;
-
-	pr_debug("trying to mount %s, source %s, flags %ld, options '%s' to %s\n",
-			fstype, source, mountflags, options, mnt);
-
-	err = create_dir(mnt);
-	if (err) {
-		pr_err("failed to create mountpoint %s\n", mnt);
-		return err;
-	}
-
-	while (1) {
-		err = do_mount(source, mnt, fstype, mountflags, options);
-		if (err != -EAGAIN)
-			break;
-
-		pr_warn("retrying in %d seconds\n", timeout);
-		sleep(timeout);
-
-		if (timeout < 32)
-			timeout <<= 1;
-	}
-
-	if (err) {
-		pr_perror("failed to mount %s to %s", fstype, mnt);
-		goto rmdir_mnt;
-	}
-
-	pr_info("Successfully mounted %s to %s\n", fstype, mnt);
-
-	return 0;
-
-rmdir_mnt:
-	if (rmdir(mnt))
-		pr_perror("failed to remove %s", mnt);
-	return err;
-
-}
-
 static int do_replace_one_spfs(const char *source, const char *target)
 {
 	int err;
@@ -584,9 +519,18 @@ static int do_mount_target(struct spfs_info_s *info,
 	if (err)
 		return err;
 
-	err = ct_run(mount_loop, info, source, target, fstype, mflags, options);
-	if (err)
+	err = create_dir(target);
+	if (err) {
+		pr_err("failed to create mountpoint %s\n", target);
 		return err;
+	}
+
+	err = ct_run(mount_loop, info, source, target, fstype, mflags, options);
+	if (err) {
+		if (rmdir(target))
+			pr_perror("failed to remove %s", target);
+		return err;
+	}
 
 	err = spfs_send_mode(info, SPFS_PROXY_MODE, target);
 	if (err)
