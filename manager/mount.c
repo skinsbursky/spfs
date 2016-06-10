@@ -113,9 +113,8 @@ static int do_mount(const char *source, const char *mnt,
 	return -errno;
 }
 
-int mount_loop(const char *source, const char *mnt,
-	       const char *fstype, unsigned long mountflags,
-	       const void *options)
+int mount_loop(const char *source, const char *mnt, const char *fstype,
+	       unsigned long mountflags, const void *options)
 {
 	int err;
 	int timeout = 1;

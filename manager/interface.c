@@ -185,14 +185,13 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 	struct opt_array_s opt_array[] = {
 		[0] = { "id=", NULL },
 		[1] = { "ns_pid=", NULL },	// optional
-		[2] = { "ns_pid=", NULL },	// optional
-		[3] = { "root=", NULL },	// optional
-		[4] = { "mode=", NULL },
-		[5] = { "proxy_dir=", NULL },	// optional
-		[6] = { "mountpoint=", NULL },
+		[2] = { "root=", NULL },	// optional
+		[3] = { "mode=", NULL },
+		[4] = { "proxy_dir=", NULL },	// optional
+		[5] = { "mountpoint=", NULL },
 		{ NULL, NULL },
 	};
-	const char *opt_id, *opt_ns_pid, *opt_ns_list, *opt_root;
+	const char *opt_id, *opt_ns_pid, *opt_root;
 	const char *opt_mode, *opt_proxy_dir, *opt_mountpoint;
 	struct spfs_info_s *info;
 	int err;
@@ -206,24 +205,13 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 
 	opt_id = opt_array[0].value;
 	opt_ns_pid = opt_array[1].value;
-	opt_ns_list = opt_array[2].value;
-	opt_root = opt_array[3].value;
-	opt_mode = opt_array[4].value;
-	opt_proxy_dir = opt_array[5].value;
-	opt_mountpoint = opt_array[6].value;
+	opt_root = opt_array[2].value;
+	opt_mode = opt_array[3].value;
+	opt_proxy_dir = opt_array[4].value;
+	opt_mountpoint = opt_array[5].value;
 
 	if (opt_id == NULL) {
 		pr_err("mount id wasn't provided\n");
-		return -EINVAL;
-	}
-
-	if (opt_ns_pid && !opt_ns_list) {
-		pr_err("namespases pid was provided without namespaces list\n");
-		return -EINVAL;
-	}
-
-	if (!opt_ns_pid && opt_ns_list) {
-		pr_err("namespases list was provided without namespaces pid\n");
 		return -EINVAL;
 	}
 
@@ -250,7 +238,7 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 		}
 	}
 
-	err = create_spfs_info(opt_id, opt_mountpoint, ns_pid, opt_ns_list, opt_root, &info);
+	err = create_spfs_info(opt_id, opt_mountpoint, ns_pid, opt_root, &info);
 	if (err)
 		return err;
 

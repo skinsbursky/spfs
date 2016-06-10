@@ -32,7 +32,7 @@ void cleanup_spfs_mount(struct spfs_info_s *info, int status)
 }
 
 int create_spfs_info(const char *id, const char *mountpoint,
-		     pid_t ns_pid, const char *ns_list, const char *root,
+		     pid_t ns_pid, const char *root,
 		     struct spfs_info_s **i)
 {
 	struct spfs_info_s *info;
@@ -50,11 +50,7 @@ int create_spfs_info(const char *id, const char *mountpoint,
 
 	if (ns_pid > 0) {
 		info->ns_pid = ns_pid;
-		info->ns_list = shm_xsprintf(ns_list);
-		if (!info->ns_list) {
-			pr_perror("failed to allocate string\n");
-			return -ENOMEM;
-		}
+
 		info->ns_fds = shm_alloc(sizeof(int) * NS_MAX);
 		if (!info->ns_fds) {
 			pr_perror("failed to allocate string\n");

@@ -28,7 +28,6 @@ struct spfs_info_s {
 	struct mount_info_s	mnt;
 	long			ns_pid;
 	int			*ns_fds;
-	char			*ns_list;
 	char			*root;
 	int			ref_cnt;
 	char			*work_dir;
@@ -47,7 +46,7 @@ struct spfs_info_s {
 
 void cleanup_spfs_mount(struct spfs_info_s *info, int status);
 int create_spfs_info(const char *id, const char *mountpoint,
-		     pid_t ns_pid, const char *ns_list, const char *root,
+		     pid_t ns_pid, const char *root,
 		     struct spfs_info_s **i);
 
 struct spfs_info_s *find_spfs_by_id(struct shared_list *mounts, const char *id);
