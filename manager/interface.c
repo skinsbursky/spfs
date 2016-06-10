@@ -185,13 +185,15 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 	struct opt_array_s opt_array[] = {
 		[0] = { "id=", NULL },
 		[1] = { "ns_pid=", NULL },	// optional
-		[2] = { "ns_list=", NULL },	// optional
+		[2] = { "ns_pid=", NULL },	// optional
 		[3] = { "root=", NULL },	// optional
 		[4] = { "mode=", NULL },
 		[5] = { "proxy_dir=", NULL },	// optional
 		[6] = { "mountpoint=", NULL },
 		{ NULL, NULL },
 	};
+	const char *opt_id, *opt_ns_pid, *opt_ns_list, *opt_root;
+	const char *opt_mode, *opt_proxy_dir, *opt_mountpoint;
 	struct spfs_info_s *info;
 	int err;
 	long ns_pid = -1;
@@ -202,67 +204,66 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 		return -EINVAL;
 	}
 
-	if (opt_array[0].value == NULL) {
+	opt_id = opt_array[0].value;
+	opt_ns_pid = opt_array[1].value;
+	opt_ns_list = opt_array[2].value;
+	opt_root = opt_array[3].value;
+	opt_mode = opt_array[4].value;
+	opt_proxy_dir = opt_array[5].value;
+	opt_mountpoint = opt_array[6].value;
+
+	if (opt_id == NULL) {
 		pr_err("mount id wasn't provided\n");
 		return -EINVAL;
 	}
 
-	if (opt_array[1].value && (opt_array[2].value == NULL)){
+	if (opt_ns_pid && !opt_ns_list) {
 		pr_err("namespases pid was provided without namespaces list\n");
 		return -EINVAL;
 	}
 
-	if (opt_array[2].value && (opt_array[1].value == NULL)){
+	if (!opt_ns_pid && opt_ns_list) {
 		pr_err("namespases list was provided without namespaces pid\n");
 		return -EINVAL;
 	}
 
-	if (opt_array[4].value == NULL) {
+	if (opt_mode == NULL) {
 		pr_err("mode wasn't provided\n");
 		return -EINVAL;
 	}
 
-	if (!strcmp(opt_array[4].value, "proxy") && (opt_array[5].value == NULL)) {
+	if (!strcmp(opt_mode, "proxy") && (opt_proxy_dir == NULL)) {
 		pr_err("no proxy directory was provided\n");
 		return -EINVAL;
 	}
 
-	if (opt_array[6].value == NULL) {
+	if (opt_mountpoint == NULL) {
 		pr_err("mountpoint wasn't provided\n");
 		return -EINVAL;
 	}
 
-	if (opt_array[1].value) {
-		err = xatol(opt_array[1].value, &ns_pid);
+	if (opt_ns_pid) {
+		err = xatol(opt_ns_pid, &ns_pid);
 		if (err) {
-			pr_err("failed to convert pid: %s\n", opt_array[1].value);
+			pr_err("failed to convert pid: %s\n", opt_ns_pid);
 			return err;
 		}
 	}
 
-	err = create_spfs_info(opt_array[0].value, opt_array[6].value,
-				ns_pid, opt_array[2].value, opt_array[3].value,
-				&info);
+	err = create_spfs_info(opt_id, opt_mountpoint, ns_pid, opt_ns_list, opt_root, &info);
 	if (err)
 		return err;
 
 	info->ovz_id = ctx->ovz_id;
 	info->orig_ns_fds = ctx->ns_fds;
 
-	/* TODO: should we add mounpoint _after_ mount? */
-	err = add_spfs_info(ctx->spfs_mounts, info);
-	if (err)
-		return -ENOMEM;
+	err = mount_spfs(ctx, info, opt_mode, opt_proxy_dir);
+	if (err) {
+		pr_err("failed to mount spfs to %s\n", opt_mountpoint);
+		return err;
+	}
 
-	err = mount_spfs(ctx, info, opt_array[4].value, opt_array[5].value);
-	if (err)
-		goto del_spfs_info;
-
-	return 0;
-
-del_spfs_info:
-	del_spfs_info(ctx->spfs_mounts, info);
-	return err;
+	return add_spfs_info(ctx->spfs_mounts, info);
 }
 
 static int change_spfs_mode(struct spfs_manager_context_s *ctx,
@@ -302,6 +303,7 @@ static int process_mode_cmd(int sock, struct spfs_manager_context_s *ctx,
 		[3] = { "all", NULL, true },
 		{ NULL, NULL },
 	};
+	const char *opt_id, *opt_mode, *opt_proxy_dir, *opt_all;
 	const struct spfs_info_s *info = NULL;
 	spfs_mode_t mode;
 	int err;
@@ -312,22 +314,27 @@ static int process_mode_cmd(int sock, struct spfs_manager_context_s *ctx,
 		return -EINVAL;
 	}
 
-	if ((opt_array[0].value == NULL) && (opt_array[3].value == NULL)) {
+	opt_id = opt_array[0].value;
+	opt_mode = opt_array[1].value;
+	opt_proxy_dir = opt_array[2].value;
+	opt_all = opt_array[3].value;
+
+	if (!opt_id && !opt_all) {
 		pr_err("mount id wasn't provided\n");
 		return -EINVAL;
 	}
 
-	if (opt_array[1].value == NULL) {
+	if (!opt_mode) {
 		pr_err("mode wasn't provided\n");
 		return -EINVAL;
 	}
 
-	if (!strcmp(opt_array[1].value, "proxy") && (opt_array[2].value == NULL)) {
+	if (!strcmp(opt_mode, "proxy") && !opt_proxy_dir) {
 		pr_err("no proxy directory was provided\n");
 		return -EINVAL;
 	}
 
-	if (opt_array[0].value) {
+	if (opt_id) {
 		info = find_spfs_by_id(ctx->spfs_mounts, opt_array[0].value);
 		if (!info) {
 			pr_err("failed to find spfs info with id %s\n", opt_array[0].value);
@@ -335,11 +342,11 @@ static int process_mode_cmd(int sock, struct spfs_manager_context_s *ctx,
 		}
 	}
 
-	mode = spfs_mode(opt_array[1].value, opt_array[2].value);
+	mode = spfs_mode(opt_mode, opt_proxy_dir);
 	if (mode < 0)
 		return mode;
 
-	return change_spfs_mode(ctx, info, mode, opt_array[2].value);
+	return change_spfs_mode(ctx, info, mode, opt_proxy_dir);
 }
 
 static int process_replace_mode_all(int sock, struct spfs_manager_context_s *ctx,
@@ -389,6 +396,8 @@ static int process_replace_cmd(int sock, struct spfs_manager_context_s *ctx,
 		[7] = { "all", NULL, true },
 		{ NULL, NULL },
 	};
+	const char *opt_id, *opt_source, *opt_type, *opt_flags;
+	const char *opt_freeze_cgroup, *opt_bindmounts, *opt_mode, *opt_all;
 	struct spfs_info_s *info;
 	void *opts = NULL;
 	int err;
@@ -403,57 +412,66 @@ static int process_replace_cmd(int sock, struct spfs_manager_context_s *ctx,
 		return -EINVAL;
 	}
 
-	if (opt_array[6].value) {
-		mode = get_replace_mode(opt_array[6].value);
+	opt_id = opt_array[0].value;
+	opt_source = opt_array[1].value;
+	opt_type = opt_array[2].value;
+	opt_flags = opt_array[3].value;
+	opt_freeze_cgroup = opt_array[4].value;
+	opt_bindmounts = opt_array[5].value;
+	opt_mode = opt_array[6].value;
+	opt_all = opt_array[7].value;
+
+	if (opt_mode) {
+		mode = get_replace_mode(opt_mode);
 		if (mode < 0) {
-			pr_err("mode is invalid: %s\n", opt_array[6].value);
+			pr_err("mode is invalid: %s\n", opt_mode);
 			return -EINVAL;
 		}
 	}
 
-	if (opt_array[7].value)
+	if (opt_all)
 		return process_replace_mode_all(sock, ctx, mode);
 
-	if (opt_array[0].value == NULL) {
+	if (opt_id == NULL) {
 		pr_err("mount id wasn't provided\n");
 		return -EINVAL;
 	}
 
-	if (opt_array[1].value == NULL) {
+	if (opt_source == NULL) {
 		pr_err("source wasn't provided\n");
 		return -EINVAL;
 	}
 
-	if (opt_array[2].value == NULL) {
+	if (opt_type == NULL) {
 		pr_err("type wasn't provided\n");
 		return -EINVAL;
 	}
 
-	if (opt_array[3].value == NULL) {
+	if (opt_flags == NULL) {
 		pr_err("flags weren't provided\n");
 		return -EINVAL;
 	}
 
-	info = find_spfs_by_id(ctx->spfs_mounts, opt_array[0].value);
+	info = find_spfs_by_id(ctx->spfs_mounts, opt_id);
 	if (!info) {
-		pr_err("failed to find spfs info with id %s\n", opt_array[0].value);
+		pr_err("failed to find spfs info with id %s\n", opt_id);
 		return -EINVAL;
 	}
 
-	if (opt_array[4].value) {
+	if (opt_freeze_cgroup) {
 		err = lock_shared_list(ctx->spfs_mounts);
 		if (err)
 			return err;
 
 		if (info->fg) {
 			pr_err("failed to set freezer cgroup %s for info %s\n",
-					opt_array[4].value, info->mnt.id);
+					opt_freeze_cgroup, info->mnt.id);
 			err = -EEXIST;
 		} else {
-			info->fg = get_freeze_cgroup(ctx->freeze_cgroups, opt_array[4].value);
+			info->fg = get_freeze_cgroup(ctx->freeze_cgroups, opt_freeze_cgroup);
 			if (!info->fg)
 				pr_err("failed to get freezer cgroup %s for info %s\n",
-						opt_array[4].value, info->mnt.id);
+						opt_freeze_cgroup, info->mnt.id);
 		}
 
 		(void) unlock_shared_list(ctx->spfs_mounts);
@@ -462,8 +480,8 @@ static int process_replace_cmd(int sock, struct spfs_manager_context_s *ctx,
 			return err;
 	}
 
-	if (opt_array[5].value) {
-		err = spfs_add_mount_paths(info, opt_array[5].value);
+	if (opt_bindmounts) {
+		err = spfs_add_mount_paths(info, opt_bindmounts);
 		if (err)
 			return err;
 	}
@@ -472,8 +490,7 @@ static int process_replace_cmd(int sock, struct spfs_manager_context_s *ctx,
 	if (err)
 		return err;
 
-	return replace_spfs(sock, info, opt_array[1].value, opt_array[2].value,
-			     opt_array[3].value, opts);
+	return replace_spfs(sock, info, opt_source, opt_type, opt_flags, opts);
 }
 
 static int process_switch_cmd(int sock, struct spfs_manager_context_s *ctx,
