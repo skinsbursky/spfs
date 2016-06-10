@@ -38,6 +38,11 @@ int set_namespaces(int *ns_fds, unsigned ns_mask)
 	if (!ns_fds)
 		return 0;
 
+	if (!ns_mask) {
+		pr_err("ns_mask is empty\n");
+		return -EINVAL;
+	}
+
 	for (ns_type = NS_UTS; ns_type < NS_MAX; ns_type++) {
 		if ((ns_mask & (1 << ns_type)) == 0)
 			continue;
