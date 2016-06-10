@@ -78,30 +78,6 @@ free_path:
 	return err;
 }
 
-int join_namespaces(int pid, const char *namespaces)
-{
-	char *ns, *ns_list, *nl;
-	int err = 0;
-
-	pr_debug("Join process %d namespaces: %s\n", pid, namespaces);
-
-	ns_list = nl = strdup(namespaces);
-	if (!ns_list) {
-		pr_err("failed to duplicate namespaces\n");
-		return -ENOMEM;
-	}
-
-	while ((ns = strsep(&nl, ",")) != NULL) {
-		err = join_one_namespace(pid, ns);
-		if (err)
-			goto free_ns_list;
-	}
-
-free_ns_list:
-	free(ns_list);
-	return err;
-}
-
 static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)
 {
 	struct spfs_manager_context_s *ctx = &spfs_manager_context;

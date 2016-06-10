@@ -658,7 +658,8 @@ static int exec_spfs(int pipe, const struct spfs_info_s *info, const char *mode,
 		return -ENOMEM;
 
 	if (info->ns_pid) {
-		err = join_namespaces(info->ns_pid, info->ns_list);
+		err = set_namespaces(info->ns_fds, NS_MNT_MASK | NS_NET_MASK |
+				NS_USER_MASK | NS_UTS_MASK);
 		if (err)
 			goto free_options;
 	}
