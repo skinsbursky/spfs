@@ -27,6 +27,7 @@ typedef enum {
 struct spfs_info_s {
 	struct mount_info_s	mnt;
 	long			ns_pid;
+	int			*ns_fds;
 	char			*ns_list;
 	char			*root;
 	int			ref_cnt;
@@ -43,6 +44,7 @@ struct spfs_info_s {
 	spfs_replace_mode_t	mode __attribute__((aligned(sizeof(int))));
 };
 
+void cleanup_spfs_mount(struct spfs_info_s *info, int status);
 int create_spfs_info(const char *id, const char *mountpoint,
 		     pid_t ns_pid, const char *ns_list, const char *root,
 		     struct spfs_info_s **i);

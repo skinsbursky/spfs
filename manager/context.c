@@ -102,17 +102,6 @@ free_ns_list:
 	return err;
 }
 
-static void cleanup_spfs_mount(struct spfs_info_s *info, int status)
-{
-	pr_debug("removing info %s from the list\n", info->mnt.id);
-	info->dead = true;
-	list_del(&info->mnt.list);
-	unlink(info->socket_path);
-
-	if (WIFEXITED(status) && (WEXITSTATUS(status) == 0))
-		spfs_cleanup_env(info);
-}
-
 static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)
 {
 	struct spfs_manager_context_s *ctx = &spfs_manager_context;
