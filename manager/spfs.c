@@ -189,16 +189,9 @@ void del_spfs_info(struct shared_list *mounts, struct spfs_info_s *info)
 	del_mount_info(mounts, &info->mnt);
 }
 
-static int enter_spfs_context(const struct spfs_info_s *info)
+int spfs_chroot(const struct spfs_info_s *info)
 {
-	int err;
 	struct stat st;
-
-	if (info->ns_pid) {
-		err = join_namespaces(info->ns_pid, info->ns_list);
-		if (err)
-			return err;
-	}
 
 	if (!strlen(info->root))
 		return 0;
@@ -221,6 +214,19 @@ static int enter_spfs_context(const struct spfs_info_s *info)
 	/* Ok, let's try to change root. And, probably, we shouldn't care
 	 * either it ours or not. */
 	return secure_chroot(info->root);
+}
+
+static int enter_spfs_context(const struct spfs_info_s *info)
+{
+	int err;
+
+	if (info->ns_pid) {
+		err = join_namespaces(info->ns_pid, info->ns_list);
+		if (err)
+			return err;
+	}
+
+	return spfs_chroot(info);
 }
 
 static int __spfs_add_one_mountpath(struct spfs_info_s *info, char *path)
