@@ -77,22 +77,12 @@ free_pids:
 	return err ? err : ret;
 }
 
-int __replace_resources(struct freeze_cgroup_s *fg,
+int __replace_resources(struct freeze_cgroup_s *fg, int *ns_fds,
 		      const char *source_mnt, dev_t src_dev,
 		      const char *target_mnt,
 		      pid_t ns_pid)
 {
 	int err, status, pid;
-	int ct_ns_fds[NS_MAX], *ns_fds = NULL;
-
-	if (ns_pid) {
-		err = open_namespaces(ns_pid, ct_ns_fds);
-		if (err) {
-			pr_perror("failed to open %d namespaces", ns_pid);
-			return err;
-		}
-		ns_fds = ct_ns_fds;
-	}
 
 	/* Join target pid namespace to extract virtual pids from freezer cgroup.
 	 * This is required, because resources reopen must be performed in
@@ -102,7 +92,7 @@ int __replace_resources(struct freeze_cgroup_s *fg,
 	 */
 	err = set_namespaces(ns_fds, NS_PID_MASK);
 	if (err)
-		goto close_namespaces;
+		return err;
 
 	pid = fork();
 	switch (pid) {
@@ -117,8 +107,6 @@ int __replace_resources(struct freeze_cgroup_s *fg,
 	if (pid > 0)
 		err = collect_child(pid, &status, 0);
 
-close_namespaces:
-	close_namespaces(ns_fds);
 	return err ? err : status;
 }
 
@@ -128,6 +116,16 @@ int replace_resources(struct freeze_cgroup_s *fg,
 		      pid_t ns_pid)
 {
 	int res, err;
+	int ct_ns_fds[NS_MAX], *ns_fds = NULL;
+
+	if (ns_pid) {
+		err = open_namespaces(ns_pid, ct_ns_fds);
+		if (err) {
+			pr_perror("failed to open %d namespaces", ns_pid);
+			return err;
+		}
+		ns_fds = ct_ns_fds;
+	}
 
 	res = lock_cgroup(fg);
 	if (!res) {
@@ -136,14 +134,16 @@ int replace_resources(struct freeze_cgroup_s *fg,
 			(void) unlock_cgroup(fg);
 	}
 	if (res)
-		return res;
+		goto close_ns_fds;
 
-	err = __replace_resources(fg, source_mnt, src_dev, target_mnt, ns_pid);
+	err = __replace_resources(fg, ns_fds, source_mnt, src_dev, target_mnt, ns_pid);
 
 	res = thaw_cgroup(fg);
 	if (!res)
 		(void) unlock_cgroup(fg);
 
+close_ns_fds:
+	if (ns_fds)
+		close_namespaces(ns_fds);
 	return err ? err : res;
-
 }

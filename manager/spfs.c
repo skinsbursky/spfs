@@ -523,7 +523,7 @@ static int do_replace_spfs(struct spfs_info_s *info, const char *source)
 
 	err = ct_run(do_replace_mounts, info, source);
 	if (!err)
-		err = __replace_resources(info->fg, NULL, mnt->st.st_dev,
+		err = __replace_resources(info->fg, info->ns_fds, NULL, mnt->st.st_dev,
 					  mnt->mountpoint, info->ns_pid);
 
 	res = spfs_thaw_and_unlock(info);
