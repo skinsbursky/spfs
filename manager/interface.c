@@ -1,5 +1,3 @@
-#include "spfs_config.h"
-
 #include <stdlib.h>
 #include <poll.h>
 #include <signal.h>
@@ -93,49 +91,11 @@ static int parse_cmd_options(struct opt_array_s *array, char *options)
 	return 0;
 }
 
-static int exec_spfs(int pipe, const struct spfs_info_s *info, const char *mode,
-		     const char *proxy_dir, const char *socket_path, const char *log_path,
-		     const char *mountpoint)
-{
-	const char *spfs = FS_NAME;
-	char wpipe[16];
-	char **options;
-	int err = -ENOMEM;
-
-	sprintf(wpipe, "%d", pipe);
-
-	options = exec_options(0, "spfs", "-vvvv", "-f", "--single-user",
-				"-o", "no_remote_lock",
-				"--mode", mode,
-				"--socket-path", socket_path,
-				"--ready-fd", wpipe,
-				"--log", log_path,
-				mountpoint, NULL);
-	if (options && strlen(info->root))
-		options = add_exec_options(options, "--root", info->root, NULL);
-	if (options && proxy_dir)
-		options = add_exec_options(options, "--proxy-dir", proxy_dir, NULL);
-
-	if (!options)
-		return -ENOMEM;
-
-	if (info->ns_pid)
-		if (join_namespaces(info->ns_pid, info->ns_list))
-			goto free_options;
-
-	err = execvp_print(spfs, options);
-
-free_options:
-	free(options);
-	return err;
-}
-
 static int mount_spfs(struct spfs_manager_context_s *ctx,
 		      struct spfs_info_s *info,
 		      const char *mode, const char *proxy_dir)
 {
-	char *cwd, *socket_path, *log_path, *mountpoint, *dir;
-	int status = -ENOMEM, initpipe[2], timeout_ms = 5000;
+	int status = -ENOMEM, initpipe[2], timeout_ms = 500000;
 	struct pollfd pfd;
 	pid_t pid;
 
@@ -144,50 +104,15 @@ static int mount_spfs(struct spfs_manager_context_s *ctx,
 		return -errno;
 	}
 
-	cwd = get_current_dir_name();
-	if (!cwd) {
-		pr_perror("failed to get cwd");
-		goto close_pipe;
-	}
-
-	mountpoint = xsprintf("%s%s", info->root, info->mnt.mountpoint);
-	if (!mountpoint)
-		goto free_cwd;
-
-	socket_path = xsprintf("%s/%s", cwd, info->socket_path);
-	if (!socket_path)
-		goto free_mountpoint;
-
-	log_path = xsprintf("%s/spfs-%s.log", cwd, info->mnt.id);
-	if (!log_path)
-		goto free_socket_path;
-
-	if (strcmp(mode, "restore"))
-		dir = strdup(proxy_dir);
-	else {
-		mode = "proxy";
-		dir = xsprintf("%s/restore", info->work_dir);
-	}
-	if (!dir) {
-		pr_perror("failed to allocate\n");
-		goto free_log_path;
-	}
-
-	status = spfs_prepare_env(info, dir);
-	if (status)
-		goto free_proxy_dir;
-
 	pid = fork();
 	switch (pid) {
 		case -1:
 			pr_perror("failed to fork");
 			status = -errno;
-			goto cleanup_env;
+			goto close_pipe;
 		case 0:
 			close(initpipe[0]);
-			_exit(exec_spfs(initpipe[1], info, mode,
-					dir, socket_path, log_path,
-					mountpoint));
+			_exit(do_mount_spfs(info, mode, proxy_dir, initpipe[1]));
 	}
 
 	/* First, close write end of the pipe */
@@ -240,16 +165,6 @@ repeat:
 
 	info->pid = pid;
 
-free_proxy_dir:
-	free(dir);
-free_log_path:
-	free(log_path);
-free_socket_path:
-	free(socket_path);
-free_mountpoint:
-	free(mountpoint);
-free_cwd:
-	free(cwd);
 close_pipe:
 	if (initpipe[1] >= 0)
 		close(initpipe[1]);
@@ -260,9 +175,8 @@ kill_spfs:
 	kill_child_and_collect(pid);
 umount_spfs:
 	umount(info->mnt.mountpoint);
-cleanup_env:
 	spfs_cleanup_env(info);
-	goto free_proxy_dir;
+	goto close_pipe;
 }
 
 static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,

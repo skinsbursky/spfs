@@ -1,3 +1,5 @@
+#include "spfs_config.h"
+
 #include <stdlib.h>
 #include <sys/mount.h>
 #include <sys/types.h>
@@ -643,5 +645,100 @@ int spfs_apply_replace_mode(struct spfs_info_s *info, spfs_replace_mode_t mode)
 			pr_err("failed to wake info %s replace waiters\n",
 					info->mnt.id);
 	}
+	return err;
+}
+
+static int exec_spfs(int pipe, const struct spfs_info_s *info, const char *mode,
+		     const char *proxy_dir, const char *socket_path, const char *log_path,
+		     const char *mountpoint)
+{
+	const char *spfs = FS_NAME;
+	char wpipe[16];
+	char **options;
+	int err;
+
+	sprintf(wpipe, "%d", pipe);
+
+	options = exec_options(0, "spfs", "-vvvv", "-f", "--single-user",
+				"-o", "no_remote_lock",
+				"--mode", mode,
+				"--socket-path", socket_path,
+				"--ready-fd", wpipe,
+				"--log", log_path,
+				mountpoint, NULL);
+	if (options && strlen(info->root))
+		options = add_exec_options(options, "--root", info->root, NULL);
+	if (options && proxy_dir)
+		options = add_exec_options(options, "--proxy-dir", proxy_dir, NULL);
+
+	if (!options)
+		return -ENOMEM;
+
+	if (info->ns_pid) {
+		err = join_namespaces(info->ns_pid, info->ns_list);
+		if (err)
+			goto free_options;
+	}
+
+	err = execvp_print(spfs, options);
+
+free_options:
+	free(options);
+	return err;
+}
+
+int do_mount_spfs(struct spfs_info_s *info,
+		  const char *mode, const char *proxy_dir,
+		  int pipe_fd)
+{
+	char *cwd, *socket_path, *log_path, *mountpoint, *dir;
+	int err = -ENOMEM;
+
+	cwd = get_current_dir_name();
+	if (!cwd) {
+		pr_perror("failed to get cwd");
+		return -ENOMEM;
+	}
+
+	mountpoint = xsprintf("%s%s", info->root, info->mnt.mountpoint);
+	if (!mountpoint)
+		goto free_cwd;
+
+	socket_path = xsprintf("%s/%s", cwd, info->socket_path);
+	if (!socket_path)
+		goto free_mountpoint;
+
+	log_path = xsprintf("%s/spfs-%s.log", cwd, info->mnt.id);
+	if (!log_path)
+		goto free_socket_path;
+
+	if (strcmp(mode, "restore"))
+		dir = strdup(proxy_dir);
+	else {
+		mode = "proxy";
+		dir = xsprintf("%s/restore", info->work_dir);
+	}
+	if (!dir) {
+		pr_perror("failed to allocate\n");
+		goto free_log_path;
+	}
+
+	err = spfs_prepare_env(info, dir);
+	if (err)
+		goto free_proxy_dir;
+
+	err = exec_spfs(pipe_fd, info, mode,
+			dir, socket_path, log_path, mountpoint);
+
+free_proxy_dir:
+	free(dir);
+free_log_path:
+	free(log_path);
+free_socket_path:
+	free(socket_path);
+free_mountpoint:
+	free(mountpoint);
+free_cwd:
+	free(cwd);
 	return err;
 }
