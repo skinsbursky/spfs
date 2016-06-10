@@ -229,6 +229,23 @@ static int enter_spfs_context(const struct spfs_info_s *info)
 	return spfs_chroot(info);
 }
 
+int join_spfs_context(const struct spfs_info_s *info, int ns_mask)
+{
+	int err;
+
+	if (info->ns_pid) {
+		err = set_namespaces(info->ns_fds, ns_mask);
+		if (err)
+			return err;
+	}
+
+	err = spfs_chroot(info);
+
+	if (err && info->ns_pid)
+		(void) set_namespaces(info->orig_ns_fds, ns_mask);
+	return err;
+}
+
 static int __spfs_add_one_mountpath(struct spfs_info_s *info, char *path)
 {
 	struct spfs_bindmount *bm;
