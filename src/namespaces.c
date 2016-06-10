@@ -90,28 +90,3 @@ close_saved_fd:
 	(void)close_namespaces(ns_fds);
 	return err;
 }
-
-int change_namespaces(pid_t pid, unsigned ns_mask, int *orig_ns_fds[])
-{
-	int ns_fds[NS_MAX] = {
-		-1, -1, -1, -1, -1
-	};
-	int err;
-
-	if (orig_ns_fds) {
-		err = open_namespaces(getpid(), ns_fds);
-		if (err)
-			return err;
-	}
-
-	err = open_namespaces(pid, ns_fds);
-	if (err)
-		return err;
-
-	err = set_namespaces(ns_fds, ns_mask);
-
-	(void)close_namespaces(ns_fds);
-	return err;
-}
-
-

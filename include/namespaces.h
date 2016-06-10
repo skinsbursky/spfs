@@ -21,7 +21,6 @@ enum {
 
 int open_ns(pid_t pid, const char *ns);
 int set_namespaces(int *ns_fds, unsigned ns_mask);
-int change_namespaces(pid_t pid, unsigned ns_mask, int *orig_ns_fds[]);
 int close_namespaces(int *ns_fds);
 int open_namespaces(pid_t pid, int *ns_fds);
 
