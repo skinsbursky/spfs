@@ -41,6 +41,7 @@ struct spfs_info_s {
 	struct shared_list	mountpaths;
 	struct list_head	processes;
 	const char		*ovz_id;
+	int			*orig_ns_fds;
 	spfs_replace_mode_t	mode __attribute__((aligned(sizeof(int))));
 };
 

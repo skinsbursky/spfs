@@ -333,6 +333,7 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 		return err;
 
 	info->ovz_id = ctx->ovz_id;
+	info->orig_ns_fds = ctx->ns_fds;
 
 	/* TODO: should we add mounpoint _after_ mount? */
 	err = add_spfs_info(ctx->spfs_mounts, info);

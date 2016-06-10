@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 
+#include "include/namespaces.h"
+
 struct spfs_manager_context_s {
 	const char	*progname;
 
@@ -15,6 +17,8 @@ struct spfs_manager_context_s {
 	char	*ovz_id;
 
 	int	sock;
+
+	int	ns_fds[NS_MAX];
 
 	struct shared_list *spfs_mounts;
 	struct shared_list *freeze_cgroups;
