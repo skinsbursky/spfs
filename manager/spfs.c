@@ -121,36 +121,6 @@ int create_spfs_info(const char *id, const char *mountpoint,
 	return 0;
 }
 
-static int enter_spfs_context(const struct spfs_info_s *info);
-
-#define ct_run(func, info, ...)							\
-({										\
-	int _pid, _err, _status;						\
-										\
-	_pid = fork();								\
-	switch (_pid) {								\
-		case -1:							\
-			pr_perror("failed to fork");				\
-			_err = -errno;						\
-		case 0:								\
-			_err = enter_spfs_context(info);			\
-			if (_err)						\
-				_exit(-_err);					\
-										\
-			_exit(func(info, ##__VA_ARGS__));			\
-		default:							\
-			_err = 0;						\
-	}									\
-										\
-										\
-	if (_pid > 0) {								\
-		pr_debug("Created child %d in spfs %s context\n",		\
-				_pid, info->mnt.id);				\
-		_err = collect_child(_pid, &_status, 0);			\
-	}									\
-	_err ? _err : _status;							\
-})
-
 static bool spfs_pid_match(const struct mount_info_s *mnt, const void *data)
 {
 	pid_t pid = (pid_t)(unsigned long)data;
@@ -216,20 +186,7 @@ int spfs_chroot(const struct spfs_info_s *info)
 	return secure_chroot(info->root);
 }
 
-static int enter_spfs_context(const struct spfs_info_s *info)
-{
-	int err;
-
-	if (info->ns_pid) {
-		err = join_namespaces(info->ns_pid, info->ns_list);
-		if (err)
-			return err;
-	}
-
-	return spfs_chroot(info);
-}
-
-int join_spfs_context(const struct spfs_info_s *info, int ns_mask)
+static int join_spfs_context(const struct spfs_info_s *info, int ns_mask)
 {
 	int err;
 
@@ -483,7 +440,7 @@ static int umount_target(const char *mnt)
 	return 0;
 }
 
-static int do_replace_mounts(struct spfs_info_s *info, const char *source)
+static int __do_replace_spfs_mounts(struct spfs_info_s *info, const char *source)
 {
 	int err;
 	struct spfs_bindmount *bm;
@@ -526,6 +483,21 @@ close_spfs_ref:
 	return err;
 }
 
+static int do_replace_spfs_mounts(struct spfs_info_s *info, const char *source)
+{
+	int err, res;
+
+	res = join_spfs_context(info, NS_MNT_MASK);
+	if (res)
+		return res;
+
+	err = __do_replace_spfs_mounts(info, source);
+
+	res = set_namespaces(info->orig_ns_fds, NS_MNT_MASK);
+
+	return err ? err : res;
+}
+
 static int do_replace_spfs(struct spfs_info_s *info, const char *source)
 {
 	int err, res;
@@ -541,7 +513,7 @@ static int do_replace_spfs(struct spfs_info_s *info, const char *source)
 	if (res)
 		return res;
 
-	err = ct_run(do_replace_mounts, info, source);
+	err = do_replace_spfs_mounts(info, source);
 	if (!err)
 		err = __replace_resources(info->fg, info->ns_fds, NULL, mnt->st.st_dev,
 					  mnt->mountpoint, info->ns_pid);
