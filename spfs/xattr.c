@@ -102,7 +102,7 @@ static struct file_xattr_s *find_xattr(const struct xattr_tree_s *tree,
 	struct file_xattr_s *fx;
 
 	list_for_each_entry(fx, &tree->xattrs, list) {
-		if (strcmp(fx->name, name))
+		if (!strcmp(fx->name, name))
 			return fx;
 	}
 	return NULL;
