@@ -179,8 +179,6 @@ inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 	int ___err = -ENOSYS;							\
 	const struct fuse_operations *___ops = get_operations(__fh->wm);	\
 										\
-	pr_info("gateway: %s(\"%s\") = ...\n", #__func, __path);		\
-										\
 	if (___ops->__func) {							\
 		char *___fpath;							\
 										\
@@ -317,21 +315,25 @@ inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 
 static int gateway_getattr(const char *path, struct stat *stbuf)
 {
+	pr_info("%s(\"%s\", ...) = ...\n", __func__, path);
 	return GATEWAY_METHOD_RESTARTABLE(getattr, path, stbuf);
 }
 
 static int gateway_readlink(const char *path, char *buf, size_t size)
 {
+	pr_info("%s(\"%s\", 0x%p, %ld) = ...\n", __func__, path, buf, size);
 	return GATEWAY_METHOD_RESTARTABLE(readlink, path, buf, size);
 }
 
 static int gateway_mknod(const char *path, mode_t mode, dev_t rdev)
 {
+	pr_info("%s(\"%s\", 0%o, %x) = ...\n", __func__, path, mode, rdev);
 	return GATEWAY_METHOD_RESTARTABLE(mknod, path, mode, rdev);
 }
 
 static int gateway_mkdir(const char *path, mode_t mode)
 {
+	pr_info("%s(\"%s\", 0%o) = ...\n", __func__, path, mode);
 	return GATEWAY_METHOD_RESTARTABLE(mkdir, path, mode);
 }
 
@@ -339,6 +341,7 @@ static int gateway_unlink(const char *path)
 {
 	int err;
 
+	pr_info("%s(\"%s\") = ...\n", __func__, path);
 	err = GATEWAY_METHOD_RESTARTABLE(unlink, path);
 	if (!err)
 		(void) spfs_del_xattrs(path);
@@ -347,11 +350,13 @@ static int gateway_unlink(const char *path)
 
 static int gateway_rmdir(const char *path)
 {
+	pr_info("%s(\"%s\") = ...\n", __func__, path);
 	return GATEWAY_METHOD_RESTARTABLE(rmdir, path);
 }
 
 static int gateway_symlink(const char *to, const char *from)
 {
+	pr_info("%s(\"%s\", \"%s\") = ...\n", __func__, to, from);
 	return GATEWAY_LINK_RESTARTABLE(symlink, to, from);
 }
 
@@ -359,6 +364,7 @@ static int gateway_rename(const char *from, const char *to)
 {
 	int err;
 
+	pr_info("%s(\"%s\", \"%s\") = ...\n", __func__, from, to);
 	err = GATEWAY_LINK_RESTARTABLE(rename, from, to);
 	if (!err)
 		(void) spfs_move_xattrs(from, to);
@@ -369,6 +375,7 @@ static int gateway_link(const char *from, const char *to)
 {
 	int err;
 
+	pr_info("%s(\"%s\", \"%s\") = ...\n", __func__, from, to);
 	err = GATEWAY_LINK_RESTARTABLE(link, from, to);
 	if (!err)
 		(void) spfs_dup_xattrs(from, to);
@@ -377,22 +384,27 @@ static int gateway_link(const char *from, const char *to)
 
 static int gateway_chmod(const char *path, mode_t mode)
 {
+	pr_info("%s(\"%s\", 0%o) = ...\n", __func__, path, mode);
 	return GATEWAY_METHOD_RESTARTABLE(chmod, path, mode);
 }
 
 static int gateway_chown(const char *path, uid_t uid, gid_t gid)
 {
+	pr_info("%s(\"%s\", %d, %d) = ...\n", __func__, path, uid, gid);
 	return GATEWAY_METHOD_RESTARTABLE(chown, path, uid, gid);
 }
 
 static int gateway_truncate(const char *path, off_t size)
 {
+	pr_info("%s(\"%s\", %ld) = ...\n", __func__, path, size);
 	return GATEWAY_METHOD_RESTARTABLE(truncate, path, size);
 }
 
 static int gateway_read(const char *path, char *buf, size_t size, off_t offset,
 			struct fuse_file_info *fi)
 {
+	pr_info("%s(\"%s\", %p, %ld, %ld, ...) = ...\n", __func__,
+			path, buf, size, offset);
 	return GATEWAY_METHOD_FI_RESTARTABLE(read, path, fi,
 					     buf, size, offset, fi);
 }
@@ -400,17 +412,21 @@ static int gateway_read(const char *path, char *buf, size_t size, off_t offset,
 static int gateway_write(const char *path, const char *buf, size_t size,
 		off_t offset, struct fuse_file_info *fi)
 {
+	pr_info("%s(\"%s\", %p, %ld, %ld, ...) = ...\n", __func__,
+			path, buf, size, offset);
 	return GATEWAY_METHOD_FI_RESTARTABLE(write, path, fi,
 					     buf, size, offset, fi);
 }
 
 static int gateway_statfs(const char *path, struct statvfs *stbuf)
 {
+	pr_info("%s(\"%s\", %p) = ...\n", __func__, path, stbuf);
 	return GATEWAY_METHOD_RESTARTABLE(statfs, path, stbuf);
 }
 
 static int gateway_flush(const char *path, struct fuse_file_info *fi)
 {
+	pr_info("%s(\"%s\", ...) = ...\n", __func__, path);
 	return GATEWAY_METHOD_FI_RESTARTABLE(flush, path, fi,
 					     fi);
 }
@@ -418,6 +434,7 @@ static int gateway_flush(const char *path, struct fuse_file_info *fi)
 static int gateway_fsync(const char *path, int isdatasync,
 		struct fuse_file_info *fi)
 {
+	pr_info("%s(\"%s\", %d, ...) = ...\n", __func__, path, isdatasync);
 	return GATEWAY_METHOD_FI_RESTARTABLE(fsync, path, fi,
 					     isdatasync, fi);
 }
@@ -425,45 +442,79 @@ static int gateway_fsync(const char *path, int isdatasync,
 static int gateway_setxattr(const char *path, const char *name, const char *value,
 			    size_t size, int flags)
 {
-	if (is_spfs_xattr(name))
-		return spfs_setxattr(path, name, value, size, flags);
+	pr_info("%s(\"%s\", \"%s\", \"%s\", %ld, 0x%x) = ...\n", __func__,
+			path, name, value, size, flags);
+	if (is_spfs_xattr(name)) {
+		int err;
+
+		err = spfs_setxattr(path, name, value, size, flags);
+		if (err < 0)
+			pr_info("= %d (%s)\n", err, strerror(-err));
+		else
+			pr_info("= %d\n", err);
+		return err;
+	}
 	return GATEWAY_METHOD_RESTARTABLE(setxattr, path, name, value, size, flags);
 }
 
 static int gateway_getxattr(const char *path, const char *name, char *value,
 			    size_t size)
 {
-	if (is_spfs_xattr(name))
-		return spfs_getxattr(path, name, value, size);
+	pr_info("%s(\"%s\", \"%s\", 0x%p, %ld) = ...\n", __func__,
+			path, name, value, size);
+	if (is_spfs_xattr(name)) {
+		int err;
+
+		err = spfs_getxattr(path, name, value, size);
+		if (err < 0)
+			pr_info("= %d (%s)\n", err, strerror(-err));
+		else
+			pr_info("= %d\n", err);
+		return err;
+	}
 	return GATEWAY_METHOD_RESTARTABLE(getxattr, path, name, value, size);
 }
 
 static int gateway_listxattr(const char *path, char *list, size_t size)
 {
+	pr_info("%s(\"%s\", 0x%p, %ld) = ...\n", __func__,
+			path, list, size);
 	return GATEWAY_METHOD_RESTARTABLE(listxattr, path, list, size);
 }
 
 static int gateway_removexattr(const char *path, const char *name)
 {
-	if (is_spfs_xattr(name))
-		return spfs_removexattr(path, name);
+	pr_info("%s(\"%s\", \"%s\") = ...\n", __func__, path, name);
+	if (is_spfs_xattr(name)) {
+		int err;
+
+		err = spfs_removexattr(path, name);
+		if (err < 0)
+			pr_info("= %d (%s)\n", err, strerror(-err));
+		else
+			pr_info("= %d\n", err);
+		return err;
+	}
 	return GATEWAY_METHOD_RESTARTABLE(removexattr, path, name);
 }
 
 static int gateway_release(const char *path, struct fuse_file_info *fi)
 {
+	pr_info("%s(\"%s\", ...) = ...\n", __func__, path);
 	return GATEWAY_RELEASE(release, path, fi,
 			      fi);
 }
 
 static int gateway_open(const char *path, struct fuse_file_info *fi)
 {
+	pr_info("%s(\"%s\", ...) = ...\n", __func__, path);
 	return GATEWAY_OPEN_RESTARTABLE(open, path, fi,
 					fi);
 }
 
 static int gateway_opendir(const char *path, struct fuse_file_info *fi)
 {
+	pr_info("%s(\"%s\", ...) = ...\n", __func__, path);
 	return GATEWAY_OPEN_RESTARTABLE(opendir, path, fi,
 					fi);
 }
@@ -471,6 +522,7 @@ static int gateway_opendir(const char *path, struct fuse_file_info *fi)
 static int gateway_create(const char *path, mode_t mode,
 		struct fuse_file_info *fi)
 {
+	pr_info("%s(\"%s\", 0%o, ...) = ...\n", __func__, path, mode);
 	return GATEWAY_OPEN_RESTARTABLE(create, path, fi,
 					mode, fi);
 }
@@ -478,12 +530,14 @@ static int gateway_create(const char *path, mode_t mode,
 static int gateway_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 			   off_t offset, struct fuse_file_info *fi)
 {
+	pr_info("%s(\"%s\", %p, %ld, ...) = ...\n", __func__, path, buf, offset);
 	return GATEWAY_METHOD_FI_RESTARTABLE(readdir, path, fi,
 					     buf, filler, offset, fi);
 }
 
 static int gateway_releasedir(const char *path, struct fuse_file_info *fi)
 {
+	pr_info("%s(\"%s\", ...) = ...\n", __func__, path);
 	return GATEWAY_RELEASE(releasedir, path, fi,
 			       fi);
 }
@@ -498,12 +552,14 @@ static int gateway_fsyncdir(const char *path, int isdatasync,
 
 static int gateway_access(const char *path, int mask)
 {
+	pr_info("%s(\"%s\", 0%o = ...\n", __func__, path, mask);
 	return GATEWAY_METHOD_RESTARTABLE(access, path, mask);
 }
 
 static int gateway_ftruncate(const char *path, off_t offset,
 		struct fuse_file_info *fi)
 {
+	pr_info("%s(\"%s\", %ld, ...) = ...\n", __func__, path, offset);
 	return GATEWAY_METHOD_FI_RESTARTABLE(ftruncate, path, fi,
 					     offset, fi);
 }
@@ -511,6 +567,7 @@ static int gateway_ftruncate(const char *path, off_t offset,
 static int gateway_fgetattr(const char *path, struct stat *stbuf,
 			    struct fuse_file_info *fi)
 {
+	pr_info("%s(\"%s\", 0x%p, ...) = ...\n", __func__, path, stbuf);
 	return GATEWAY_METHOD_FI_RESTARTABLE(fgetattr, path, fi,
 					     stbuf, fi);
 }
@@ -518,12 +575,14 @@ static int gateway_fgetattr(const char *path, struct stat *stbuf,
 static int gateway_lock(const char *path, struct fuse_file_info *fi, int cmd,
 			struct flock *lock)
 {
+	pr_info("%s(\"%s\", %d, 0x%p, ...) = ...\n", __func__, path, cmd, lock);
 	return GATEWAY_METHOD_FI_RESTARTABLE(lock, path, fi,
 					     fi, cmd, lock);
 }
 
 static int gateway_utimens(const char *path, const struct timespec tv[2])
 {
+	pr_info("%s(\"%s\", 0x%p) = ...\n", __func__, path, tv);
 	return GATEWAY_METHOD_RESTARTABLE(utimens, path, tv);
 }
 #if 0
@@ -559,6 +618,7 @@ static int gateway_read_buf(const char *path, struct fuse_bufvec **bufp,
 #endif
 static int gateway_flock(const char *path, struct fuse_file_info *fi, int op)
 {
+	pr_info("%s(\"%s\", %d, ...) = ...\n", __func__, path, op);
 	return GATEWAY_METHOD_FI_RESTARTABLE(flock, path, fi,
 					     fi, op);
 }
@@ -566,6 +626,8 @@ static int gateway_flock(const char *path, struct fuse_file_info *fi, int op)
 static int gateway_fallocate(const char *path, int mode, off_t offset,
 			     off_t lenght, struct fuse_file_info *fi)
 {
+	pr_info("%s(\"%s\", 0%o, %ld, %ld, ...) = ...\n", __func__, path, mode,
+			offset, lenght);
 	return GATEWAY_METHOD_FI_RESTARTABLE(fallocate, path, fi,
 					     mode, offset, lenght, fi);
 }
