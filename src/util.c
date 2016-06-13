@@ -348,3 +348,11 @@ bool unlinked_path(const char *path)
 		return true;
 	return false;
 }
+
+void strip_deleted(char *path)
+{
+	const char *suffix = " (deleted)";
+
+	if (unlinked_path(path))
+		path[strlen(path) - strlen(suffix)] = '\0';
+}

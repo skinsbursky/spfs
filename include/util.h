@@ -31,4 +31,6 @@ char **add_exec_options(char **options, ...);
 
 bool unlinked_path(const char *path);
 
+void strip_deleted(char *path);
+
 #endif
