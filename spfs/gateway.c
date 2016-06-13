@@ -3,6 +3,7 @@
 #include <fuse.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 
 #include "include/util.h"
 #include "include/log.h"
@@ -69,11 +70,47 @@ static int gateway_create_fh(struct gateway_fh_s **gw_fh, unsigned open_flags)
 	return 0;
 }
 
+static bool path_is_hidden(const char *path)
+{
+	const char *basename;
+	const char *deleted = ".fuse_hidden";
+
+	basename = strrchr(path, '/');
+	if (!basename) {
+		pr_err("failed to get basename for %s\n", path);
+		return -EINVAL;
+	}
+
+	return !strncmp(basename + 1, deleted, strlen(deleted));
+}
+
+static const char *gateway_real_path(const char *path, char *buf, size_t rsize)
+{
+	const char *real = path;
+
+	if (path_is_hidden(path)) {
+		ssize_t size;
+
+		size = spfs_getxattr(path, SPFS_XATTR_LINK_REMAP, buf, rsize);
+		if (size < 0) {
+			pr_err("failed to find xattr %s for file %s: %ld\n",
+					SPFS_XATTR_LINK_REMAP, path, size);
+			return path;
+		}
+		real = buf;
+		pr_debug("found real path %s for file %s\n", real, path);
+	}
+	return real;
+}
+
 static char *gateway_full_path(const char *path, const struct work_mode_s *wm)
 {
+	char real[PATH_MAX];
+
 	if (wm->mode != SPFS_PROXY_MODE)
 		return strdup(path);
-	return xsprintf("%s%s", wm->proxy_dir, path);
+	return xsprintf("%s%s", wm->proxy_dir,
+				gateway_real_path(path, real, PATH_MAX));
 }
 
 inline static int gateway_stale_fh(struct fuse_file_info *fi)

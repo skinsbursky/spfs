@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 
+#define SPFS_XATTR_LINK_REMAP		"security.spfs.link_remap"
+
 bool is_spfs_xattr(const char *xattr);
 int spfs_del_xattrs(const char *path);
 
