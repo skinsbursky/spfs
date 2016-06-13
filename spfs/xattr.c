@@ -412,7 +412,7 @@ ssize_t spfs_getxattr(const char *path, const char *name,
 	}
 
 	err = tree_getxattr(fxt->tree, name, value, size);
-	if (!err)
+	if (err >= 0)
 		pr_debug("return xattr %s of file %s\n", name, path);
 
 unlock:
