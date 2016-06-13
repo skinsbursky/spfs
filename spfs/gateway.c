@@ -337,7 +337,12 @@ static int gateway_mkdir(const char *path, mode_t mode)
 
 static int gateway_unlink(const char *path)
 {
-	return GATEWAY_METHOD_RESTARTABLE(unlink, path);
+	int err;
+
+	err = GATEWAY_METHOD_RESTARTABLE(unlink, path);
+	if (!err)
+		(void) spfs_del_xattrs(path);
+	return err;
 }
 
 static int gateway_rmdir(const char *path)
@@ -447,13 +452,8 @@ static int gateway_removexattr(const char *path, const char *name)
 
 static int gateway_release(const char *path, struct fuse_file_info *fi)
 {
-	int err;
-
-	err = GATEWAY_RELEASE(release, path, fi,
+	return GATEWAY_RELEASE(release, path, fi,
 			      fi);
-	if (!err)
-		(void) spfs_del_xattrs(path);
-	return err;
 }
 
 static int gateway_open(const char *path, struct fuse_file_info *fi)
