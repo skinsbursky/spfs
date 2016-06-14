@@ -52,13 +52,13 @@ static int fifo_file_fill(const char *source, unsigned fd)
 
 	fifo = open(path, O_RDWR);
 	if (fifo < 0) {
-		pr_perror("failed to open %s in read/write mode", path);
+		pr_perror("failed to open fifo %s in read/write mode", path);
 		return -errno;
 	}
 
 	source_fd = open(source, O_RDONLY | O_NONBLOCK);
 	if (source_fd < 0) {
-		pr_perror("failed to open %s", source);
+		pr_perror("failed to open source fifo %s", source);
 		err = -errno;
 		goto close_fifo_rw;
 	}
@@ -91,7 +91,7 @@ static int open_fifo_fd(const char *path, unsigned flags)
 
 	fifo_rw = open(path, O_RDWR);
 	if (fifo_rw < 0) {
-		pr_perror("failed to open %s in read/write mode", path);
+		pr_perror("failed to open fifo %s in read/write mode", path);
 		return -errno;
 	}
 
@@ -109,7 +109,7 @@ static int open_fifo_fd(const char *path, unsigned flags)
 
 	fd = open(path, flags);
 	if (fd < 0) {
-		pr_perror("failed to open %s with 0%o flags", path, flags);
+		pr_perror("failed to open fifo %s with 0%o flags", path, flags);
 		err = -errno;
 	}
 
@@ -152,7 +152,7 @@ static int reg_file_open(const char *path, unsigned flags, const char *parent)
 
 	fd = open(path, flags);
 	if (fd < 0) {
-		pr_perror("failed to open %s", path);
+		pr_perror("failed to open regular file %s", path);
 		return -errno;
 	}
 
