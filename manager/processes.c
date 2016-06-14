@@ -436,11 +436,16 @@ static int collect_process_fd(struct process_info *p, int dir,
 		return err;
 
 	if (!rfd->file_obj) {
+		char link[PATH_MAX];
+
+		/* TODO This is a temporary solution !!! */
+		snprintf(link, PATH_MAX, "/proc/%d/fd/%d", p->pid, fdi.fd);
+
 		/* TODO it makes sense to create file objects (open files) only
 		 * shared files here.
 		 * Private files can be opened by the process itself */
 		err = create_file_obj(path, fdi.flags, fdi.st.st_mode,
-				      fdi.path, &rfd->file_obj);
+				      link, &rfd->file_obj);
 		if (err) {
 			pr_err("failed to open file object for /proc/%d/fd/%d\n",
 					rfd->pid, rfd->fd);
