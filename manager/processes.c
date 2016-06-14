@@ -495,7 +495,7 @@ static int iterate_dir_name(const char *dpath, struct process_info *p,
 
 		err = actor(p, dir, fd, data);
 		if (err) {
-			pr_err("actor '%s' for %s/%s\n failed\n",
+			pr_err("actor '%s' for %s/%s failed\n",
 					actor_name, dpath, fd);
 			break;
 		}
