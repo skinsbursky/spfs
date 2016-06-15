@@ -322,13 +322,42 @@ struct fd_info_s {
 	char            path[PATH_MAX];
 };
 
+static int get_fd_flags(pid_t pid, int fd)
+{
+	char path[PATH_MAX];
+	FILE *fdinfo;
+	char buf[64];
+	int flags = -ENOENT;
+
+	snprintf(path, PATH_MAX, "/proc/%d/fdinfo/%d", pid, fd);
+
+	fdinfo = fopen(path, "r");
+	if (!fdinfo) {
+		pr_perror("failed to open %s", path);
+		return -errno;
+	}
+
+	while (fgets(buf, 64, fdinfo) != NULL) {
+		if (strncmp(buf, "flags", strlen("flags")))
+			continue;
+		if (sscanf(buf, "flags:\t%o", &flags) != 1) {
+			pr_err("failed to sscanf '%s'\n", buf);
+			flags = -EINVAL;
+		}
+		break;
+	}
+	if (flags < 0)
+		pr_err("failed to get %s flags: %d\n", path, flags);
+	pr_debug("%s: flags: 0%o\n", __func__, flags);
+	return flags;
+}
+
 static int get_fd_info(struct process_info *p, int dir,
 		const char *process_fd, struct fd_info_s *fdi)
 {
 	int local_fd, err;
 	ssize_t bytes;
 	char link[PATH_MAX];
-	int fd_flags;
 
 	err = xatol(process_fd, (long *)&fdi->fd);
 	if (err) {
@@ -349,21 +378,13 @@ static int get_fd_info(struct process_info *p, int dir,
 		goto close_local_fd;
 	}
 
-	fdi->flags = fcntl(local_fd, F_GETFL, NULL);
+	fdi->flags = get_fd_flags(p->pid, fdi->fd);
 	if (fdi->flags < 0) {
-		pr_perror("failed to get file flags for fd %d", local_fd);
-		err = -errno;
+		pr_perror("failed to get fd flags for /proc/%d/fd/%d", p->pid,
+				fdi->fd);
+		err = fdi->flags;
 		goto close_local_fd;
 	}
-
-	fd_flags = fcntl(local_fd, F_GETFD, NULL);
-	if (fd_flags < 0) {
-		pr_perror("failed to get fd flags for fd %d", local_fd);
-		err = -errno;
-		goto close_local_fd;
-	}
-	if (fd_flags)
-		fdi->flags |= O_CLOEXEC;
 
 	snprintf(link, PATH_MAX, "/proc/%d/fd/%d", p->pid, fdi->fd);
 	bytes = readlink(link, fdi->path, PATH_MAX - 1);
