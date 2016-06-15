@@ -544,18 +544,36 @@ close_fd:
 	return err;
 }
 
-static mode_t map_open_mode(char r, char w, char p)
+static int map_open_mode(int map_files_fd,
+			    unsigned long start, unsigned long end,
+			    mode_t *mode)
 {
-	if ((w == 'w') && (p == 's')) {
-		if (r == 'r')
-			return O_RDWR;
-		return O_WRONLY;
+	char map_file[64];
+	struct stat st;
+
+	sprintf(map_file, "%lx-%lx", start, end);
+
+	if (fstatat(map_files_fd, map_file, &st, AT_SYMLINK_NOFOLLOW) < 0) {
+		pr_err("failed to stat map file %s", map_file);
+		return -errno;
 	}
-	/* Private write mapping have to be opened with O_RDONLY, because it
-	 * can be an executable, which is used already (opened via spfs) and in
-	 * this case system won't allow to open it in write mode.
-	 */
-	return O_RDONLY;
+
+	switch(st.st_mode & 0600) {
+		case 0200:
+			*mode = O_WRONLY;
+			break;
+		case 0400:
+			*mode = O_RDONLY;
+			break;
+		case 0600:
+			*mode = O_RDWR;
+			break;
+		default:
+			pr_err("unsupported mode for map file: 0%o\n",
+			st.st_mode & 0600);
+			return -EINVAL;
+	}
+	return 0;
 }
 
 static bool is_mnt_map(struct process_info *p, int dir,
@@ -595,15 +613,15 @@ static int collect_process_maps(struct process_info *p,
 	while (fgets(map, sizeof(map), fmap)) {
 		char path[PATH_MAX];
 		unsigned long start, end, ino;
-		char r, w, prot;
 		int ret, path_off;
 		char *map_file;
+		mode_t mode = 0;
 
 		map[strlen(map)-1] = '\0';
 
-		ret = sscanf(map, "%lx-%lx %c%c%*c%c %*x %*x:%*x %lu %n",
-				&start, &end, &r, &w, &prot, &ino, &path_off);
-		if (ret != 6) {
+		ret = sscanf(map, "%lx-%lx %*c%*c%*c%*c %*x %*x:%*x %lu %n",
+				&start, &end, &ino, &path_off);
+		if (ret != 3) {
 			pr_err("failed to parse '%s': %d\n", map, ret);
 			err = -EINVAL;
 			goto close_fmap;
@@ -623,8 +641,11 @@ static int collect_process_maps(struct process_info *p,
 		if (err)
 			goto close_fmap;
 
-		err = collect_map_file(p, start, end,
-				       map_open_mode(r, w, prot), path);
+		err = map_open_mode(dir, start, end, &mode);
+		if (err)
+			goto close_fmap;
+
+		err = collect_map_file(p, start, end, mode, path);
 		if (err)
 			goto close_fmap;
 	}
