@@ -153,6 +153,7 @@ static void do_something(int *pipe_fd, int fd)
 
 int main()
 {
+	unsigned long  setfd[3] = { FD_CLOEXEC, 0, FD_CLOEXEC };
 	int src[3], dst[3], ret, exe, cwd_fd;
 	unsigned long addr = 0x12345678;
 	unsigned size = sizeof(addr);
@@ -238,6 +239,7 @@ int main()
 
 	se.src_fd	= src;
 	se.dst_fd	= dst;
+	se.setfd	= setfd;
 	se.nfd		= 3;
 
 	se.exe_fd	= exe;

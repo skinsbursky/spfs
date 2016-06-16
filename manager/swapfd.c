@@ -698,7 +698,7 @@ static int get_flocks(struct parasite_ctl *ctl, FILE *fp, struct lock *head)
 }
 
 /* Replace a fd, having number @src_fd, with a fd, received from socket */
-static int changefd(struct parasite_ctl *ctl, pid_t pid, int src_fd, int dst_fd)
+static int changefd(struct parasite_ctl *ctl, pid_t pid, int src_fd, int dst_fd, unsigned long f_setfd)
 {
 	char fdinfo[] = "/proc/XXXXXXXXXX/fdinfo/XXXXXXXXXX";
 	FILE *fp;
@@ -749,7 +749,15 @@ static int changefd(struct parasite_ctl *ctl, pid_t pid, int src_fd, int dst_fd)
 			pr_err("Can't lseek pid=%d, fd=%d, ret=%d, sret=%d\n",
 				pid, src_fd, ret, (int)(long)sret);
 			exit_code = -1;
+			goto out;
 		}
+	}
+
+	ret = syscall_seized(ctl, __NR_fcntl, &sret, src_fd, F_SETFD, f_setfd, 0, 0, 0);
+	if (ret < 0 || ((int)(long)sret) < 0) {
+		pr_err("Can't fcntl pid=%d, fd=%d, ret=%d, sret=%d\n",
+			pid, src_fd, ret, (int)(long)sret);
+		exit_code = -1;
 	}
 out:
 	ptr = head.next;
@@ -850,7 +858,7 @@ int swapfd_tracee(struct parasite_ctl *ctl, struct swapfd_exchange *se)
 		ret = remote_fd = transfer_local_fd(ctl, se->dst_fd[i]);
 		if (ret < 0)
 			goto out;
-		ret = changefd(ctl, se->pid, se->src_fd[i], remote_fd);
+		ret = changefd(ctl, se->pid, se->src_fd[i], remote_fd, se->setfd[i]);
 		if (ret < 0)
 			goto out;
 	}
