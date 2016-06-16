@@ -10,6 +10,7 @@ struct swapfd_exchange {
 
 	int		*src_fd;	/* Array of tracee's fds to be replaced with caller's dst_fds */
 	int		*dst_fd;
+	unsigned long	*setfd;		/* Arguments of F_SETFD */
 	int		nfd;		/* Number of replaced fds */
 
 	int		exe_fd;		/* exe fd or -1 */
