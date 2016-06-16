@@ -733,15 +733,17 @@ static int changefd(struct parasite_ctl *ctl, pid_t pid, int src_fd, int dst_fd)
 	if (ret < 0 || ((int)(long)sret) < 0) {
 		pr_err("Can't dup2(%d, %d). pid=%d\n", dst_fd, src_fd, pid);
 		exit_code = -1;
+		goto out;
 	}
 
 	ret = close_seized(ctl, dst_fd);
 	if (ret < 0) {
 		pr_err("Can't close temporary fd, pid=%d\n", pid);
 		exit_code = -1;
+		goto out;
 	}
 
-	if (exit_code == 0 && f_pos != 0) {
+	if (f_pos != 0) {
 		ret = syscall_seized(ctl, __NR_lseek, &sret, src_fd, f_pos, SEEK_SET, 0, 0, 0);
 		if (ret < 0 || ((int)(long)sret) < 0) {
 			pr_err("Can't lseek pid=%d, fd=%d, ret=%d, sret=%d\n",
