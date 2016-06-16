@@ -189,22 +189,27 @@ static int do_swap_process_resources(struct process_info *p)
 
 	if (p->fds_nr) {
 		int *s, *d;
+		unsigned long *f;
 
 		se.src_fd = malloc(sizeof(*se.src_fd) * p->fds_nr);
 		se.dst_fd = malloc(sizeof(*se.dst_fd) * p->fds_nr);
-		if (!se.src_fd || !se.dst_fd) {
+		se.setfd = malloc(sizeof(*se.setfd) * p->fds_nr);
+		if (!se.src_fd || !se.dst_fd || !se.setfd) {
 			pr_err("failed to allocate\n");
 			goto free;
 		}
 
 		s = se.src_fd;
 		d = se.dst_fd;
+		f = se.setfd;
 		list_for_each_entry(pfd, &p->fds, list) {
-			pr_debug("\t/proc/%d/fd/%d --> /proc/%d/fd/%d\n",
+			pr_debug("\t/proc/%d/fd/%d --> /proc/%d/fd/%d %s\n",
 					getpid(), pfd->target_fd,
-					p->pid, pfd->source_fd);
+					p->pid, pfd->source_fd,
+					pfd->cloexec ? "(O_CLOEXEC)" : "");
 			*s++ = pfd->source_fd;
 			*d++ = pfd->target_fd;
+			*f++ = pfd->cloexec;
 		}
 		se.nfd = p->fds_nr;
 	}
@@ -259,6 +264,7 @@ static int do_swap_process_resources(struct process_info *p)
 
 	close(se.root.cwd_fd);
 free:
+	free(se.setfd);
 	free(se.src_fd);
 	free(se.dst_fd);
 	free(se.addr);

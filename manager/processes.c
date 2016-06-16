@@ -265,7 +265,8 @@ static int get_link_path(const char *link,
 	return fixup_source_path(source_path, source_mnt, target_mnt, path, size);
 }
 
-static int process_add_fd(struct process_info *p, int source_fd, int target_fd)
+static int process_add_fd(struct process_info *p, int source_fd, int target_fd,
+			  unsigned long cloexec)
 {
 	struct process_fd *pfd;
 
@@ -277,6 +278,9 @@ static int process_add_fd(struct process_info *p, int source_fd, int target_fd)
 
 	pfd->source_fd = source_fd;
 	pfd->target_fd = target_fd;
+	pfd->cloexec = 0;
+	if (cloexec)
+		pfd->cloexec = FD_CLOEXEC;
 	list_add_tail(&pfd->list, &p->fds);
 	p->fds_nr++;
 
@@ -481,7 +485,7 @@ static int collect_process_fd(struct process_info *p, int dir,
 	pr_debug("\t/proc/%d/fd/%d ---> %s (fd: %d, flags: 0%o)\n",
 			p->pid, fdi.fd, path, target_fd, fdi.flags);
 
-	return process_add_fd(p, fdi.fd, target_fd);
+	return process_add_fd(p, fdi.fd, target_fd, fdi.flags & O_CLOEXEC);
 }
 
 static int iterate_dir_name(const char *dpath, struct process_info *p,
