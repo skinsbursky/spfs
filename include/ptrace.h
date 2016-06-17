@@ -4,10 +4,12 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/user.h>
+#include <stdbool.h>
 #include <sys/un.h>
 #include <unistd.h>
 #include <stdint.h>
 #include "include/list.h"
+#include "include/log.h"
 
 typedef uint32_t u32;
 
@@ -80,8 +82,57 @@ typedef struct {
 	unsigned long   es;
 	unsigned long   fs;
 	unsigned long   gs;
+} user_regs_struct64;
+
+typedef struct {
+	uint32_t	bx;
+	uint32_t	cx;
+	uint32_t	dx;
+	uint32_t	si;
+	uint32_t	di;
+	uint32_t	bp;
+	uint32_t	ax;
+	uint32_t	ds;
+	uint32_t	es;
+	uint32_t	fs;
+	uint32_t	gs;
+	uint32_t	orig_ax;
+	uint32_t	ip;
+	uint32_t	cs;
+	uint32_t	flags;
+	uint32_t	sp;
+	uint32_t	ss;
+} user_regs_struct32;
+
+/*
+ * To be sure that we rely on inited reg->__is_native, this member
+ * is (short int) instead of initial (bool). The right way to
+ * check if regs are native or compat is to use user_regs_native() macro.
+ * This should cost nothing, as *usually* sizeof(bool) == sizeof(short)
+ */
+typedef struct {
+	union {
+		user_regs_struct64 native;
+		user_regs_struct32 compat;
+	};
+	short __is_native; /* use user_regs_native macro to check it */
 } user_regs_struct_t;
 
+#define NATIVE_MAGIC    0x0A
+#define COMPAT_MAGIC    0x0C
+static inline bool user_regs_native(user_regs_struct_t *pregs)
+{
+	if (pregs->__is_native != NATIVE_MAGIC &&
+			pregs->__is_native != COMPAT_MAGIC) {
+		pr_err("User regs neither native not compat!\n");
+	}
+	return pregs->__is_native == NATIVE_MAGIC;
+}
+
+#define get_user_reg(pregs, name) ((user_regs_native(pregs)) ?          \
+		                ((pregs)->native.name) : ((pregs)->compat.name))
+#define set_user_reg(pregs, name, val) ((user_regs_native(pregs)) ?     \
+		                ((pregs)->native.name = (val)) : ((pregs)->compat.name = (val)))
 struct thread_ctx {
 	k_rtsigset_t		sigmask;
 	user_regs_struct_t	regs;

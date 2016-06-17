@@ -26,6 +26,11 @@ const char code_syscall[] = {
 	0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc	/* int 3, ... */
 };
 
+const char code_int_80[] = {
+	0xcd, 0x80,				/* int $0x80  */
+	0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc	/* int 3, ... */
+};
+
 int ptrace_peek_area(pid_t pid, void *dst, void *addr, long bytes)
 {
 	unsigned long w;
@@ -77,21 +82,41 @@ int ptrace_swap_area(pid_t pid, void *dst, void *src, long bytes)
 	return 0;
 }
 
-static inline int ptrace_get_regs(int pid, user_regs_struct_t *regs)
+static int ptrace_get_regs(pid_t pid, user_regs_struct_t *regs)
 {
 	struct iovec iov;
+	int ret;
 
-	iov.iov_base = regs;
-	iov.iov_len = sizeof(user_regs_struct_t);
-	return ptrace(PTRACE_GETREGSET, pid, NT_PRSTATUS, &iov);
+	iov.iov_base = &regs->native;
+	iov.iov_len = sizeof(user_regs_struct64);
+
+	ret = ptrace(PTRACE_GETREGSET, pid, NT_PRSTATUS, &iov);
+	if (iov.iov_len == sizeof(regs->native)) {
+		regs->__is_native = NATIVE_MAGIC;
+		return ret;
+	}
+	if (iov.iov_len == sizeof(regs->compat)) {
+		regs->__is_native = COMPAT_MAGIC;
+		return ret;
+	}
+
+	pr_err("PTRACE_GETREGSET read %zu bytes for pid %d, but native/compat regs sizes are %zu/%zu bytes",
+			iov.iov_len, pid,
+			sizeof(regs->native), sizeof(regs->compat));
+	return -1;
 }
 
-static inline int ptrace_set_regs(int pid, user_regs_struct_t *regs)
+static int ptrace_set_regs(pid_t pid, user_regs_struct_t *regs)
 {
 	struct iovec iov;
 
-	iov.iov_base = regs;
-	iov.iov_len = sizeof(user_regs_struct_t);
+	if (user_regs_native(regs)) {
+		iov.iov_base = &regs->native;
+		iov.iov_len = sizeof(user_regs_struct64);
+	} else {
+		iov.iov_base = &regs->compat;
+		iov.iov_len = sizeof(user_regs_struct32);
+	}
 	return ptrace(PTRACE_SETREGSET, pid, NT_PRSTATUS, &iov);
 }
 
@@ -133,17 +158,18 @@ static inline void ksigfillset(k_rtsigset_t *set)
 	set->sig[i] = (unsigned long)-1;
 }
 
-static void parasite_setup_regs(unsigned long new_ip, void *stack, user_regs_struct_t *regs)
+void parasite_setup_regs(unsigned long new_ip, void *stack, user_regs_struct_t *regs)
 {
-	regs->ip = new_ip;
+	set_user_reg(regs, ip, new_ip);
 	if (stack)
-		regs->sp = (unsigned long) stack;
+		set_user_reg(regs, sp, (unsigned long) stack);
 
 	/* Avoid end of syscall processing */
-	regs->orig_ax = -1;
+	set_user_reg(regs, orig_ax, -1);
 
 	/* Make sure flags are in known state */
-	regs->flags &= ~(X86_EFLAGS_TF | X86_EFLAGS_DF | X86_EFLAGS_IF);
+	set_user_reg(regs, flags, get_user_reg(regs, flags) &
+		     ~(X86_EFLAGS_TF | X86_EFLAGS_DF | X86_EFLAGS_IF));
 }
 
 static int parasite_run(pid_t pid, int cmd, unsigned long ip, void *stack,
@@ -276,17 +302,33 @@ int syscall_seized(struct parasite_ctl *ctl, int nr, unsigned long *ret,
 	user_regs_struct_t regs = ctl->orig.regs;
 	int err;
 
-	regs.ax  = (unsigned long)nr;
-	regs.di  = arg1;
-	regs.si  = arg2;
-	regs.dx  = arg3;
-	regs.r10 = arg4;
-	regs.r8  = arg5;
-	regs.r9  = arg6;
+	if (user_regs_native(&regs)) {
+		user_regs_struct64 *r = &regs.native;
 
-	err = __parasite_execute_syscall(ctl, &regs, code_syscall);
+		r->ax  = (uint64_t)nr;
+		r->di  = arg1;
+		r->si  = arg2;
+		r->dx  = arg3;
+		r->r10 = arg4;
+		r->r8  = arg5;
+		r->r9  = arg6;
 
-	*ret = regs.ax;
+		err = __parasite_execute_syscall(ctl, &regs, code_syscall);
+	} else {
+		user_regs_struct32 *r = &regs.compat;
+
+		r->ax  = (uint32_t)nr;
+		r->bx  = arg1;
+		r->cx  = arg2;
+		r->dx  = arg3;
+		r->si  = arg4;
+		r->di  = arg5;
+		r->bp  = arg6;
+
+		err = __parasite_execute_syscall(ctl, &regs, code_int_80);
+	}
+
+	*ret = get_user_reg(&regs, ax);
 	return err;
 }
 
