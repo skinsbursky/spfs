@@ -1,142 +1,96 @@
 #!/bin/bash
-CTID=$1
-ZDTM_DIR=$2
 
-#STATIC_TEST_LIST="fifo_wronly fifo fifo_ro fifo-rowo-pair chroot fd fdt_shared \
-#		  file_append file_fown file_shared maps00 \
-#		  maps_file_prot write_read00 write_read01 write_read02 \
-#		  deleted_unix_sock sk-unix-unconn"
-
-STATIC_TEST_LIST="	\
-		write_read00		\
-		write_read01		\
-		write_read02		\
-		file_fown		\
-		file_locks00		\
-		file_locks02		\
-		file_locks03		\
-		file_locks04		\
-		file_locks05		\
-		file_shared		\
-		file_append		\
-		socket_queues		\
-		socket-ext		\
-		sockets_dgram		\
-		socket_dgram_data		\
-		deleted_unix_sock		\
-		pipe02		\
-		fdt_shared		\
-		maps00		\
-		maps02		\
-		maps05		\
-		maps_file_prot		\
-		mtime_mmap		\
-		fifo		\
-		fifo_ro		\
-		fifo_wronly		\
-		fifo-rowo-pair		\
-		sk-unix-unconn		\
-		inotify_irmap		\
-		fd		\
-		cwd00		\
-		selfexe00		\
-		mprotect00		\
-		chroot		\
-		chroot-file		\
+TESTS_LIST="	\
+		static/write_read00		\
+		static/write_read01		\
+		static/write_read02		\
+		static/file_fown		\
+		static/file_locks00		\
+		static/file_locks02		\
+		static/file_locks03		\
+		static/file_locks04		\
+		static/file_locks05		\
+		static/file_shared		\
+		static/file_append		\
+		static/socket_queues		\
+		static/socket-ext		\
+		static/sockets_dgram		\
+		static/socket_dgram_data	\
+		static/deleted_unix_sock	\
+		static/pipe02			\
+		static/fdt_shared		\
+		static/maps00			\
+		static/maps02			\
+		static/maps05			\
+		static/maps_file_prot		\
+		static/mtime_mmap		\
+		static/fifo			\
+		static/fifo_ro			\
+		static/fifo_wronly		\
+		static/fifo-rowo-pair		\
+		static/sk-unix-unconn		\
+		static/inotify_irmap		\
+		static/fd			\
+		static/cwd00			\
+		static/selfexe00		\
+		static/mprotect00		\
+		static/chroot			\
+		static/chroot-file		\
+						\
+		transition/fifo_loop		\
+		transition/fifo_dyn		\
+		transition/epoll		\
+		transition/file_aio		\
+		transition/file_read		\
 		"
 
-STATIC_NOT_STARTING_TEST_LIST="		\
-		deleted_dev		\
-		fanotify00		\
-		unlink_fstat00		\
-		maps04		\
-		maps03		\
-		sockets00		\
-		vt		\
+NOT_STARTING_TEST_LIST="			\
+		static/deleted_dev		\
+		static/fanotify00		\
+		static/unlink_fstat00		\
+		static/maps04			\
+		static/maps03			\
+		static/sockets00		\
+		static/vt			\
 		"
 
-STATIC_NOT_DUMPABLE_OVERMOUNT_TEST_LIST="			\
-		bind-mount		\
-		tempfs		\
+NOT_DUMPABLE_OVERMOUNT_TEST_LIST="		\
+		static/bind-mount		\
+		static/tempfs			\
 		"
-STATIC_NOT_DUMPABLE_STALE_TEST_LIST="			\
-		rmdir_open		\
-		cwd01		\
-		cwd02		\
-		"
-
-STATIC_NOT_DUMPABLE_UNLINKED_TEST_LIST="			\
-		unlink_fstat01		\
-		unlink_fstat02		\
-		unlink_fstat03		\
-		unlink_mmap01		\
-		unlink_mmap02		\
-		unlink_mmap00		\
-		link10		\
-		unlink_fifo		\
-		unlink_fifo_wronly		\
-		write_read10		\
-		file_attr		\
-		fifo-ghost		\
+NOT_DUMPABLE_STALE_TEST_LIST="			\
+		static/rmdir_open		\
+		static/cwd02			\
 		"
 
-STATIC_NOT_DUMPABLE_SOCKETS_TEST_LIST="			\
-		sk-unix-rel		\
+NOT_DUMPABLE_UNLINKED_TEST_LIST="		\
+		static/cwd01			\
+		static/unlink_fstat01		\
+		static/unlink_fstat02		\
+		static/unlink_fstat03		\
+		static/unlink_mmap01		\
+		static/unlink_mmap02		\
+		static/unlink_mmap00		\
+		static/link10			\
+		static/unlink_fifo		\
+		static/unlink_fifo_wronly	\
+		static/write_read10		\
+		static/file_attr		\
+		static/fifo-ghost		\
 		"
-STATIC_ALWAYS_FAIL_TEST_LIST="			\
-		file_locks01		\
+
+NOT_DUMPABLE_SOCKETS_TEST_LIST="		\
+		static/sk-unix-rel		\
 		"
-
-#STREAMING_TEST_LIST="fifo_dyn fifo_loop"
-#STREAMING_TEST_LIST="fifo_dyn"
-#STREAMING_TEST_LIST=""
-
-#TRANSITION_TEST_LIST="file_read"
-#TRANSITION_TEST_LIST=""
-
-TESTS_LIST="$STATIC_TEST_LIST $STREAMING_TEST_LIST $TRANSITION_TEST_LIST"
-
-static_test_dir=""
-transition_test_dir=""
+ALWAYS_FAIL_TEST_LIST="				\
+		static/file_locks01		\
+		"
 
 function vz_ct_exec {
 	local cmd=$1
 
-#	echo "vz_ct_exec: $cmd"
 	$(vzctl exec $CTID $cmd > /dev/null)
 }
-
-
-#vz_ct_exec "test -d $ZDTM_DIR/live"
-
-#if [ $? -eq 0 ]; then
-#	static_test_dir="${ZDTM_DIR}/live/static"
-#	streaming_test_dir="${ZDTM_DIR}/live/streaming"
-#	transition_test_dir="${ZDTM_DIR}/live/transition"
-#else
-	static_test_dir="${ZDTM_DIR}/static"
-	streaming_test_dir="${ZDTM_DIR}/transition"
-	transition_test_dir="${ZDTM_DIR}/transition"
-#fi
-
-vz_ct_exec "test -d $static_test_dir"
-if [ $? -ne 0 ]; then
-	echo "failed to find static tests in $ZDTM_DIR"
-	return 1
-fi
-
-vz_ct_exec "test -d $streaming_test_dir"
-if [ $? -ne 0 ]; then
-	echo "failed to find streaming tests in $ZDTM_DIR"
-	return 1
-fi
-
-
-vz_ct_exec "test -d $transition_test_dir"
-if [ $? -ne 0 ]; then
-	echo "failed to find transition tests in $ZDTM_DIR"
-	return 1
-fi
 
 printf_test_len=0
 
@@ -163,8 +117,11 @@ function test_operation {
 	local test_dir=$1
 	local test_name=$2
 	local op=$3
+	local array
 
-	vz_ct_exec "make -C $test_dir ${test_name}.${op}"
+	IFS='/' read -ra array <<< "$test_name"
+
+	vz_ct_exec "make -C $test_dir/${array[0]} ${array[1]}.${op}"
 }
 
 function start_one_test {
@@ -185,27 +142,39 @@ function start_tests {
 	local test_dir=$1
 	local list=$2
 
-	vz_ct_exec "make -C $test_dir cleanout"
-
 	for t in $list; do
-		start_one_test $test_dir $t
-		if [ $? -ne 0 ]; then
-			echo "failed to start $test_dir/$test_name"
-			echo $(cat_test_file $test_dir $t "out")
-			return 1
+		local pid="not found"
+
+		printf "\t%-*s: " $printf_test_len "$t"
+		test_file_exist $test_dir $t "c"
+		if [ $? -eq 0 ]; then
+			start_one_test $test_dir $t
+			if [ $? -ne 0 ]; then
+				echo "failed to start $test_dir/$test_name"
+				echo $(cat_test_file $test_dir $t "out")
+				return 1
+			fi
+			local pid=$(cat_test_file $test_dir $t "pid")
 		fi
-		local pid=$(cat_test_file $test_dir $t "pid")
-		printf "\t%-*s: %s\n" $printf_test_len "$t" "$pid"
+		printf "%s\n" "$pid"
 	done
 }
 
 function test_result {
 	local test_dir=$1
 	local t=$2
+	local attempts=15
 
-	while true; do
+	while [ -n "$list" ]; do
+		attempts=$((attempts - 1))
+		if [ $attempts -eq 0 ]; then
+			echo "no out file"
+			return 1
+		fi
+		sleep 0.2
 		vz_ct_exec "test -f $test_dir/${t}.out" && break
 	done
+
 	out_file=$(cat_test_file $test_dir $t "out")
 	if [ -n "$(echo $out_file | grep 'PASS')" ]; then
 		echo "PASS"
@@ -217,11 +186,14 @@ function test_result {
 function stop_tests {
 	local test_dir=$1
 	local list=$2
+	local array=($list)
 
-	for t in $list; do
+	for (( idx=${#array[@]}-1 ; idx>=0 ; idx-- )) ; do
+		local t=${array[idx]}
+		printf "\t%-*s: " $printf_test_len "$t"
 		stop_one_test $test_dir $t
 		local out=$(test_result $test_dir $t "out")
-		printf "\t%-*s: %s\n" $printf_test_len "$t" "$out"
+		printf "%s\n" "$out"
 		if [ "$out" == "PASS" ]; then
 			PASSED_TESTS="$PASSED_TESTS $t"
 		else
@@ -233,11 +205,13 @@ function stop_tests {
 function kill_tests {
 	local list=$1
 
-	echo "Killing tests"
+	echo -n "Killing tests... "
 
 	for t in $list; do
-		killall -9 $t > /dev/null 2>&1
+		IFS='/' read -ra array <<< "$t"
+		killall -9 ${array[1]} > /dev/null 2>&1
 	done
+	echo "done"
 }
 
 function get_spfs_processes_list {
@@ -247,33 +221,33 @@ function get_spfs_processes_list {
 
 function wait_spfs_exited {
 	local list=$(get_spfs_processes_list)
-	local attempts=0
+	local attempts=25
 
-	echo "Waiting until SPFS is exited..."
+	echo -n "Waiting until SPFS is exited... "
 
 	while [ -n "$list" ]; do
-		attempts=$((attempts + 1))
-		if [ $attempts -eq 5 ]; then
+		attempts=$((attempts - 1))
+		if [ $attempts -eq 0 ]; then
+			echo "timed out"
 			return 1
 		fi
-		sleep 1
+		sleep 0.2
 		list=$(get_spfs_processes_list)
 	done
+	echo "done"
 	return 0
 }
 
 function suspend_restore {
-	local ID=$1
-
-	echo "Suspending $ID"
-	vzctl suspend $ID > /dev/null 2>&1
+	echo "Suspending $CTID"
+	vzctl suspend $CTID > /dev/null 2>&1
 	if [ $? -ne 0 ]; then 
 		echo "failed to suspend"
 		return 1
 	fi
 
-	echo "Restoring $ID"
-	vzctl restore $ID > /dev/null 2>&1
+	echo "Restoring $CTID"
+	vzctl restore $CTID > /dev/null 2>&1
 	if [ $? -ne 0 ]; then 
 		echo "failed to resume"
 		exit 1
@@ -310,39 +284,183 @@ function set_test_print_len {
 	printf_test_len=$max_len
 }
 
-set_test_print_len "$TESTS_LIST"
-
-kill_tests "$TESTS_LIST"
-
-echo "Start tests"
-start_tests $static_test_dir "$STATIC_TEST_LIST"
-if [ $? -ne 0 ]; then
-	kill_tests "$TESTS_LIST"
-	exit 1
-fi
-
-start_tests $streaming_test_dir "$STREAMING_TEST_LIST"
-if [ $? -ne 0 ]; then
-	kill_tests "$TESTS_LIST"
-	exit 1
-fi
-
-start_tests $transition_test_dir "$TRANSITION_TEST_LIST"
-if [ $? -ne 0 ]; then
-	kill_tests "$TESTS_LIST"
-	exit 1
-fi
-
-suspend_restore $CTID || exit 1
-
-echo "Stop tests"
-stop_tests $transition_test_dir "$TRANSITION_TEST_LIST"
-stop_tests $streaming_test_dir "$STREAMING_TEST_LIST"
-stop_tests $static_test_dir "$STATIC_TEST_LIST"
-
-if [ -n "$FAILED_TESTS" ]; then
-	echo "Failed tests"
-	for t in $FAILED_TESTS; do
-		printf "\t%-*s: FAIL\n" $printf_test_len "$t"
+function list_tests {
+	echo "Tests list:"
+	for t in $tests_list; do
+		printf "\t%s\n" "$t"
 	done
-fi
+}
+
+function print_help {
+cat<<EOF
+usage:
+nfs_test.sh [command] [options]...
+
+Commands:
+	start		start tests
+	stop		stop tests
+	clean		clean tests output
+	cr		suspend and restore container
+	list		print tests list
+	kill		kill tests
+	run		do the whole test sequence: kill, clean, start, suspend, restore, stop (default)
+
+Options:
+	-C --ctid       container ID
+	-d --zdtm-dir   path to ZDTM tests within container
+	-t --test       test name
+	-h --help	this help
+
+Examples:
+	Run tests, located in /mnt/criu/test/zdtm in CT 102:
+		nfs_test.sh --ctid 102 --zdtm-dir /mnt/criu/test/zdtm
+
+	Kill all tests:
+		nfs_test.sh kill
+
+	List all tests:
+		nfs_test.sh list
+
+	Start only "static/deleted_unix_sock" test located in /mnt/criu/test/zdtm in CT 102:
+		nfs_test.sh --ctid 102 --zdtm-dir /mnt/criu/test/zdtm -t static/deleted_unix_sock start
+
+EOF
+exit
+}
+
+function set_env {
+	if [ -z "$CTID" ]; then
+		echo "CT ID must be provided"
+		exit 1
+	fi
+
+	if [ -z "$ZDTM_DIR" ]; then
+		echo "Path to ZDTM tests must be provided"
+		exit 1
+	fi
+
+	set_test_print_len "$tests_list"
+}
+
+function start_zdtm_tests {
+	echo "Start tests"
+	start_tests $ZDTM_DIR "$tests_list"
+	if [ $? -ne 0 ]; then
+		kill_tests "$tests_list"
+		exit 1
+	fi
+}
+
+function stop_zdtm_tests {
+	echo "Stop tests"
+	stop_tests $ZDTM_DIR "$tests_list"
+
+	if [ -n "$FAILED_TESTS" ]; then
+		echo "Failed tests"
+		for t in $FAILED_TESTS; do
+			printf "\t%-*s: FAIL\n" $printf_test_len "$t"
+		done
+	else
+		echo "Success"
+	fi
+}
+
+function clean_tests_out {
+	vz_ct_exec "make -C $ZDTM_DIR cleanout"
+}
+
+function run_zdtm_tests {
+	kill_tests "$tests_list"
+	clean_tests_out
+	start_zdtm_tests
+	suspend_restore || exit 1
+	stop_zdtm_tests
+}
+
+[ -n "$*" ] || print_help
+
+while [ "$*" ] ; do
+	arg="$1"
+	shift
+	case $arg in
+		-C|--ctid)
+			CTID=$1
+			shift
+			;;
+		-d|--zdtm-dir)
+			ZDTM_DIR=$1
+			shift
+			;;
+		-t|--test)
+			tests_list="$tests_list $1"
+			shift
+			;;
+		-h|--help)
+			print_help
+			shift
+			;;
+		run)
+			cmd="run"
+			shift
+			;;
+		cr)
+			cmd="cr"
+			shift
+			;;
+		start)
+			cmd="start"
+			shift
+			;;
+		stop)
+			cmd="stop"
+			shift
+			;;
+		kill)
+			cmd="kill"
+			shift
+			;;
+		clean)
+			cmd="clean"
+			shift
+			;;
+		list)
+			cmd="list"
+			shift
+			;;
+		*)
+			echo "unknown $arg"
+			exit 2
+			;;
+	esac
+done
+
+[ -n "$cmd" ] || cmd="run"
+[ -n "$tests_list" ] || tests_list="$TESTS_LIST"
+
+case $cmd in
+	run)
+		set_env
+		run_zdtm_tests
+		;;
+	start)
+		set_env
+		start_zdtm_tests
+		;;
+	stop)
+		set_env
+		stop_zdtm_tests
+		;;
+	list)
+		list_tests
+		;;
+	clean)
+		set_env
+		clean_tests_out
+		;;
+	cr)
+		suspend_restore
+		;;
+	kill)
+		kill_tests "$tests_list"
+		;;
+esac
