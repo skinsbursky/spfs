@@ -239,19 +239,23 @@ function wait_spfs_exited {
 }
 
 function suspend_restore {
-	echo "Suspending $CTID"
+	echo -n "Suspending $CTID... "
 	vzctl suspend $CTID > /dev/null 2>&1
 	if [ $? -ne 0 ]; then 
-		echo "failed to suspend"
+		echo "failed"
+		grep Error /vz/private/$CTID/dump/Dump.fail/dump.log 
 		return 1
 	fi
+	echo "done"
 
-	echo "Restoring $CTID"
+	echo -n "Restoring $CTID... "
 	vzctl restore $CTID > /dev/null 2>&1
 	if [ $? -ne 0 ]; then 
-		echo "failed to resume"
+		echo "failed"
+		grep Error /vz/private/$CTID/dump/Dump/restore.log 
 		exit 1
 	fi
+	echo "done"
 
 	wait_spfs_exited
 	if [ $? -ne 0 ]; then 
@@ -343,7 +347,7 @@ function set_env {
 }
 
 function start_zdtm_tests {
-	echo "Start tests"
+	echo "Start tests:"
 	start_tests $ZDTM_DIR "$tests_list"
 	if [ $? -ne 0 ]; then
 		kill_tests "$tests_list"
@@ -352,7 +356,7 @@ function start_zdtm_tests {
 }
 
 function stop_zdtm_tests {
-	echo "Stop tests"
+	echo "Stop tests:"
 	stop_tests $ZDTM_DIR "$tests_list"
 
 	if [ -n "$FAILED_TESTS" ]; then
