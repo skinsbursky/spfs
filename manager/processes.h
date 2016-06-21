@@ -42,6 +42,9 @@ struct process_map {
 	int map_fd;
 	off_t start;
 	off_t end;
+	int prot;
+	int flags;
+	unsigned long long pgoff;
 };
 
 struct parasite_ctl;

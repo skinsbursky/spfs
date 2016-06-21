@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <dirent.h>
 #include <stdlib.h>
+#include <sys/mman.h>
 
 #include "include/list.h"
 #include "include/log.h"
@@ -288,7 +289,8 @@ static int process_add_fd(struct process_info *p, int source_fd, int target_fd,
 }
 
 static int process_add_mapping(struct process_info *p, int map_fd,
-				off_t start, off_t end)
+			       off_t start, off_t end,
+			       int prot, int flags, unsigned long long pgoff)
 {
 	struct process_map *mfd;
 
@@ -301,6 +303,9 @@ static int process_add_mapping(struct process_info *p, int map_fd,
 	mfd->map_fd = map_fd;
 	mfd->start = start;
 	mfd->end = end;
+	mfd->prot = prot;
+	mfd->flags = flags;
+	mfd->pgoff = pgoff;
 	list_add_tail(&mfd->list, &p->maps);
 	p->maps_nr++;
 
@@ -541,7 +546,8 @@ static int collect_process_open_fds(struct process_info *p,
 
 static int collect_map_file(struct process_info *p,
 			    unsigned long start, unsigned long end,
-			    mode_t mode, const char *path)
+			    mode_t mode, const char *path,
+			    int prot, int flags, unsigned long long pgoff)
 {
 	int fd, map_fd = -1, err;
 
@@ -560,7 +566,7 @@ static int collect_map_file(struct process_info *p,
 	pr_debug("\t/proc/%d/map_files/%lx-%lx ---> %s (fd: %d)\n",
 			p->pid, start, end, path, map_fd);
 
-	err = process_add_mapping(p, map_fd, start, end);
+	err = process_add_mapping(p, map_fd, start, end, prot, flags, pgoff);
 
 close_fd:
 	if ((fd != map_fd) || err)
@@ -610,6 +616,20 @@ static bool is_mnt_map(struct process_info *p, int dir,
 	return is_mnt_file(p, dir, path, mi->source_mnt, mi->src_dev);
 }
 
+static int map_prot(char r, char w, char x)
+{
+	int prot = 0;
+
+	if (r == 'r')
+		prot |= PROT_READ;
+	if (w == 'w')
+		prot |= PROT_WRITE;
+	if (x == 'x')
+		prot |= PROT_EXEC;
+
+	return prot;
+}
+
 static int collect_process_maps(struct process_info *p,
 				struct mounts_info_s *mi)
 {
@@ -640,12 +660,14 @@ static int collect_process_maps(struct process_info *p,
 		int ret, path_off;
 		char *map_file;
 		mode_t mode = 0;
+		char r, w, x, s;
+		unsigned long long pgoff;
 
 		map[strlen(map)-1] = '\0';
 
-		ret = sscanf(map, "%lx-%lx %*c%*c%*c%*c %*x %*x:%*x %lu %n",
-				&start, &end, &ino, &path_off);
-		if (ret != 3) {
+		ret = sscanf(map, "%lx-%lx %c%c%c%c %llx %*x:%*x %lu %n",
+				&start, &end, &r, &w, &x, &s, &pgoff, &ino, &path_off);
+		if (ret != 8) {
 			pr_err("failed to parse '%s': %d\n", map, ret);
 			err = -EINVAL;
 			goto close_fmap;
@@ -669,7 +691,10 @@ static int collect_process_maps(struct process_info *p,
 		if (err)
 			goto close_fmap;
 
-		err = collect_map_file(p, start, end, mode, path);
+		err = collect_map_file(p, start, end, mode, path,
+				       map_prot(r, w, x),
+				       s == 's' ? MAP_SHARED : MAP_PRIVATE,
+				       pgoff);
 		if (err)
 			goto close_fmap;
 	}
