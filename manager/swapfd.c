@@ -389,20 +389,18 @@ int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl)
 	ret = syscall_seized(ctl, __NR_memfd_create, &sret,
 			     (unsigned long)where, 0, 0, 0, 0, 0);
 
+	fd = (int)(long)sret;
 	if (ptrace_poke_area(pid, orig_code, where, sizeof(orig_code))) {
-		fd = (int)(long)sret;
 		if (fd >= 0)
 			close_seized(ctl, fd);
 		pr_err("Can't restore memfd args (pid: %d)\n", pid);
 		goto err_free;
 	}
 
-	if (ret < 0)
+	if (ret < 0 || fd < 0) {
+		pr_err("Can't create memfd: %d %d\n", ret, fd);
 		goto err_free;
-
-	fd = (int)(long)sret;
-	if (fd < 0)
-		goto err_free;
+	}
 
 	ctl->map_length = MMAP_SIZE;
 	sprintf(path, "/proc/%d/fd/%d", pid, fd);
