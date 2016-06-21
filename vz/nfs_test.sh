@@ -371,6 +371,7 @@ function stop_zdtm_tests {
 
 function clean_tests_out {
 	vz_ct_exec "make -C $ZDTM_DIR cleanout"
+	vz_ct_exec "rm -rf $ZDTM_DIR/*/*.test*"
 }
 
 function run_zdtm_tests {
