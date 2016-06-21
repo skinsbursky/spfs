@@ -1,6 +1,8 @@
 #ifndef __SPFS_MANAGER_SWAPFD_H__
 #define __SPFS_MANAGER_SWAPFD_H__
 
+#include <stdbool.h>
+
 struct swapfd_exchange {
 	pid_t		pid;
 
@@ -29,5 +31,14 @@ int wait_task_seized(pid_t pid);
 int swapfd_tracee(struct parasite_ctl *ctl, struct swapfd_exchange *se);
 int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl);
 void destroy_parasite_ctl(pid_t pid, struct parasite_ctl *ctl);
+
+int swap_fds(struct parasite_ctl *ctl,
+	     int *src_fd, int *dst_fd, unsigned long *cloexec, int nfd);
+int swap_maps(struct parasite_ctl *ctl,
+	      unsigned long *addr, int *addr_fd, int naddr);
+int swap_exe(struct parasite_ctl *ctl, int exe_fd);
+int swap_root(struct parasite_ctl *ctl, int cwd_fd, const char *root,
+	      bool restore_cwd);
+int swap_cwd(struct parasite_ctl *ctl, int cwd_fd);
 
 #endif
