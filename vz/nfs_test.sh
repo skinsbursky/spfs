@@ -155,6 +155,7 @@ function start_tests {
 				return 1
 			fi
 			local pid=$(cat_test_file $test_dir $t "pid")
+			running_tests="$running_tests $t"
 		fi
 		printf "%s\n" "$pid"
 	done
@@ -204,6 +205,8 @@ function stop_tests {
 
 function kill_tests {
 	local list=$1
+
+	[ -n "$list" ] || return 0
 
 	echo -n "Killing tests... "
 
@@ -350,14 +353,16 @@ function start_zdtm_tests {
 	echo "Start tests:"
 	start_tests $ZDTM_DIR "$tests_list"
 	if [ $? -ne 0 ]; then
-		kill_tests "$tests_list"
+		kill_tests "$running_tests"
 		exit 1
 	fi
 }
 
 function stop_zdtm_tests {
+	[ -n "$running_tests" ] || return 0
+
 	echo "Stop tests:"
-	stop_tests $ZDTM_DIR "$tests_list"
+	stop_tests $ZDTM_DIR "$running_tests"
 
 	if [ -n "$FAILED_TESTS" ]; then
 		echo "Failed tests"
