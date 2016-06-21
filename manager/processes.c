@@ -352,7 +352,6 @@ static int get_fd_flags(pid_t pid, int fd)
 	}
 	if (flags < 0)
 		pr_err("failed to get %s flags: %d\n", path, flags);
-	pr_debug("%s: flags: 0%o\n", __func__, flags);
 	return flags;
 }
 
