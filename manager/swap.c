@@ -21,29 +21,26 @@ typedef enum swap_resource_type {
 	SWAP_RESOURCE_MAX,
 } swap_resource_t;
 
-static int do_swap_process_fds(struct process_info *p, struct swapfd_exchange *se)
+static int do_swap_process_fds(struct process_info *p)
 {
 	struct process_fd *pfd;
 	int err = -ENOMEM;
-	int *s, *d;
-	unsigned long *f;
+	int *src_fd, *dst_fd, *s, *d;
+	unsigned long *cloexec, *ce;
 
 	if (!p->fds_nr)
 		return 0;
 
 	pr_debug("Swapping process %d file descriptors:\n", p->pid);
 
-	se->src_fd = malloc(sizeof(*se->src_fd) * p->fds_nr);
-	se->dst_fd = malloc(sizeof(*se->dst_fd) * p->fds_nr);
-	se->setfd = malloc(sizeof(*se->setfd) * p->fds_nr);
-	if (!se->src_fd || !se->dst_fd || !se->setfd) {
+	src_fd = s = malloc(sizeof(int) * p->fds_nr);
+	dst_fd = d = malloc(sizeof(int) * p->fds_nr);
+	cloexec = ce = malloc(sizeof(unsigned long) * p->fds_nr);
+	if (!src_fd || !dst_fd || !cloexec) {
 		pr_err("failed to allocate\n");
 		goto free;
 	}
 
-	s = se->src_fd;
-	d = se->dst_fd;
-	f = se->setfd;
 	list_for_each_entry(pfd, &p->fds, list) {
 		pr_debug("\t/proc/%d/fd/%d --> /proc/%d/fd/%d %s\n",
 				getpid(), pfd->target_fd,
@@ -51,89 +48,91 @@ static int do_swap_process_fds(struct process_info *p, struct swapfd_exchange *s
 				pfd->cloexec ? "(O_CLOEXEC)" : "");
 		*s++ = pfd->source_fd;
 		*d++ = pfd->target_fd;
-		*f++ = pfd->cloexec;
+		*ce++ = pfd->cloexec;
 	}
-	se->nfd = p->fds_nr;
 
-	err = swapfd_tracee(p->pctl, se);
+	err = swap_fds(p->pctl, src_fd, dst_fd, cloexec, p->fds_nr);
 
 free:
-	free(se->setfd);
-	free(se->src_fd);
-	free(se->dst_fd);
+	free(cloexec);
+	free(dst_fd);
+	free(src_fd);
 	return err;
 }
 
-static int do_swap_process_maps(struct process_info *p, struct swapfd_exchange *se)
+static int do_swap_process_maps(struct process_info *p)
 {
-	struct process_map *mfd;
+	struct process_map *pm;
 	int err = -ENOMEM;
-	int *m;
-	unsigned long *ma;
+	int *map_fds, *mfd;
+	unsigned long *map_addrs, *maddr;
 
 	if (!p->maps_nr)
 		return 0;
 
 	pr_debug("Swapping process %d mappings:\n", p->pid);
 
-	se->addr = malloc(sizeof(*se->addr) * p->maps_nr);
-	se->addr_fd = malloc(sizeof(*se->addr_fd) * p->maps_nr);
-	if (!se->addr || !se->addr) {
+	map_fds = mfd = malloc(sizeof(int) * p->maps_nr);
+	map_addrs = maddr = malloc(sizeof(unsigned long) * p->maps_nr);
+	if (!map_fds || !map_addrs) {
 		pr_err("failed to allocate\n");
 		goto free;
 	}
 
-	m = se->addr_fd;
-	ma = se->addr;
-	list_for_each_entry(mfd, &p->maps, list) {
+	list_for_each_entry(pm, &p->maps, list) {
 		pr_debug("\t/proc/%d/fd/%d --> /proc/%d/map_files/%ld-%ld\n",
-				getpid(), mfd->map_fd, p->pid, mfd->start, mfd->end);
-		*m++ = mfd->map_fd;
-		*ma++ = mfd->start;
+				getpid(), pm->map_fd, p->pid, pm->start, pm->end);
+		*mfd++ = pm->map_fd;
+		*maddr++ = pm->start;
 	}
-	se->naddr = p->maps_nr;
 
-	err = swapfd_tracee(p->pctl, se);
+	err = swap_maps(p->pctl, map_addrs, map_fds, p->maps_nr);
 
 free:
-	free(se->addr);
-	free(se->addr_fd);
+	free(map_addrs);
+	free(map_fds);
 	return err;
 }
 
-static int do_swap_process_fs(struct process_info *p, struct swapfd_exchange *se)
+static int do_swap_process_fs(struct process_info *p)
 {
 	int err;
+	int cwd_fd = -1;
 
 	if ((p->fs.cwd_fd < 0) && !p->fs.root < 0)
 		return 0;
 
 	pr_debug("Swapping process %d fs:\n", p->pid);
 
-	if (p->fs.cwd_fd >= 0) {
-		pr_debug("\t/proc/%d/fd/%d --> /proc/%d/cwd\n",
-				getpid(), p->fs.cwd_fd, p->pid);
-		se->cwd_fd = p->fs.cwd_fd;
-	}
 
 	if (p->fs.root) {
 		pr_debug("\t%s --> /proc/%d/root\n", p->fs.root, p->pid);
-		se->root.cwd_fd = open("/", O_PATH);
-		if (se->root.cwd_fd < 0) {
+		cwd_fd = open("/", O_PATH);
+		if (cwd_fd < 0) {
 			pr_perror("failed to open /");
 			return -errno;
 		}
-		se->root.path = p->fs.root + 1;
+
+		err = swap_root(p->pctl, cwd_fd, p->fs.root + 1, p->fs.cwd_fd == -1);
+		if (err)
+			goto err;
 	}
 
-	err = swapfd_tracee(p->pctl, se);
+	if (p->fs.cwd_fd) {
+		pr_debug("\t/proc/%d/fd/%d --> /proc/%d/cwd\n",
+				getpid(), p->fs.cwd_fd, p->pid);
+		err = swap_cwd(p->pctl, p->fs.cwd_fd);
+		if (err)
+			goto err;
+	}
 
-	if (p->fs.root)
-		close(se->root.cwd_fd);
+err:
+	if (cwd_fd >= 0)
+		close(cwd_fd);
 	return err;
 }
 
-static int do_swap_process_exe(struct process_info *p, struct swapfd_exchange *se)
+static int do_swap_process_exe(struct process_info *p)
 {
 	if (p->exe_fd < 0)
 		return 0;
@@ -142,12 +141,11 @@ static int do_swap_process_exe(struct process_info *p, struct swapfd_exchange *s
 
 	pr_debug("\t/proc/%d/fd/%d --> /proc/%d/exe\n",
 			getpid(), p->exe_fd, p->pid);
-	se->exe_fd = p->exe_fd;
 
-	return swapfd_tracee(p->pctl, se);
+	return swap_exe(p->pctl, p->exe_fd);
 }
 
-typedef int (*swap_handler_t)(struct process_info *p, struct swapfd_exchange *se);
+typedef int (*swap_handler_t)(struct process_info *p);
 
 static swap_handler_t swap_resources_handlers[SWAP_RESOURCE_MAX] = {
 	[SWAP_RESOURCE_FDS] = do_swap_process_fds,
@@ -172,11 +170,6 @@ static int do_swap_process_resources(struct process_info *p)
 	pr_debug("Swapping process %d resources:\n", p->pid);
 
 	for (type = SWAP_RESOURCE_FDS; type < SWAP_RESOURCE_MAX; type++) {
-		struct swapfd_exchange se = {
-			.exe_fd = -1,
-			.cwd_fd = -1,
-			.pid = p->pid,
-		};
 		swap_handler_t handler;
 		int err;
 
@@ -184,7 +177,7 @@ static int do_swap_process_resources(struct process_info *p)
 		if (handler < 0)
 			return -EINVAL;
 
-		err = handler(p, &se);
+		err = handler(p);
 		if (err)
 			return err;
 	}
