@@ -171,40 +171,19 @@ out:
 	return ret;
 }
 
-/* Find mapping backed by src_fd OR starting at src_addr and make them backed by dst_fd */
-static int move_mappings(struct parasite_ctl *ctl, unsigned long src_addr, int src_fd, int dst_fd)
+/* Find mapping starting at src_addr and make them backed by dst_fd */
+static int move_mappings(struct parasite_ctl *ctl, unsigned long src_addr, int dst_fd)
 {
-	unsigned int dev_major = 0, dev_minor = 0;
 	int ret, prot, flags, moved = 0;
 	unsigned long sret, addr;
 	struct map_struct *map;
-	char path[PATH_MAX];
-	struct stat st;
 	size_t length;
-
-	if (src_fd >= 0) {
-		sprintf(path, "/proc/%d/fd/%d", ctl->pid, src_fd);
-
-		if (stat(path, &st) < 0) {
-			pr_perror("Can't do stat on %s", path);
-			return -1;
-		}
-
-		dev_major = major(st.st_dev);
-		dev_minor = minor(st.st_dev);
-	}
 
 	list_for_each_entry(map, &ctl->maps, list) {
 		if (map->moved)
 			continue;
-		if (src_fd >= 0) {
-			if (map->major != dev_major || map->minor != dev_minor ||
-			    map->ino != st.st_ino)
-				continue;
-		} else {
-			if (map->start != src_addr)
-				continue;
-		}
+		if (map->start != src_addr)
+			continue;
 
 		length = map->end - map->start;
 
@@ -250,8 +229,8 @@ static int move_mappings(struct parasite_ctl *ctl, unsigned long src_addr, int s
 		moved = map->moved = 1;
 	}
 
-	if (src_fd < 0 && !moved) {
-		pr_err("Can't find a mapping with addr=%lx\n", src_addr);
+	if (!moved) {
+		pr_err("Can't move mapping with addr=%lx\n", src_addr);
 		return -1;
 	}
 
@@ -544,7 +523,7 @@ static int changemap(struct parasite_ctl *ctl, unsigned long addr, int dst_fd)
 {
 	int ret;
 
-	if (move_mappings(ctl, addr, -1, dst_fd) < 0) {
+	if (move_mappings(ctl, addr, dst_fd) < 0) {
 		pr_err("Can't move mapping on addr %lx\n", addr);
 		return -1;
 	}
@@ -723,9 +702,6 @@ static int changefd(struct parasite_ctl *ctl, pid_t pid, int src_fd, int dst_fd,
 		exit_code = -1;
 		goto out;
 	}
-
-	if (move_mappings(ctl, ~0UL, src_fd, dst_fd) < 0)
-		return -1;
 
 	ret = syscall_seized(ctl, __NR_dup2, &sret, dst_fd, src_fd, 0, 0, 0, 0);
 	if (ret < 0 || ((int)(long)sret) < 0) {
