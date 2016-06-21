@@ -500,6 +500,17 @@ static int change_exe(struct parasite_ctl *ctl, int exe_fd)
 	return 0;
 }
 
+int swap_exe(struct parasite_ctl *ctl, int exe_fd)
+{
+	int ret, remote_fd;
+
+	ret = remote_fd = transfer_local_fd(ctl, exe_fd);
+	if (ret < 0)
+		return ret;
+
+	return change_exe(ctl, remote_fd);
+}
+
 static int change_cwd(struct parasite_ctl *ctl, int cwd_fd)
 {
 	int ret;
@@ -536,6 +547,24 @@ static int changemap(struct parasite_ctl *ctl, unsigned long addr, int dst_fd)
 
 	return 0;
 }
+
+int swap_maps(struct parasite_ctl *ctl,
+	      unsigned long *addr, int *addr_fd, int naddr)
+{
+	int i, ret = -ENOENT, remote_fd;
+
+	for (i = 0; i < naddr; i++) {
+		ret = remote_fd = transfer_local_fd(ctl, addr_fd[i]);
+		if (remote_fd < 0)
+			break;
+
+		ret = changemap(ctl, addr[i], remote_fd);
+		if (ret < 0)
+			break;
+	}
+	return ret;
+}
+
 struct lock {
 	loff_t start, end;
 	short type;
@@ -675,7 +704,7 @@ static int get_flocks(struct parasite_ctl *ctl, FILE *fp, struct lock *head)
 }
 
 /* Replace a fd, having number @src_fd, with a fd, received from socket */
-static int changefd(struct parasite_ctl *ctl, pid_t pid, int src_fd, int dst_fd, unsigned long f_setfd)
+static int changefd(struct parasite_ctl *ctl, int src_fd, int dst_fd, unsigned long f_setfd)
 {
 	char fdinfo[] = "/proc/XXXXXXXXXX/fdinfo/XXXXXXXXXX";
 	FILE *fp;
@@ -685,7 +714,7 @@ static int changefd(struct parasite_ctl *ctl, pid_t pid, int src_fd, int dst_fd,
 	int ret = 0, exit_code = 0;
 	struct lock head = {.next = NULL,}, *ptr;
 
-	sprintf(fdinfo, "/proc/%d/fdinfo/%d", pid, src_fd);
+	sprintf(fdinfo, "/proc/%d/fdinfo/%d", ctl->pid, src_fd);
 	fp = fopen(fdinfo, "r");
 	if (!fp) {
 		pr_perror("Can't open %s", fdinfo);
@@ -705,14 +734,14 @@ static int changefd(struct parasite_ctl *ctl, pid_t pid, int src_fd, int dst_fd,
 
 	ret = syscall_seized(ctl, __NR_dup2, &sret, dst_fd, src_fd, 0, 0, 0, 0);
 	if (ret < 0 || ((int)(long)sret) < 0) {
-		pr_err("Can't dup2(%d, %d). pid=%d\n", dst_fd, src_fd, pid);
+		pr_err("Can't dup2(%d, %d). pid=%d\n", dst_fd, src_fd, ctl->pid);
 		exit_code = -1;
 		goto out;
 	}
 
 	ret = close_seized(ctl, dst_fd);
 	if (ret < 0) {
-		pr_err("Can't close temporary fd, pid=%d\n", pid);
+		pr_err("Can't close temporary fd, pid=%d\n", ctl->pid);
 		exit_code = -1;
 		goto out;
 	}
@@ -721,7 +750,7 @@ static int changefd(struct parasite_ctl *ctl, pid_t pid, int src_fd, int dst_fd,
 		ret = syscall_seized(ctl, __NR_lseek, &sret, src_fd, f_pos, SEEK_SET, 0, 0, 0);
 		if (ret < 0 || ((int)(long)sret) < 0) {
 			pr_err("Can't lseek pid=%d, fd=%d, ret=%d, sret=%d\n",
-				pid, src_fd, ret, (int)(long)sret);
+				ctl->pid, src_fd, ret, (int)(long)sret);
 			exit_code = -1;
 			goto out;
 		}
@@ -730,7 +759,7 @@ static int changefd(struct parasite_ctl *ctl, pid_t pid, int src_fd, int dst_fd,
 	ret = syscall_seized(ctl, __NR_fcntl, &sret, src_fd, F_SETFD, f_setfd, 0, 0, 0);
 	if (ret < 0 || ((int)(long)sret) < 0) {
 		pr_err("Can't fcntl pid=%d, fd=%d, ret=%d, sret=%d\n",
-			pid, src_fd, ret, (int)(long)sret);
+			ctl->pid, src_fd, ret, (int)(long)sret);
 		exit_code = -1;
 	}
 out:
@@ -752,6 +781,28 @@ out:
 	if (fp)
 		fclose(fp);
 	return exit_code;
+}
+
+int swap_fds(struct parasite_ctl *ctl,
+	     int *src_fd, int *dst_fd, unsigned long *cloexec, int nfd)
+{
+	int i, ret = -ENOENT, remote_fd;
+
+	for (i = 0; i < nfd; i++) {
+		pr_debug("%s: %d\n", __func__, i);
+		ret = remote_fd = transfer_local_fd(ctl, dst_fd[i]);
+		if (ret < 0) {
+			pr_err("failed to get remote fd %d\n", dst_fd[i]);
+			break;
+		}
+
+		ret = changefd(ctl, src_fd[i], remote_fd, cloexec[i]);
+		if (ret < 0) {
+			pr_err("failed to change source fd %s remote fd %d\n", dst_fd[i]);
+			break;
+		}
+	}
+	return ret;
 }
 
 static int change_root(struct parasite_ctl *ctl, int cwd_fd, const char *root, bool restore_cwd)
@@ -814,60 +865,64 @@ static int change_root(struct parasite_ctl *ctl, int cwd_fd, const char *root, b
 	return 0;
 }
 
+int swap_root(struct parasite_ctl *ctl, int cwd_fd, const char *root, bool restore_cwd)
+{
+	int ret, remote_fd = -1;
+
+	if (cwd_fd >= 0) {
+		ret = remote_fd = transfer_local_fd(ctl, cwd_fd);
+		if (ret < 0)
+			return ret;
+	}
+
+	return change_root(ctl, remote_fd, root, restore_cwd);
+}
+
+int swap_cwd(struct parasite_ctl *ctl, int cwd_fd)
+{
+	int ret, remote_fd;
+
+	ret = remote_fd = transfer_local_fd(ctl, cwd_fd);
+	if (ret < 0)
+		return ret;
+
+	return change_cwd(ctl, remote_fd);
+}
+
 int swapfd_tracee(struct parasite_ctl *ctl, struct swapfd_exchange *se)
 {
-	int i, remote_fd, ret;
+	int ret = 0;
 
-	for (i = 0; i < se->naddr; i++) {
-		ret = remote_fd = transfer_local_fd(ctl, se->addr_fd[i]);
-		if (remote_fd < 0)
-			goto out;
-
-		ret = changemap(ctl, se->addr[i], remote_fd);
-		if (ret < 0)
+	if (se->naddr) {
+		ret = swap_maps(ctl, se->addr, se->addr_fd, se->naddr);
+		if (ret)
 			goto out;
 	}
 
-	for (i = 0; i < se->nfd; i++) {
-		ret = remote_fd = transfer_local_fd(ctl, se->dst_fd[i]);
-		if (ret < 0)
-			goto out;
-		ret = changefd(ctl, se->pid, se->src_fd[i], remote_fd, se->setfd[i]);
-		if (ret < 0)
+	if (se->nfd) {
+		ret = swap_fds(ctl, se->src_fd, se->dst_fd, se->setfd, se->nfd);
+		if (ret)
 			goto out;
 	}
 
 	if (se->exe_fd >= 0) {
-		ret = remote_fd = transfer_local_fd(ctl, se->exe_fd);
-		if (ret < 0)
-			goto out;
-
-		ret = change_exe(ctl, remote_fd);
+		ret = swap_exe(ctl, se->exe_fd);
 		if (ret < 0)
 			goto out;
 	}
 
 	if (se->root.path) {
-		remote_fd = -1;
-		if (se->root.cwd_fd >= 0) {
-			ret = remote_fd = transfer_local_fd(ctl, se->root.cwd_fd);
-			if (ret < 0)
-				goto out;
-		}
-		ret = change_root(ctl, remote_fd, se->root.path, se->cwd_fd == -1);
+		ret = swap_root(ctl, se->root.cwd_fd, se->root.path, se->cwd_fd == -1);
 		if (ret < 0)
 			goto out;
 	}
 
 	if (se->cwd_fd >= 0 && se->cwd_fd != se->root.cwd_fd) {
-		ret = remote_fd = transfer_local_fd(ctl, se->cwd_fd);
-		if (ret < 0)
-			goto out;
-
-		ret = change_cwd(ctl, remote_fd);
+		ret = swap_cwd(ctl, se->cwd_fd);
 		if (ret < 0)
 			goto out;
 	}
+
 out:
 	return ret;
 }
