@@ -267,7 +267,7 @@ static int get_link_path(const char *link,
 }
 
 static int process_add_fd(struct process_info *p, int source_fd, int target_fd,
-			  unsigned long cloexec)
+			  unsigned long cloexec, long long pos)
 {
 	struct process_fd *pfd;
 
@@ -282,6 +282,7 @@ static int process_add_fd(struct process_info *p, int source_fd, int target_fd,
 	pfd->cloexec = 0;
 	if (cloexec)
 		pfd->cloexec = FD_CLOEXEC;
+	pfd->pos = pos;
 	list_add_tail(&pfd->list, &p->fds);
 	p->fds_nr++;
 
@@ -327,16 +328,17 @@ struct fd_info_s {
 	int             fd;
 	struct stat     st;
 	unsigned        flags;
+	long long	pos;
 	bool            unlinked;
 	char            path[PATH_MAX];
 };
 
-static int get_fd_flags(pid_t pid, int fd)
+static int parse_fdinfo(pid_t pid, int fd, unsigned *flags, long long *pos)
 {
 	char path[PATH_MAX];
 	FILE *fdinfo;
 	char buf[64];
-	int flags = -ENOENT;
+	int err = 0;
 
 	snprintf(path, PATH_MAX, "/proc/%d/fdinfo/%d", pid, fd);
 
@@ -347,17 +349,21 @@ static int get_fd_flags(pid_t pid, int fd)
 	}
 
 	while (fgets(buf, 64, fdinfo) != NULL) {
-		if (strncmp(buf, "flags", strlen("flags")))
-			continue;
-		if (sscanf(buf, "flags:\t%o", &flags) != 1) {
-			pr_err("failed to sscanf '%s'\n", buf);
-			flags = -EINVAL;
+		if (!strncmp(buf, "flags:\t", strlen("flags:\t"))) {
+			if (sscanf(buf + strlen("flags:\t"), "%o", flags) != 1) {
+				pr_err("failed to sscanf '%s'\n", buf);
+				err = -EINVAL;
+			}
+		} else if (!strncmp(buf, "pos:\t", strlen("pos:\t"))) {
+			if (sscanf(buf + strlen("pos:\t"), "%lli", pos) != 1) {
+				pr_err("failed to sscanf '%s'\n", buf);
+				err = -EINVAL;
+			}
 		}
-		break;
 	}
-	if (flags < 0)
-		pr_err("failed to get %s flags: %d\n", path, flags);
-	return flags;
+	if (err < 0)
+		pr_err("failed to parse %s: %d\n", path, err);
+	return err;
 }
 
 static int get_fd_info(struct process_info *p, int dir,
@@ -386,11 +392,10 @@ static int get_fd_info(struct process_info *p, int dir,
 		goto close_local_fd;
 	}
 
-	fdi->flags = get_fd_flags(p->pid, fdi->fd);
-	if (fdi->flags < 0) {
-		pr_perror("failed to get fd flags for /proc/%d/fd/%d", p->pid,
+	err = parse_fdinfo(p->pid, fdi->fd, &fdi->flags, &fdi->pos);
+	if (err) {
+		pr_err("failed to get fd flags for /proc/%d/fd/%d", p->pid,
 				fdi->fd);
-		err = fdi->flags;
 		goto close_local_fd;
 	}
 
@@ -489,7 +494,7 @@ static int collect_process_fd(struct process_info *p, int dir,
 	pr_debug("\t/proc/%d/fd/%d ---> %s (fd: %d, flags: 0%o)\n",
 			p->pid, fdi.fd, path, target_fd, fdi.flags);
 
-	return process_add_fd(p, fdi.fd, target_fd, fdi.flags & O_CLOEXEC);
+	return process_add_fd(p, fdi.fd, target_fd, fdi.flags & O_CLOEXEC, fdi.pos);
 }
 
 static int iterate_dir_name(const char *dpath, struct process_info *p,

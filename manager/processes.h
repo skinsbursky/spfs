@@ -35,6 +35,7 @@ struct process_fd {
 	int source_fd;
 	int target_fd;
 	unsigned long cloexec;
+	long long pos;
 };
 
 struct process_map {
