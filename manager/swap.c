@@ -63,35 +63,23 @@ free:
 static int do_swap_process_maps(struct process_info *p)
 {
 	struct process_map *pm;
-	int err = -ENOMEM;
-	int *map_fds, *mfd;
-	unsigned long *map_addrs, *maddr;
+	int err;
 
 	if (!p->maps_nr)
 		return 0;
 
 	pr_debug("Swapping process %d mappings:\n", p->pid);
 
-	map_fds = mfd = malloc(sizeof(int) * p->maps_nr);
-	map_addrs = maddr = malloc(sizeof(unsigned long) * p->maps_nr);
-	if (!map_fds || !map_addrs) {
-		pr_err("failed to allocate\n");
-		goto free;
-	}
-
 	list_for_each_entry(pm, &p->maps, list) {
-		pr_debug("\t/proc/%d/fd/%d --> /proc/%d/map_files/%ld-%ld\n",
+		pr_debug("\t/proc/%d/fd/%d --> /proc/%d/map_files/%lx-%lx\n",
 				getpid(), pm->map_fd, p->pid, pm->start, pm->end);
-		*mfd++ = pm->map_fd;
-		*maddr++ = pm->start;
+		err = swap_map(p->pctl, pm->map_fd, pm->start, pm->end,
+			       pm->prot, pm->flags, pm->pgoff);
+		if (err)
+			return err;
 	}
 
-	err = swap_maps(p->pctl, map_addrs, map_fds, p->maps_nr);
-
-free:
-	free(map_addrs);
-	free(map_fds);
-	return err;
+	return 0;
 }
 
 static int do_swap_process_fs(struct process_info *p)
