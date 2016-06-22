@@ -28,7 +28,7 @@ static int do_replace_resources(struct freeze_cgroup_s *fg,
 	 */
 	err = set_namespaces(ns_fds, NS_MNT_MASK);
 	if (err)
-		return err;
+		goto free_pids;
 
 	err = collect_processes(pids, &processes);
 	if (err)
@@ -50,7 +50,7 @@ static int do_replace_resources(struct freeze_cgroup_s *fg,
 	 */
 	err = set_namespaces(ns_fds, NS_MNT_MASK | NS_NET_MASK);
 	if (err)
-		goto free_pids;
+		goto release_processes;
 
 	err = seize_processes(&processes);
 	if (err)
