@@ -329,7 +329,6 @@ struct fd_info_s {
 	struct stat     st;
 	unsigned        flags;
 	long long	pos;
-	bool            unlinked;
 	char            path[PATH_MAX];
 };
 
@@ -407,8 +406,6 @@ static int get_fd_info(struct process_info *p, int dir,
 		goto close_local_fd;
 	}
 	fdi->path[bytes] = '\0';
-
-	fdi->unlinked = unlinked_path(fdi->path);
 
 close_local_fd:
 	close(local_fd);
