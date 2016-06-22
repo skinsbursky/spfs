@@ -24,40 +24,24 @@ typedef enum swap_resource_type {
 static int do_swap_process_fds(struct process_info *p)
 {
 	struct process_fd *pfd;
-	int err = -ENOMEM;
-	int *src_fd, *dst_fd, *s, *d;
-	unsigned long *cloexec, *ce;
+	int err;
 
 	if (!p->fds_nr)
 		return 0;
 
 	pr_debug("Swapping process %d file descriptors:\n", p->pid);
 
-	src_fd = s = malloc(sizeof(int) * p->fds_nr);
-	dst_fd = d = malloc(sizeof(int) * p->fds_nr);
-	cloexec = ce = malloc(sizeof(unsigned long) * p->fds_nr);
-	if (!src_fd || !dst_fd || !cloexec) {
-		pr_err("failed to allocate\n");
-		goto free;
-	}
-
 	list_for_each_entry(pfd, &p->fds, list) {
-		pr_debug("\t/proc/%d/fd/%d --> /proc/%d/fd/%d %s\n",
+		pr_debug("\t/proc/%d/fd/%d --> /proc/%d/fd/%d (%s%lli)\n",
 				getpid(), pfd->target_fd,
 				p->pid, pfd->source_fd,
-				pfd->cloexec ? "(O_CLOEXEC)" : "");
-		*s++ = pfd->source_fd;
-		*d++ = pfd->target_fd;
-		*ce++ = pfd->cloexec;
+				pfd->cloexec ? "O_CLOEXEC, " : "", pfd->pos);
+		err = swap_fd(p->pctl, pfd->source_fd, pfd->target_fd,
+			      pfd->cloexec, pfd->pos);
+		if (err)
+			return err;
 	}
-
-	err = swap_fds(p->pctl, src_fd, dst_fd, cloexec, p->fds_nr);
-
-free:
-	free(cloexec);
-	free(dst_fd);
-	free(src_fd);
-	return err;
+	return 0;
 }
 
 static int do_swap_process_maps(struct process_info *p)

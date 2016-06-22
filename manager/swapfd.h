@@ -31,14 +31,13 @@ int wait_task_seized(pid_t pid);
 int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl);
 void destroy_parasite_ctl(pid_t pid, struct parasite_ctl *ctl);
 
-int swap_fds(struct parasite_ctl *ctl,
-	     int *src_fd, int *dst_fd, unsigned long *cloexec, int nfd);
 int swap_exe(struct parasite_ctl *ctl, int exe_fd);
 int swap_root(struct parasite_ctl *ctl, int cwd_fd, const char *root,
 	      bool restore_cwd);
 int swap_cwd(struct parasite_ctl *ctl, int cwd_fd);
 
-
+int swap_fd(struct parasite_ctl *ctl, int src_fd, int dst_fd,
+	    unsigned long cloexec, long long pos);
 int swap_map(struct parasite_ctl *ctl, int map_fd,
 	     unsigned long start, unsigned long end,
 	     int prot, int flags, unsigned long long pgoff);

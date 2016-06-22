@@ -413,31 +413,6 @@ void destroy_parasite_ctl(pid_t pid, struct parasite_ctl *ctl)
 	free(ctl);
 }
 
-/* Get pos and flags from just open fdinfo file */
-static int get_fd_mode(FILE *fp, long long int *pos, mode_t *mode)
-{
-	int i = 0, ret = 0;
-	char *line = NULL;
-	size_t size = 0;
-
-	while (getline(&line, &size, fp) != -1) {
-		if (strncmp(line, "pos:\t", 5) == 0)
-			sscanf(line + 5, "%lli", pos);
-		else if (strncmp(line, "flags:\t0", 8) == 0)
-			sscanf(line + 8, "%o", mode);
-		else {
-			pr_err("Can't parse fdinfo file\n");
-			ret = -1;
-			break;
-		}
-		if (++i == 2)
-			break;
-	}
-	pr_debug("pos=%lli, mode=0%o\n", *pos, *mode);
-	free(line);
-	return ret;
-}
-
 static int change_exe(struct parasite_ctl *ctl, int exe_fd)
 {
 	unsigned long sret;
@@ -627,13 +602,12 @@ static int get_flocks(struct parasite_ctl *ctl, FILE *fp, struct lock *head)
 }
 
 /* Replace a fd, having number @src_fd, with a fd, received from socket */
-static int changefd(struct parasite_ctl *ctl, int src_fd, int dst_fd, unsigned long f_setfd)
+static int changefd(struct parasite_ctl *ctl, int src_fd, int dst_fd,
+		    unsigned long f_setfd, long long f_pos)
 {
 	char fdinfo[] = "/proc/XXXXXXXXXX/fdinfo/XXXXXXXXXX";
 	FILE *fp;
-	long long int f_pos;
 	unsigned long sret;
-	mode_t mode;
 	int ret = 0, exit_code = 0;
 	struct lock head = {.next = NULL,}, *ptr;
 
@@ -641,11 +615,6 @@ static int changefd(struct parasite_ctl *ctl, int src_fd, int dst_fd, unsigned l
 	fp = fopen(fdinfo, "r");
 	if (!fp) {
 		pr_perror("Can't open %s", fdinfo);
-		exit_code = -1;
-		goto out;
-	}
-
-	if (get_fd_mode(fp, &f_pos, &mode) < 0) {
 		exit_code = -1;
 		goto out;
 	}
@@ -706,25 +675,20 @@ out:
 	return exit_code;
 }
 
-int swap_fds(struct parasite_ctl *ctl,
-	     int *src_fd, int *dst_fd, unsigned long *cloexec, int nfd)
+int swap_fd(struct parasite_ctl *ctl, int src_fd, int dst_fd,
+	    unsigned long cloexec, long long pos)
 {
-	int i, ret = -ENOENT, remote_fd;
+	int err, remote_fd;
 
-	for (i = 0; i < nfd; i++) {
-		ret = remote_fd = transfer_local_fd(ctl, dst_fd[i]);
-		if (ret < 0) {
-			pr_err("failed to get remote fd %d\n", dst_fd[i]);
-			break;
-		}
+	remote_fd = transfer_local_fd(ctl, dst_fd);
+	if (remote_fd < 0)
+		return remote_fd;
 
-		ret = changefd(ctl, src_fd[i], remote_fd, cloexec[i]);
-		if (ret < 0) {
-			pr_err("failed to change source fd %s remote fd %d\n", dst_fd[i]);
-			break;
-		}
-	}
-	return ret;
+	err = changefd(ctl, src_fd, remote_fd, cloexec, pos);
+	if (err < 0)
+		pr_err("failed to change source fd %d remote fd %d\n", src_fd, remote_fd);
+
+	return err;
 }
 
 static int change_root(struct parasite_ctl *ctl, int cwd_fd, const char *root, bool restore_cwd)
