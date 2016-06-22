@@ -155,7 +155,6 @@ struct parasite_ctl {
 	unsigned long		syscall_ip;
 	unsigned long		syscall_ip_saved;
 	struct thread_ctx	orig;
-	struct list_head	maps;
 };
 
 int ptrace_peek_area(pid_t pid, void *dst, void *addr, long bytes);
