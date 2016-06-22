@@ -34,8 +34,6 @@ void destroy_parasite_ctl(pid_t pid, struct parasite_ctl *ctl);
 
 int swap_fds(struct parasite_ctl *ctl,
 	     int *src_fd, int *dst_fd, unsigned long *cloexec, int nfd);
-int swap_maps(struct parasite_ctl *ctl,
-	      unsigned long *addr, int *addr_fd, int naddr);
 int swap_exe(struct parasite_ctl *ctl, int exe_fd);
 int swap_root(struct parasite_ctl *ctl, int cwd_fd, const char *root,
 	      bool restore_cwd);

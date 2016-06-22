@@ -233,72 +233,6 @@ int swap_map(struct parasite_ctl *ctl, int map_fd,
 	return err;
 }
 
-/* Find mapping starting at src_addr and make them backed by dst_fd */
-static int move_mappings(struct parasite_ctl *ctl, unsigned long src_addr, int dst_fd)
-{
-	int ret, prot, flags, moved = 0;
-	unsigned long sret, addr;
-	struct map_struct *map;
-	size_t length;
-
-	list_for_each_entry(map, &ctl->maps, list) {
-		if (map->moved)
-			continue;
-		if (map->start != src_addr)
-			continue;
-
-		length = map->end - map->start;
-
-		ret = syscall_seized(ctl, __NR_msync, &sret, map->start, length, MS_SYNC, 0, 0, 0);
-		if (ret || sret) {
-			pr_err("Can't msync at [%lx; %lx], ret=%d, sret=%d\n",
-				map->start, map->end, ret, (int)(long)sret);
-			return -1;
-		}
-
-		prot = 0;
-		if (map->r == 'r')
-			prot |= PROT_READ;
-		if (map->w == 'w')
-			prot |= PROT_WRITE;
-		if (map->x == 'x')
-			prot |= PROT_EXEC;
-
-		flags = map->s == 's' ? MAP_SHARED : MAP_PRIVATE;
-
-		pr_debug("mmap to replace %lx: len=%lx, prot=%x, flags=%x, off=%lx\n",
-			 map->start, length, prot, flags, map->pgoff);
-		addr = (unsigned long)mmap_seized(ctl, 0, length, prot, flags, dst_fd, map->pgoff);
-		if (!addr) {
-			pr_err("mmap failed\n");
-			return -1;
-		}
-
-		if (flags & MAP_PRIVATE) {
-			ret = copy_private_content(ctl, addr, map->start, length);
-			if (ret)
-				return -1;
-		}
-
-		flags = MREMAP_FIXED | MREMAP_MAYMOVE;
-		pr_debug("remapping %lx to %lx, size=%lx\n", addr, map->start, length);
-		ret = syscall_seized(ctl, __NR_mremap, &sret, addr, length, length, flags, map->start, 0);
-		if (ret || IS_ERR_VALUE(sret)) {
-			pr_err("Can't remap: ret=%d, sret=%d\n", ret, (int)(long)sret);
-			return -1;
-		}
-
-		moved = map->moved = 1;
-	}
-
-	if (!moved) {
-		pr_err("Can't move mapping with addr=%lx\n", src_addr);
-		return -1;
-	}
-
-	return 0;
-}
-
 static void destroy_dgram_socket(struct parasite_ctl *ctl)
 {
 	int ret;
@@ -590,41 +524,6 @@ static int change_cwd(struct parasite_ctl *ctl, int cwd_fd)
 	}
 
 	return 0;
-}
-
-static int changemap(struct parasite_ctl *ctl, unsigned long addr, int dst_fd)
-{
-	int ret;
-
-	if (move_mappings(ctl, addr, dst_fd) < 0) {
-		pr_err("Can't move mapping on addr %lx\n", addr);
-		return -1;
-	}
-
-	ret = close_seized(ctl, dst_fd);
-	if (ret < 0) {
-		pr_err("Can't close temporary fd=%d, pid=%d\n", dst_fd, ctl->pid);
-		return -1;
-	}
-
-	return 0;
-}
-
-int swap_maps(struct parasite_ctl *ctl,
-	      unsigned long *addr, int *addr_fd, int naddr)
-{
-	int i, ret = -ENOENT, remote_fd;
-
-	for (i = 0; i < naddr; i++) {
-		ret = remote_fd = transfer_local_fd(ctl, addr_fd[i]);
-		if (remote_fd < 0)
-			break;
-
-		ret = changemap(ctl, addr[i], remote_fd);
-		if (ret < 0)
-			break;
-	}
-	return ret;
 }
 
 struct lock {
@@ -949,44 +848,6 @@ int swap_cwd(struct parasite_ctl *ctl, int cwd_fd)
 		return ret;
 
 	return change_cwd(ctl, remote_fd);
-}
-
-int swapfd_tracee(struct parasite_ctl *ctl, struct swapfd_exchange *se)
-{
-	int ret = 0;
-
-	if (se->naddr) {
-		ret = swap_maps(ctl, se->addr, se->addr_fd, se->naddr);
-		if (ret)
-			goto out;
-	}
-
-	if (se->nfd) {
-		ret = swap_fds(ctl, se->src_fd, se->dst_fd, se->setfd, se->nfd);
-		if (ret)
-			goto out;
-	}
-
-	if (se->exe_fd >= 0) {
-		ret = swap_exe(ctl, se->exe_fd);
-		if (ret < 0)
-			goto out;
-	}
-
-	if (se->root.path) {
-		ret = swap_root(ctl, se->root.cwd_fd, se->root.path, se->cwd_fd == -1);
-		if (ret < 0)
-			goto out;
-	}
-
-	if (se->cwd_fd >= 0 && se->cwd_fd != se->root.cwd_fd) {
-		ret = swap_cwd(ctl, se->cwd_fd);
-		if (ret < 0)
-			goto out;
-	}
-
-out:
-	return ret;
 }
 
 static int seize_catch_task(pid_t pid)
