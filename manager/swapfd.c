@@ -712,7 +712,6 @@ int swap_fds(struct parasite_ctl *ctl,
 	int i, ret = -ENOENT, remote_fd;
 
 	for (i = 0; i < nfd; i++) {
-		pr_debug("%s: %d\n", __func__, i);
 		ret = remote_fd = transfer_local_fd(ctl, dst_fd[i]);
 		if (ret < 0) {
 			pr_err("failed to get remote fd %d\n", dst_fd[i]);
