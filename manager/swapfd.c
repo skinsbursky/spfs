@@ -41,22 +41,6 @@ struct map_struct {
 	int moved;
 };
 
-static int collect_map(struct parasite_ctl *ctl, struct map_struct *m)
-{
-	struct map_struct *new = malloc(sizeof(*new));
-
-	if (!new) {
-		pr_perror("Can't alloc map_struct");
-		return -1;
-	}
-
-	memcpy(new, m, sizeof(*m));
-	new->moved = 0;
-	list_add_tail(&new->list, &ctl->maps);
-
-	return 0;
-}
-
 static void *find_mapping(pid_t pid, struct parasite_ctl *ctl)
 {
 	char path[PATH_MAX];
@@ -85,37 +69,19 @@ static void *find_mapping(pid_t pid, struct parasite_ctl *ctl)
 			break;
 		}
 
-		if (m.ino && collect_map(ctl, &m) < 0) {
-			result = MAP_FAILED;
-			break;
-		}
-
 		if (m.x != 'x' || m.start > TASK_SIZE)
 			continue;
 
 		pr_debug("Found: start=%08lx, end=%08lx, r=%c, w=%c, x=%c\n",
 				m.start, m.end, m.r, m.w, m.x);
 		result = (void *)m.start;
+		break;
 	}
 
 	free(line);
 	fclose(fp);
 
-	if (result == MAP_FAILED) {
-		struct map_struct *m, *tmp;
-		list_for_each_entry_safe(m, tmp, &ctl->maps, list) {
-			free(m);
-		}
-	}
-
 	return result;
-}
-
-static void free_mappings(struct parasite_ctl *ctl)
-{
-	struct map_struct *m, *tmp;
-	list_for_each_entry_safe(m, tmp, &ctl->maps, list)
-		free(m);
 }
 
 static int copy_private_content(struct parasite_ctl *ctl, unsigned long to,
@@ -337,8 +303,6 @@ int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl)
 		return -ENOMEM;
 	}
 
-	INIT_LIST_HEAD(&ctl->maps);
-
 	addr = find_mapping(pid, ctl);
 	where = addr + BUILTIN_SYSCALL_SIZE;
 
@@ -427,7 +391,6 @@ err_curef:
 err_cure:
 	close_seized(ctl, fd);
 err_free:
-	free_mappings(ctl);
 	free(ctl);
 	return -1;
 }
@@ -447,7 +410,6 @@ void destroy_parasite_ctl(pid_t pid, struct parasite_ctl *ctl)
 	ret = munmap(ctl->local_map, ctl->map_length);
 	if (ret)
 		pr_perror("Can't munmap local map");
-	free_mappings(ctl);
 	free(ctl);
 }
 

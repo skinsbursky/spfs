@@ -252,10 +252,11 @@ int main()
 	ret = set_parasite_ctl(se.pid, &ctl);
 	if (ret < 0)
 		goto out_detach;
-
+#if 0
+	/* swapfd_tracee was removed as obsolete */
 	if (swapfd_tracee(ctl, &se) == 0)
 		ret = 0;
-
+#endif
 	destroy_parasite_ctl(se.pid, ctl);
 out_detach:
 	detach_from_task(child);
