@@ -32,15 +32,6 @@
 #define MMAP_SIZE (PATH_MAX + BUILTIN_SYSCALL_SIZE)
 #define MAX_BIND_ATTEMPTS	1000
 
-struct map_struct {
-	struct list_head list;
-	unsigned long start, end, ino;
-	unsigned long long pgoff;
-	unsigned major, minor;
-	char r, w, x, s;
-	int moved;
-};
-
 static void *find_mapping(pid_t pid, struct parasite_ctl *ctl)
 {
 	char path[PATH_MAX];
@@ -57,24 +48,21 @@ static void *find_mapping(pid_t pid, struct parasite_ctl *ctl)
 	}
 
 	while (getline(&line, &size, fp) != -1) {
-		struct map_struct m;
+		unsigned long start;
+		char x;
 		int ret;
 
-		ret = sscanf(line, "%lx%*c%lx %c%c%c%c %llx %x%*c%x %lu",
-			     &m.start, &m.end, &m.r, &m.w, &m.x, &m.s,
-			     &m.pgoff, &m.major, &m.minor, &m.ino);
-		if (ret != 10) {
+		ret = sscanf(line, "%lx-%*x %*c%*c%c", &start, &x);
+		if (ret != 2) {
 			pr_err("Can't parse line: %s", line);
 			result = MAP_FAILED;
 			break;
 		}
 
-		if (m.x != 'x' || m.start > TASK_SIZE)
+		if (x != 'x' || start > TASK_SIZE)
 			continue;
 
-		pr_debug("        Found: start=%08lx, end=%08lx, r=%c, w=%c, x=%c\n",
-				m.start, m.end, m.r, m.w, m.x);
-		result = (void *)m.start;
+		result = (void *)start;
 		break;
 	}
 
@@ -383,7 +371,6 @@ int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl)
 	}
 
 	*ret_ctl = ctl;
-	pr_debug("        Set up parasite blob using memfd\n");
 	return 0;
 
 err_curef:
