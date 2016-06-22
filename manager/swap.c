@@ -71,7 +71,7 @@ static int do_swap_process_fs(struct process_info *p)
 	int err;
 	int cwd_fd = -1;
 
-	if ((p->fs.cwd_fd < 0) && !p->fs.root < 0)
+	if ((p->fs.cwd_fd < 0) && !p->fs.root)
 		return 0;
 
 	pr_debug("Swapping process %d fs:\n", p->pid);
@@ -90,7 +90,7 @@ static int do_swap_process_fs(struct process_info *p)
 			goto err;
 	}
 
-	if (p->fs.cwd_fd) {
+	if (p->fs.cwd_fd >= 0) {
 		pr_debug("\t/proc/%d/fd/%d --> /proc/%d/cwd\n",
 				getpid(), p->fs.cwd_fd, p->pid);
 		err = swap_cwd(p->pctl, p->fs.cwd_fd);
