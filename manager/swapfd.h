@@ -41,4 +41,9 @@ int swap_root(struct parasite_ctl *ctl, int cwd_fd, const char *root,
 	      bool restore_cwd);
 int swap_cwd(struct parasite_ctl *ctl, int cwd_fd);
 
+
+int swap_map(struct parasite_ctl *ctl, int map_fd,
+	     unsigned long start, unsigned long end,
+	     int prot, int flags, unsigned long long pgoff);
+
 #endif
