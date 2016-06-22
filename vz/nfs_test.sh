@@ -85,8 +85,13 @@ NOT_DUMPABLE_SOCKETS_TEST_LIST="		\
 ALWAYS_FAIL_TEST_LIST="				\
 		static/file_locks01		\
 		"
-
 function vz_ct_exec {
+	local cmd=$1
+
+	echo $(vzctl exec $CTID $cmd)
+}
+
+function vz_ct_exec_silent {
 	local cmd=$1
 
 	$(vzctl exec $CTID $cmd > /dev/null)
@@ -102,7 +107,7 @@ function test_file_exist {
 	local test_name=$2
 	local file=$3
 
-	vz_ct_exec "test -f $test_dir/${test_name}.${file}"
+	vz_ct_exec_silent "test -f $test_dir/${test_name}.${file}"
 }
 
 function cat_test_file {
@@ -110,7 +115,7 @@ function cat_test_file {
 	local test_name=$2
 	local file=$3
 
-	echo $(vzctl exec $CTID cat $test_dir/${test_name}.${file})
+	vz_ct_exec "cat $test_dir/${test_name}.${file}"
 }
 
 function test_operation {
@@ -121,7 +126,25 @@ function test_operation {
 
 	IFS='/' read -ra array <<< "$test_name"
 
-	vz_ct_exec "make -C $test_dir/${array[0]} ${array[1]}.${op}"
+	vz_ct_exec_silent "make -C $test_dir/${array[0]} ${array[1]}.${op}"
+}
+
+function get_test_pid {
+	local test_dir=$1
+	local test_name=$2
+	local pid="0"
+
+	test_file_exist $test_dir $t "pid"
+	if [ $? -eq 0 ]; then
+		pid="$(cat_test_file $test_dir $t "pid")"
+	fi
+	echo $pid
+}
+
+function test_is_running {
+	local pid=$(get_test_pid $1 $2)
+	local res=$(vz_ct_exec "ps axf | grep \"^ $pid \" | awk '{print \$1;}'")
+	echo $res
 }
 
 function start_one_test {
@@ -142,12 +165,27 @@ function start_tests {
 	local test_dir=$1
 	local list=$2
 
+	running_tests=""
+
 	for t in $list; do
 		local pid="not found"
 
 		printf "\t%-*s: " $printf_test_len "$t"
 		test_file_exist $test_dir $t "c"
 		if [ $? -eq 0 ]; then
+			test_file_exist $test_dir $t "pid"
+			if [ $? -eq 0 ]; then
+				echo "already running"
+				running_tests="$running_tests $t"
+				continue
+			fi
+
+			test_file_exist $test_dir $t "out"
+			if [ $? -eq 0 ]; then
+				echo "dirty"
+				return 1
+			fi
+
 			start_one_test $test_dir $t
 			if [ $? -ne 0 ]; then
 				echo "failed to start $test_dir/$test_name"
@@ -173,7 +211,7 @@ function test_result {
 			return 1
 		fi
 		sleep 0.2
-		vz_ct_exec "test -f $test_dir/${t}.out" && break
+		vz_ct_exec_silent "test -f $test_dir/${t}.out" && break
 	done
 
 	out_file=$(cat_test_file $test_dir $t "out")
@@ -192,13 +230,20 @@ function stop_tests {
 	for (( idx=${#array[@]}-1 ; idx>=0 ; idx-- )) ; do
 		local t=${array[idx]}
 		printf "\t%-*s: " $printf_test_len "$t"
-		stop_one_test $test_dir $t
-		local out=$(test_result $test_dir $t "out")
-		printf "%s\n" "$out"
-		if [ "$out" == "PASS" ]; then
-			PASSED_TESTS="$PASSED_TESTS $t"
+
+		pid=$(test_is_running $test_dir $t)
+		if [ -n "$pid" ]; then
+			stop_one_test $test_dir $t
+			local out=$(test_result $test_dir $t "out")
+			printf "%s\n" "$out"
+			if [ "$out" == "PASS" ]; then
+				PASSED_TESTS="$PASSED_TESTS $t"
+			else
+				FAILED_TESTS="$FAILED_TESTS $t"
+			fi
 		else
-			FAILED_TESTS="$FAILED_TESTS $t"
+			printf "not running\n"
+			SKIPPED_TESTS="$SKIPPED_TESTS $t"
 		fi
 	done
 }
@@ -364,6 +409,13 @@ function stop_zdtm_tests {
 	echo "Stop tests:"
 	stop_tests $ZDTM_DIR "$running_tests"
 
+	if [ -n "$SKIPPED_TESTS" ]; then
+		echo "Skipped tests"
+		for t in $SKIPPED_TESTS; do
+			printf "\t%-*s: SKIP\n" $printf_test_len "$t"
+		done
+	fi
+
 	if [ -n "$FAILED_TESTS" ]; then
 		echo "Failed tests"
 		for t in $FAILED_TESTS; do
@@ -375,8 +427,8 @@ function stop_zdtm_tests {
 }
 
 function clean_tests_out {
-	vz_ct_exec "make -C $ZDTM_DIR cleanout"
-	vz_ct_exec "rm -rf $ZDTM_DIR/*/*.test*"
+	vz_ct_exec_silent "make -C $ZDTM_DIR cleanout"
+	vz_ct_exec_silent "rm -rf $ZDTM_DIR/*/*.test*"
 }
 
 function run_zdtm_tests {
@@ -446,6 +498,8 @@ done
 
 [ -n "$cmd" ] || cmd="run"
 [ -n "$tests_list" ] || tests_list="$TESTS_LIST"
+
+running_tests="$tests_list"
 
 case $cmd in
 	run)
