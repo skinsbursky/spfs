@@ -171,6 +171,68 @@ out:
 	return ret;
 }
 
+static int move_map(struct parasite_ctl *ctl,
+		    unsigned long start, unsigned long end, int dst_fd,
+		    int prot, int flags, unsigned long long pgoff)
+{
+	int ret;
+	unsigned long sret, addr;
+	size_t length = end - start;
+
+	ret = syscall_seized(ctl, __NR_msync, &sret, start, length, MS_SYNC, 0, 0, 0);
+	if (ret || sret) {
+		pr_err("Can't msync at [%lx; %lx], ret=%d, sret=%d\n",
+			start, end, ret, (int)(long)sret);
+		return -1;
+	}
+
+	pr_debug("mmap to replace %lx: len=%lx, prot=%x, flags=%x, off=%lx\n",
+		 start, length, prot, flags, pgoff);
+
+	addr = (unsigned long)mmap_seized(ctl, 0, length, prot, flags, dst_fd, pgoff);
+	if (!addr) {
+		pr_err("mmap failed\n");
+		return -1;
+	}
+
+	if (flags & MAP_PRIVATE) {
+		ret = copy_private_content(ctl, addr, start, length);
+		if (ret)
+			return -1;
+	}
+
+	flags = MREMAP_FIXED | MREMAP_MAYMOVE;
+	pr_debug("remapping %lx to %lx, size=%lx\n", addr, start, length);
+	ret = syscall_seized(ctl, __NR_mremap, &sret, addr, length, length, flags, start, 0);
+	if (ret || IS_ERR_VALUE(sret)) {
+		pr_err("Can't remap: ret=%d, sret=%d\n", ret, (int)(long)sret);
+		return -1;
+	}
+
+	return 0;
+}
+
+int swap_map(struct parasite_ctl *ctl, int map_fd,
+	     unsigned long start, unsigned long end,
+	     int prot, int flags, unsigned long long pgoff)
+{
+	int err, remote_fd;
+
+	remote_fd = transfer_local_fd(ctl, map_fd);
+	if (remote_fd < 0)
+		return remote_fd;
+
+	err = move_map(ctl, start, end, remote_fd, prot, flags, pgoff);
+	if (err)
+		return err;
+
+	err = close_seized(ctl, remote_fd);
+	if (err)
+		pr_err("Can't close temporary fd=%d, pid=%d\n", remote_fd, ctl->pid);
+
+	return err;
+}
+
 /* Find mapping starting at src_addr and make them backed by dst_fd */
 static int move_mappings(struct parasite_ctl *ctl, unsigned long src_addr, int dst_fd)
 {
