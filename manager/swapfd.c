@@ -72,7 +72,7 @@ static void *find_mapping(pid_t pid, struct parasite_ctl *ctl)
 		if (m.x != 'x' || m.start > TASK_SIZE)
 			continue;
 
-		pr_debug("Found: start=%08lx, end=%08lx, r=%c, w=%c, x=%c\n",
+		pr_debug("        Found: start=%08lx, end=%08lx, r=%c, w=%c, x=%c\n",
 				m.start, m.end, m.r, m.w, m.x);
 		result = (void *)m.start;
 		break;
@@ -152,7 +152,7 @@ static int move_map(struct parasite_ctl *ctl,
 		return -1;
 	}
 
-	pr_debug("mmap to replace %lx: len=%lx, prot=%x, flags=%x, off=%lx\n",
+	pr_debug("        mmap to replace %lx: len=%lx, prot=%x, flags=%x, off=%lx\n",
 		 start, length, prot, flags, pgoff);
 
 	addr = (unsigned long)mmap_seized(ctl, 0, length, prot, flags, dst_fd, pgoff);
@@ -168,7 +168,7 @@ static int move_map(struct parasite_ctl *ctl,
 	}
 
 	flags = MREMAP_FIXED | MREMAP_MAYMOVE;
-	pr_debug("remapping %lx to %lx, size=%lx\n", addr, start, length);
+	pr_debug("        remapping %lx to %lx, size=%lx\n", addr, start, length);
 	ret = syscall_seized(ctl, __NR_mremap, &sret, addr, length, length, flags, start, 0);
 	if (ret || IS_ERR_VALUE(sret)) {
 		pr_err("Can't remap: ret=%d, sret=%d\n", ret, (int)(long)sret);
@@ -256,7 +256,7 @@ static int set_dgram_socket(struct parasite_ctl *ctl)
 
 		memcpy(&ctl->remote_addr, addr, sizeof(*addr));
 		ctl->remote_addrlen = addrlen;
-		pr_debug("Set remote sock %s\n", addr->sun_path + 1);
+		pr_debug("        Set remote sock %s\n", addr->sun_path + 1);
 		break;
 	}
 
@@ -383,7 +383,7 @@ int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl)
 	}
 
 	*ret_ctl = ctl;
-	pr_debug("Set up parasite blob using memfd\n");
+	pr_debug("        Set up parasite blob using memfd\n");
 	return 0;
 
 err_curef:
