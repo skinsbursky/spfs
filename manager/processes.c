@@ -68,6 +68,21 @@ static int detach_from_process(const struct process_info *p)
 	return 0;
 }
 
+static int destroy_process_maps(struct process_info *p)
+{
+	struct process_map *mfd, *tmp;
+
+	if (!p->maps_nr)
+		return 0;
+
+	list_for_each_entry_safe(mfd, tmp, &p->maps, list) {
+		list_del(&mfd->list);
+		free(mfd);
+	}
+
+	return 0;
+}
+
 static int destroy_process_fds(struct process_info *p)
 {
 	struct process_fd *pfd, *tmp;
@@ -872,10 +887,12 @@ static int examine_one_process(struct process_info *p, struct mounts_info_s *mi)
 
 	err = collect_process_maps(p, mi);
 	if (err)
-		goto destroy_process_fds;
+		goto destroy_process_maps;
 
 	return 0;
 
+destroy_process_maps:
+	destroy_process_maps(p);
 destroy_process_fds:
 	destroy_process_fds(p);
 	return err;
