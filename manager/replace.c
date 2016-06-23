@@ -8,12 +8,13 @@
 #include "freeze.h"
 #include "swap.h"
 #include "processes.h"
+#include "context.h"
 
 static int do_replace_resources(struct freeze_cgroup_s *fg,
 				const char *source_mnt,
 				dev_t src_dev,
 				const char *target_mnt,
-				int *ns_fds, int *cur_ns_fds)
+				int *ns_fds)
 {
 	char *pids;
 	int err, ret;
@@ -36,7 +37,7 @@ static int do_replace_resources(struct freeze_cgroup_s *fg,
 
 	/* And we also want to revert mount namespace bask, so we can find the
 	 * freezer cgroup to thaw before seize. */
-	ret = set_namespaces(cur_ns_fds, NS_MNT_MASK);
+	ret = set_namespaces(ctx_ns_fds(), NS_MNT_MASK);
 	if (ret)
 		goto release_processes;
 
@@ -80,16 +81,6 @@ int __replace_resources(struct freeze_cgroup_s *fg, int *ns_fds,
 		      pid_t ns_pid)
 {
 	int err, status, pid;
-	int cur_ns_fds[NS_MAX];
-
-	/* We open current namespaces and pass them to child.
-	 * The reason for this is that we are going to fork child in a
-	 * different pid namespace, and it's won't be able to find itself by
-	 * virtual pid in proc.
-	 */
-	err = open_namespaces(getpid(), cur_ns_fds);
-	if (err)
-		return err;
 
 	/* Join target pid namespace to extract virtual pids from freezer cgroup.
 	 * This is required, because resources reopen must be performed in
@@ -99,7 +90,7 @@ int __replace_resources(struct freeze_cgroup_s *fg, int *ns_fds,
 	 */
 	err = set_namespaces(ns_fds, NS_PID_MASK);
 	if (err)
-		goto close_cur_ns_fds;
+		return err;
 
 	pid = fork();
 	switch (pid) {
@@ -108,15 +99,12 @@ int __replace_resources(struct freeze_cgroup_s *fg, int *ns_fds,
 			err = -errno;
 		case 0:
 			_exit(do_replace_resources(fg, source_mnt, src_dev,
-						   target_mnt,
-						   ns_fds, cur_ns_fds));
+						   target_mnt, ns_fds));
 	}
 
 	if (pid > 0)
 		err = collect_child(pid, &status, 0);
 
-close_cur_ns_fds:
-	close_namespaces(cur_ns_fds);
 	return err ? err : status;
 }
 
