@@ -26,6 +26,14 @@ struct mounts_info_s {
 	const char		*target_mnt;
 };
 
+struct fd_info_s {
+	int             fd;
+	struct stat     st;
+	unsigned        flags;
+	long long	pos;
+	char            path[PATH_MAX];
+};
+
 static int seize_one_process(struct process_info *p)
 {
 	if (wait_task_seized(p->pid)) {
@@ -266,8 +274,8 @@ static int get_link_path(const char *link,
 	return fixup_source_path(source_path, source_mnt, target_mnt, path, size);
 }
 
-static int process_add_fd(struct process_info *p, int source_fd, int target_fd,
-			  unsigned long cloexec, long long pos)
+static int process_add_fd(struct process_info *p, const struct fd_info_s *fdi,
+			  int target_fd)
 {
 	struct process_fd *pfd;
 
@@ -277,12 +285,10 @@ static int process_add_fd(struct process_info *p, int source_fd, int target_fd,
 		return -ENOMEM;
 	}
 
-	pfd->source_fd = source_fd;
+	pfd->source_fd = fdi->fd;
 	pfd->target_fd = target_fd;
-	pfd->cloexec = 0;
-	if (cloexec)
-		pfd->cloexec = FD_CLOEXEC;
-	pfd->pos = pos;
+	pfd->cloexec = (fdi->flags & O_CLOEXEC) ? FD_CLOEXEC : 0;
+	pfd->pos = fdi->pos;
 	list_add_tail(&pfd->list, &p->fds);
 	p->fds_nr++;
 
@@ -323,14 +329,6 @@ static int copy_process_fd(struct process_info *p, int fd)
 
 	return recv_fd(p->pctl, false);
 }
-
-struct fd_info_s {
-	int             fd;
-	struct stat     st;
-	unsigned        flags;
-	long long	pos;
-	char            path[PATH_MAX];
-};
 
 static int parse_fdinfo(pid_t pid, int fd, unsigned *flags, long long *pos)
 {
@@ -491,7 +489,7 @@ static int collect_process_fd(struct process_info *p, int dir,
 	pr_debug("\t/proc/%d/fd/%d ---> %s (fd: %d, flags: 0%o)\n",
 			p->pid, fdi.fd, path, target_fd, fdi.flags);
 
-	return process_add_fd(p, fdi.fd, target_fd, fdi.flags & O_CLOEXEC, fdi.pos);
+	return process_add_fd(p, &fdi, target_fd);
 }
 
 static int iterate_dir_name(const char *dpath, struct process_info *p,
