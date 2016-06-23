@@ -41,6 +41,7 @@ static void *fd_tree_root = NULL;
 static void *fd_table_tree_root = NULL;
 static void *fs_struct_tree_root = NULL;
 static void *map_fd_tree_root = NULL;
+static void *fifo_tree_root = NULL;
 
 static void free_fd_node(void *nodep)
 {
@@ -68,12 +69,18 @@ static void free_map_fd_node(void *nodep)
 	free(mfd);
 }
 
+static void free_fifo_node(void *nodep)
+{
+	free(nodep);
+}
+
 void destroy_obj_trees(void)
 {
 	tdestroy(fd_tree_root, free_fd_node);
 	tdestroy(fd_table_tree_root, free_fd_table_node);
 	tdestroy(fs_struct_tree_root, free_fs_struct_node);
 	tdestroy(map_fd_tree_root, free_map_fd_node);
+	tdestroy(fifo_tree_root, free_fifo_node);
 }
 
 static int kcmp(int type, pid_t pid1, pid_t pid2, unsigned long idx1, unsigned long idx2)
@@ -314,7 +321,5 @@ static int collect_path(const char *path, void **root)
 
 int collect_fifo(const char *path)
 {
-	static void *fifo_tree_root = NULL;
-
 	return collect_path(path, &fifo_tree_root);
 }
