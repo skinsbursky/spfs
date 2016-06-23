@@ -31,7 +31,7 @@ int open_ns(pid_t pid, const char *ns_type)
 	return fd;
 }
 
-int set_namespaces(int *ns_fds, unsigned ns_mask)
+int set_namespaces(const int *ns_fds, unsigned ns_mask)
 {
 	int ns_type, err;
 
