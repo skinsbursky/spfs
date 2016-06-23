@@ -16,4 +16,6 @@ int collect_map_fd(int fd, const char *path, mode_t mode, int *map_fd);
 
 int collect_fifo(const char *path);
 
+void destroy_obj_trees(void);
+
 #endif
