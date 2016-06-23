@@ -123,6 +123,8 @@ int release_processes(struct list_head *processes)
 	list_for_each_entry_safe(p, tmp, processes, list)
 		destroy_one_process(p);
 
+	destroy_obj_trees();
+
 	return 0;
 }
 

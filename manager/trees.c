@@ -23,10 +23,58 @@ enum kcmp_type {
 	KCMP_TYPES,
 };
 
+struct map_fd_s {
+	int map_fd;
+	char *path;
+	mode_t mode;
+};
+
+struct fd_table_s {
+	pid_t pid;
+};
+
+struct fs_struct_s {
+	pid_t pid;
+};
+
 static void *fd_tree_root = NULL;
 static void *fd_table_tree_root = NULL;
 static void *fs_struct_tree_root = NULL;
 static void *map_fd_tree_root = NULL;
+
+static void free_fd_node(void *nodep)
+{
+	struct replace_fd *rfd = nodep;
+	/*TODO close file_obj somehow... */
+
+	free(rfd);
+}
+
+static void free_fd_table_node(void *nodep)
+{
+	free(nodep);
+}
+
+static void free_fs_struct_node(void *nodep)
+{
+	free(nodep);
+}
+
+static void free_map_fd_node(void *nodep)
+{
+	struct map_fd_s *mfd = nodep;
+
+	close(mfd->map_fd);
+	free(mfd);
+}
+
+void destroy_obj_trees(void)
+{
+	tdestroy(fd_tree_root, free_fd_node);
+	tdestroy(fd_table_tree_root, free_fd_table_node);
+	tdestroy(fs_struct_tree_root, free_fs_struct_node);
+	tdestroy(map_fd_tree_root, free_map_fd_node);
+}
 
 static int kcmp(int type, pid_t pid1, pid_t pid2, unsigned long idx1, unsigned long idx2)
 {
@@ -95,10 +143,6 @@ free_new_fd:
 	return err;
 }
 
-struct fd_table_s {
-	pid_t pid;
-};
-
 static int compare_fd_tables(const void *a, const void *b)
 {
 	const struct fd_table_s *f = a, *s = b;
@@ -146,10 +190,6 @@ free_new_fdt:
 	return err;
 }
 
-struct fs_struct_s {
-	pid_t pid;
-};
-
 static int compare_fs_struct(const void *a, const void *b)
 {
 	const struct fs_struct_s *f = a, *s = b;
@@ -187,12 +227,6 @@ free_new_fs:
 		*exists = false;
 	return err;
 }
-
-struct map_fd_s {
-	int map_fd;
-	char *path;
-	mode_t mode;
-};
 
 static int compare_map_fd(const void *a, const void *b)
 {
