@@ -98,21 +98,30 @@ static int destroy_process_fds(struct process_info *p)
 	return 0;
 }
 
+static void destroy_one_process(struct process_info *p)
+{
+	destroy_process_maps(p);
+	destroy_process_fds(p);
+	list_del(&p->list);
+	free(p);
+}
+
 static void release_one_process(struct process_info *p)
 {
 	if (p->pctl)
 		(void) destroy_parasite_ctl(p->pid, p->pctl);
 	(void) detach_from_process(p);
-	list_del(&p->list);
-	free(p);
 }
 
 int release_processes(struct list_head *processes)
 {
 	struct process_info *p, *tmp;
 
-	list_for_each_entry_safe(p, tmp, processes, list)
+	list_for_each_entry(p, processes, list)
 		release_one_process(p);
+
+	list_for_each_entry_safe(p, tmp, processes, list)
+		destroy_one_process(p);
 
 	return 0;
 }
