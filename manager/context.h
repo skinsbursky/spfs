@@ -28,4 +28,6 @@ struct spfs_manager_context_s *create_context(int argc, char **argv);
 
 extern int spfs_manager_packet_handler(int sock, void *data, void *package, size_t psize);
 
+const int *ctx_ns_fds(void);
+
 #endif

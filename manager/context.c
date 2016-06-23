@@ -27,6 +27,11 @@
 
 static struct spfs_manager_context_s spfs_manager_context;
 
+const int *ctx_ns_fds(void)
+{
+	return spfs_manager_context.ns_fds;
+}
+
 static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)
 {
 	struct spfs_manager_context_s *ctx = &spfs_manager_context;
