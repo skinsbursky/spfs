@@ -143,7 +143,7 @@ function get_test_pid {
 
 function test_is_running {
 	local pid=$(get_test_pid $1 $2)
-	local res=$(vz_ct_exec "ps axf | grep \"^ $pid \" | awk '{print \$1;}'")
+	local res=$(vz_ct_exec "ps axf | grep \"^ *$pid \" | awk '{print \$1;}'")
 	echo $res
 }
 
