@@ -153,6 +153,7 @@ int add_spfs_info(struct shared_list *mounts, struct spfs_info_s *info)
 void del_spfs_info(struct shared_list *mounts, struct spfs_info_s *info)
 {
 	del_mount_info(mounts, &info->mnt);
+	close_namespaces(info->ns_fds);
 }
 
 int spfs_chroot(const struct spfs_info_s *info)
