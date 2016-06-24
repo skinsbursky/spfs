@@ -79,11 +79,6 @@ void del_mount_info(struct shared_list *mounts, struct mount_info_s *info)
 int init_mount_info(struct mount_info_s *mnt, const char *id,
 		    const char *mountpoint)
 {
-	if (stat(mountpoint, &mnt->st)) {
-		pr_perror("failed to stat %s", mountpoint);
-		return -errno;
-	}
-
 	mnt->mountpoint = shm_xsprintf(mountpoint);
 	mnt->id = shm_xsprintf(id);
 	if (!mnt->mountpoint || !mnt->id) {
