@@ -63,6 +63,7 @@ static void *find_mapping(pid_t pid, struct parasite_ctl *ctl)
 			continue;
 
 		result = (void *)start;
+		pr_debug("Using mapping: %s\n", line);
 		break;
 	}
 
