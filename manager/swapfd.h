@@ -3,6 +3,11 @@
 
 #include <stdbool.h>
 
+#define TASK_UNDEF              0x0
+#define TASK_ALIVE              0x1
+#define TASK_DEAD               0x2
+#define TASK_STOPPED            0x3
+
 struct swapfd_exchange {
 	pid_t		pid;
 
@@ -23,10 +28,17 @@ struct swapfd_exchange {
 	int		cwd_fd;		/* cwd fd or -1 */
 };
 
+struct proc_status_creds {
+	char                    state;
+	int                     ppid;
+	unsigned long long      sigpnd;
+	unsigned long long      shdpnd;
+};
+
 struct parasite_ctl;
 
 pid_t attach_to_task(pid_t pid);
-int detach_from_task(pid_t pid);
+int detach_from_task(pid_t pid, int orig_st);
 int wait_task_seized(pid_t pid);
 int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl);
 void destroy_parasite_ctl(pid_t pid, struct parasite_ctl *ctl);

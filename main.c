@@ -160,7 +160,7 @@ int main()
 	struct swapfd_exchange se;
 	struct parasite_ctl *ctl;
 	pid_t child;
-	int fd[2];
+	int fd[2], st = TASK_ALIVE;
 
 	memset(&se, 0, sizeof(se));
 
@@ -219,6 +219,8 @@ int main()
 	if (change_cgroup_state("FROZEN") < 0)
 		goto out_kill;
 
+	kill(child, SIGSTOP);
+
 	/* Entry point */
 	if (attach_to_task(child) != child) {
 		change_cgroup_state("THAWED");
@@ -228,7 +230,8 @@ int main()
 	if (change_cgroup_state("THAWED") < 0)
 		goto out_detach;
 
-	if (wait_task_seized(child) < 0)
+	st = wait_task_seized(child);
+	if (st < 0)
 		goto out_detach;
 
 	se.pid		= child;
@@ -257,9 +260,14 @@ int main()
 	if (swapfd_tracee(ctl, &se) == 0)
 		ret = 0;
 #endif
+	if (swap_fd(ctl, src[0], dst[0], 0, 0) == 0) {
+		pr_debug("Success\n");
+		ret = 0;
+	}
+
 	destroy_parasite_ctl(se.pid, ctl);
 out_detach:
-	detach_from_task(child);
+	detach_from_task(child, st);
 	/* Exit point */
 out_kill:
 	kill(child, SIGTERM);
