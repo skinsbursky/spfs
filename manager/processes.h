@@ -63,6 +63,7 @@ struct process_info {
 	struct list_head fds;
 	struct list_head maps;
 	struct parasite_ctl *pctl;
+	int orig_st;
 };
 
 #endif

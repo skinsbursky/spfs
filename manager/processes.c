@@ -36,7 +36,8 @@ struct fd_info_s {
 
 static int seize_one_process(struct process_info *p)
 {
-	if (wait_task_seized(p->pid)) {
+	p->orig_st = wait_task_seized(p->pid);
+	if (p->orig_st < 0) {
 		pr_err("failed to seize process %d\n", p->pid);
 		return -EPERM;
 	}
@@ -60,7 +61,7 @@ int seize_processes(struct list_head *processes)
 
 static int detach_from_process(const struct process_info *p)
 {
-	if (detach_from_task(p->pid)) {
+	if (detach_from_task(p->pid, p->orig_st)) {
 		pr_err("failed to detach from process %d\n", p->pid);
 		return -EPERM;
 	}
@@ -965,6 +966,7 @@ static struct process_info *create_process_info(pid_t pid)
 	p->fs.cwd_fd = -1;
 	p->fs.root = NULL;
 	p->pctl = NULL;
+	p->orig_st = TASK_UNDEF;
 	INIT_LIST_HEAD(&p->fds);
 	INIT_LIST_HEAD(&p->maps);
 
