@@ -43,6 +43,7 @@ struct spfs_info_s {
 	int			*mgr_ns_fds;
 	spfs_replace_mode_t	mode __attribute__((aligned(sizeof(int))));
 	int			replacer;
+	int			mnt_ref;
 };
 
 int create_spfs_info(const char *id, const char *mountpoint,

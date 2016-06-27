@@ -450,18 +450,11 @@ static int __do_replace_spfs_mounts(struct spfs_info_s *info, const char *source
 	int err;
 	struct spfs_bindmount *bm;
 	struct mount_info_s *mnt = &info->mnt;
-	int spfs_ref;
-
-	spfs_ref = open(mnt->mountpoint, O_RDONLY | O_DIRECTORY);
-	if (spfs_ref < 0) {
-		pr_perror("failed to open %s", mnt->mountpoint);
-		return spfs_ref;
-	}
 
 	err = lock_shared_list(&info->mountpaths);
 	if (err) {
 		pr_err("failed to lock info %s mount paths list\n", mnt->id);
-		goto close_spfs_ref;
+		return err;
 	}
 
 	list_for_each_entry(bm, &info->mountpaths.list, list) {
@@ -478,8 +471,6 @@ static int __do_replace_spfs_mounts(struct spfs_info_s *info, const char *source
 
 unlock_shared_list:
 	(void) unlock_shared_list(&info->mountpaths);
-close_spfs_ref:
-	close(spfs_ref);
 	return err;
 }
 
@@ -747,8 +738,16 @@ int update_spfs_info(struct spfs_info_s *info)
 		pr_perror("failed to stat spfs %s mount point (%s)", mnt->id,
 				mnt->mountpoint);
 		err = -errno;
+		goto set_orig_ns;
 	}
 
+	info->mnt_ref = open(mnt->mountpoint, O_PATH);
+	if (info->mnt_ref < 0) {
+		pr_perror("failed to open %s", mnt->mountpoint);
+		err = -errno;
+	}
+
+set_orig_ns:
 	res = set_namespaces(info->mgr_ns_fds, NS_MNT_MASK);
 
 	return err ? err : res;
