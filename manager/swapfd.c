@@ -812,9 +812,12 @@ pid_t attach_to_task(pid_t pid)
 	return pid;
 }
 
-int detach_from_task(pid_t pid)
+int detach_from_task(pid_t pid, int orig_st)
 {
 	int status, ret;
+
+	if (orig_st == TASK_STOPPED)
+		kill(pid, SIGSTOP);
 
 	ret = ptrace(PTRACE_DETACH, pid, NULL, NULL);
 	if (ret) {
@@ -830,32 +833,165 @@ int detach_from_task(pid_t pid)
 
 }
 
-int wait_task_seized(pid_t pid)
+static int parse_pid_status(pid_t pid, struct proc_status_creds *cr)
 {
-	int status, ret;
-	siginfo_t si;
+	char path[PATH_MAX];
+	FILE *fp;
+	int done = 0;
+	int ret = -1;
+	char *str = NULL;
+	size_t len;
 
-try_again:
-	ret = wait4(pid, &status, __WALL, NULL);
-	if (ret < 0) {
-		pr_perror("Can't wait %d", pid);
-		return ret;
+	sprintf(path, "/proc/%d/status", pid);
+
+	fp = fopen(path, "r");
+	if (!fp) {
+		pr_perror("Can't open proc status");
+		return -1;
 	}
 
-	if (WIFEXITED(status) || WIFSIGNALED(status)) {
-		pr_err("Task exited unexpected %d\n", pid);
-		return -1;
+	cr->sigpnd = 0;
+	cr->shdpnd = 0;
+
+	while (done < 3 && getline(&str, &len, fp) > 0) {
+		if (!strncmp(str, "State:", 6)) {
+			cr->state = str[7];
+			done++;
+			continue;
+		}
+
+		if (!strncmp(str, "ShdPnd:", 7)) {
+			unsigned long long sigpnd;
+
+			if (sscanf(str + 7, "%llx", &sigpnd) != 1)
+				goto err_parse;
+			cr->shdpnd |= sigpnd;
+
+			done++;
+			continue;
+		}
+		if (!strncmp(str, "SigPnd:", 7)) {
+			unsigned long long sigpnd;
+
+			if (sscanf(str + 7, "%llx", &sigpnd) != 1)
+				goto err_parse;
+			cr->sigpnd |= sigpnd;
+
+			done++;
+			continue;
+		}
+	}
+
+	if (done == 3)
+		ret = 0;
+
+err_parse:
+	if (ret)
+		pr_err("Error parsing proc status file\n");
+	free(str);
+	fclose(fp);
+	return ret;
+}
+
+static int skip_sigstop(int pid, int nr_signals)
+{
+	int i, status, ret;
+
+	/*
+	 * 1) SIGSTOP is queued, but isn't handled yet:
+	 * SGISTOP can't be blocked, so we need to wait when the kernel
+	 * handles this signal.
+	 *
+	 * Otherwise the process will be stopped immediatly after
+	 * starting it.
+	 *
+	 * 2) A seized task was stopped:
+	 * PTRACE_SEIZE doesn't affect signal or group stop state.
+	 * Currently ptrace reported that task is in stopped state.
+	 * We need to start task again, and it will be trapped
+	 * immediately, because we sent PTRACE_INTERRUPT to it.
+	 */
+	for (i = 0; i < nr_signals; i++) {
+		ret = ptrace(PTRACE_CONT, pid, 0, 0);
+		if (ret) {
+			pr_perror("Unable to start process");
+			return -1;
+		}
+
+		ret = wait4(pid, &status, __WALL, NULL);
+		if (ret < 0) {
+			pr_perror("SEIZE %d: can't wait task", pid);
+			return -1;
+		}
+
+		if (!WIFSTOPPED(status)) {
+			pr_err("SEIZE %d: task not stopped after seize\n", pid);
+			return -1;
+		}
+	}
+	return 0;
+}
+
+/*
+ * This routine seizes task putting it into a special
+ * state where we can manipulate the task via ptrace
+ * interface, and finally we can detach ptrace out of
+ * of it so the task would not know if it was saddled
+ * up with someone else.
+ */
+int wait_task_seized(pid_t pid)
+{
+	siginfo_t si;
+	int status, nr_sigstop;
+	int ret = 0, ret2, wait_errno = 0;
+	struct proc_status_creds cr;
+
+	/*
+	 * For the comparison below, let's zero out any padding.
+	 */
+	memset(&cr, 0, sizeof(struct proc_status_creds));
+
+try_again:
+
+	ret = wait4(pid, &status, __WALL, NULL);
+	if (ret < 0) {
+		/*
+		 * wait4() can expectedly fail only in a first time
+		 * if a task is zombie. If we are here from try_again,
+		 * this means that we are tracing this task.
+		 *
+		 * processes_to_wait should be descrimented only once in this
+		 * function if a first wait was success.
+		 */
+		wait_errno = errno;
+	}
+
+	ret2 = parse_pid_status(pid, &cr);
+	if (ret2)
+		goto err;
+
+	if (ret < 0 || WIFEXITED(status) || WIFSIGNALED(status)) {
+		if (cr.state != 'Z') {
+			if (pid == getpid())
+				pr_err("The criu itself is within dumped tree.\n");
+			else
+				pr_err("Unseizable non-zombie %d found, state %c, err %d/%d\n",
+						pid, cr.state, ret, wait_errno);
+			return -1;
+		}
+
+		return TASK_DEAD;
 	}
 
 	if (!WIFSTOPPED(status)) {
 		pr_err("SEIZE %d: task not stopped after seize\n", pid);
-		return -1;
+		goto err;
 	}
 
 	ret = ptrace(PTRACE_GETSIGINFO, pid, NULL, &si);
 	if (ret < 0) {
 		pr_perror("SEIZE %d: can't read signfo", pid);
-		return -1;
+		goto err;
 	}
 
 	if (SI_EVENT(si.si_code) != PTRACE_EVENT_STOP) {
@@ -864,15 +1000,44 @@ try_again:
 		 * event other than the STOP, i.e. -- a signal. Let the task
 		 * handle one and repeat.
 		 */
+
 		if (ptrace(PTRACE_CONT, pid, NULL,
 					(void *)(unsigned long)si.si_signo)) {
-			pr_perror("Can't continue signal handling, aborting, pid=%d, errno=%d", pid, errno);
-			return -1;
+			pr_perror("Can't continue signal handling, aborting");
+			goto err;
 		}
 
 		ret = 0;
 		goto try_again;
 	}
 
-	return 0;
+	nr_sigstop = 0;
+	if (cr.sigpnd & (1 << (SIGSTOP - 1)))
+		nr_sigstop++;
+	if (cr.shdpnd & (1 << (SIGSTOP - 1)))
+		nr_sigstop++;
+	if (si.si_signo == SIGSTOP)
+		nr_sigstop++;
+
+	if (nr_sigstop) {
+		if (skip_sigstop(pid, nr_sigstop))
+			goto err_stop;
+
+		return TASK_STOPPED;
+	}
+
+	if (si.si_signo == SIGTRAP)
+		return TASK_ALIVE;
+	else {
+		pr_err("SEIZE %d: unsupported stop signal %d\n", pid, si.si_signo);
+		goto err;
+	}
+
+err_stop:
+	kill(pid, SIGSTOP);
+err:
+	if (ptrace(PTRACE_DETACH, pid, NULL, NULL))
+		pr_perror("Unable to detach from %d", pid);
+	return -1;
 }
+
