@@ -3,11 +3,14 @@
 
 #include "include/list.h"
 
-struct mount_info_s;
+struct mounts_info_s;
 
 int get_pids_list(const char *tasks_file, char **list);
 
 int collect_processes(const char *pids, struct list_head *collection);
+
+int examine_processes(struct list_head *collection,
+		      const struct mounts_info_s *mi);
 
 int examine_processes_by_dev(struct list_head *collection,
 			     dev_t src_dev, const char *target_mnt);
