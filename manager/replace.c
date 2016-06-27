@@ -77,8 +77,7 @@ free_pids:
 
 int __replace_resources(struct freeze_cgroup_s *fg, int *ns_fds,
 		      const char *source_mnt, dev_t src_dev,
-		      const char *target_mnt,
-		      pid_t ns_pid)
+		      const char *target_mnt)
 {
 	int err, status, pid;
 
@@ -134,7 +133,7 @@ int replace_resources(struct freeze_cgroup_s *fg,
 	if (res)
 		goto close_ns_fds;
 
-	err = __replace_resources(fg, ns_fds, source_mnt, src_dev, target_mnt, ns_pid);
+	err = __replace_resources(fg, ns_fds, source_mnt, src_dev, target_mnt);
 
 	res = thaw_cgroup(fg);
 	if (!res)
