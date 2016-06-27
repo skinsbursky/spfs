@@ -578,7 +578,7 @@ close_dir:
 }
 
 static int collect_process_open_fds(struct process_info *p,
-				    struct mounts_info_s *mi)
+				    const struct mounts_info_s *mi)
 {
 	char dpath[PATH_MAX];
 
@@ -650,7 +650,7 @@ static int map_open_mode(int map_files_fd,
 
 static bool is_mnt_map(struct process_info *p, int dir,
 		       unsigned long start, unsigned long end,
-		       struct mounts_info_s *mi)
+		       const struct mounts_info_s *mi)
 {
 	char path[PATH_MAX];
 
@@ -673,7 +673,7 @@ static int map_prot(char r, char w, char x)
 }
 
 static int collect_process_maps(struct process_info *p,
-				struct mounts_info_s *mi)
+				const struct mounts_info_s *mi)
 {
 	char map[PATH_MAX];
 	FILE *fmap;
@@ -750,7 +750,7 @@ close_dir:
 }
 
 static int get_process_env(struct process_info *p,
-			   struct mounts_info_s *mi,
+			   const struct mounts_info_s *mi,
 			   const char *dentry, char *path, size_t size)
 {
 	char link[PATH_MAX];
@@ -760,7 +760,7 @@ static int get_process_env(struct process_info *p,
 }
 
 static int open_process_env(struct process_info *p,
-			    struct mounts_info_s *mi,
+			    const struct mounts_info_s *mi,
 			    const char *dentry)
 {
 	char path[PATH_MAX];
@@ -782,7 +782,7 @@ static int open_process_env(struct process_info *p,
 }
 
 static int collect_process_fs(struct process_info *p,
-			       struct mounts_info_s *mi,
+			       const struct mounts_info_s *mi,
 			       int dir)
 {
 	bool mnt_cwd, mnt_root;
@@ -826,7 +826,7 @@ static int collect_process_fs(struct process_info *p,
 }
 
 static int collect_process_exe(struct process_info *p,
-			       struct mounts_info_s *mi,
+			       const struct mounts_info_s *mi,
 			       int dir)
 {
 	if (!is_mnt_file(p, dir, "exe", mi->source_mnt, mi->src_dev))
@@ -840,7 +840,7 @@ static int collect_process_exe(struct process_info *p,
 }
 
 static int collect_process_env(struct process_info *p,
-			       struct mounts_info_s *mi)
+			       const struct mounts_info_s *mi)
 {
 	int dir, err;
 	char path[PATH_MAX];
@@ -864,7 +864,7 @@ close_dir:
 }
 
 static int collect_process_fds(struct process_info *p,
-			       struct mounts_info_s *mi)
+			       const struct mounts_info_s *mi)
 {
 	int err;
 
@@ -883,7 +883,7 @@ static int collect_process_fds(struct process_info *p,
 	return err;
 }
 
-static int examine_one_process(struct process_info *p, struct mounts_info_s *mi)
+static int examine_one_process(struct process_info *p, const struct mounts_info_s *mi)
 {
 	int err;
 
