@@ -910,20 +910,14 @@ destroy_process_fds:
 	return err;
 }
 
-static int examine_processes(struct list_head *collection,
-			     dev_t src_dev,
-			     const char *source_mnt, const char *target_mnt)
+int examine_processes(struct list_head *collection,
+		      const struct mounts_info_s *mi)
 {
-	struct mounts_info_s mi = {
-		.src_dev = src_dev,
-		.source_mnt = source_mnt,
-		.target_mnt = target_mnt,
-	};
 	struct process_info *p;
 	int err;
 
 	list_for_each_entry(p, collection, list) {
-		err = examine_one_process(p, &mi);
+		err = examine_one_process(p, mi);
 		if (err)
 			return err;
 	}
@@ -933,12 +927,22 @@ static int examine_processes(struct list_head *collection,
 int examine_processes_by_dev(struct list_head *collection,
 			     dev_t src_dev, const char *target_mnt)
 {
-	return examine_processes(collection, src_dev, NULL, target_mnt);
+	struct mounts_info_s mi = {
+		.src_dev = src_dev,
+		.source_mnt = NULL,
+		.target_mnt = target_mnt,
+	};
+
+	return examine_processes(collection, &mi);
 }
 
 int examine_processes_by_mnt(struct list_head *collection,
 			     const char *source_mnt, const char *target_mnt)
 {
+	struct mounts_info_s mi = {
+		.source_mnt = source_mnt,
+		.target_mnt = target_mnt,
+	};
 	struct stat st;
 
 	if (stat(source_mnt, &st) < 0) {
@@ -946,7 +950,9 @@ int examine_processes_by_mnt(struct list_head *collection,
 		return -errno;
 	}
 
-	return examine_processes(collection, st.st_dev, source_mnt, target_mnt);
+	mi.src_dev = st.st_dev;
+
+	return examine_processes(collection, &mi);
 }
 
 static struct process_info *create_process_info(pid_t pid)
