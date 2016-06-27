@@ -59,12 +59,22 @@ static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)
 		else
 			pr_err("%d killed by signal %d (%s)\n", pid, WTERMSIG(status), strsignal(WTERMSIG(status)));
 
-		info = find_spfs_by_pid(ctx->spfs_mounts, pid);
-		if (info) {
-			cleanup_spfs_mount(ctx, info, status);
-			if (list_empty(&ctx->spfs_mounts->list) && ctx->exit_with_spfs) {
-				pr_info("spfs list is empty. Exiting.\n");
-				exit(0);
+		info = find_spfs_by_replacer(ctx->spfs_mounts, pid);
+		if (info && (WEXITSTATUS(status) == 0)) {
+			/* SPFS has been successfully replaced.
+			 * Now we can release spfs mount by closing
+			 * corresponding fd.
+			 */
+			pr_debug("releasing spfs %s mount reference\n", info->mnt.id);
+			close(info->mnt_ref);
+		} else {
+			info = find_spfs_by_pid(ctx->spfs_mounts, pid);
+			if (info) {
+				cleanup_spfs_mount(ctx, info, status);
+				if (list_empty(&ctx->spfs_mounts->list) && ctx->exit_with_spfs) {
+					pr_info("spfs list is empty. Exiting.\n");
+					exit(0);
+				}
 			}
 		}
 	}
