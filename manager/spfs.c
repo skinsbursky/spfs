@@ -5,12 +5,16 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/xattr.h>
+#include <limits.h>
 
 #include "include/log.h"
 #include "include/util.h"
 #include "include/socket.h"
 #include "include/futex.h"
 #include "include/namespaces.h"
+
+#include "spfs/xattr.h"
 
 #include "spfs.h"
 #include "freeze.h"
@@ -787,4 +791,43 @@ int umount_spfs(struct spfs_info_s *info)
 	res = set_namespaces(info->mgr_ns_fds, NS_MNT_MASK);
 
 	return err ? err : res;
+}
+
+int spfs_link_remap(int mnt_fd, const char *rel_path, char *link_remap, size_t size)
+{
+	char path[PATH_MAX], *cwd;
+	int err = 0;
+
+	cwd = getcwd(path, PATH_MAX);
+	if (!cwd) {
+		pr_perror("failed to get cwd");
+		return -errno;
+	}
+
+	/* Why it's done via fchdir, when there if fgetxattr?
+	 * Because we need to open an fd otherwise. And it can be not only
+	 * regular file, but fifo. ANd it doesn't make sense to bring stat and
+	 * various "open" call for different file types here.
+	 */
+	if (fchdir(mnt_fd)) {
+		pr_perror("failed to chdir to mnt_fd %d", mnt_fd);
+		return -errno;
+	}
+
+	if (getxattr(rel_path, SPFS_XATTR_LINK_REMAP, link_remap, size) < 0) {
+		err = -errno;
+		if ((errno != ENODATA) && (errno != ENOTSUP))
+			pr_perror("failed to get xattr %s for %s",
+					SPFS_XATTR_LINK_REMAP, rel_path);
+		if (err == -ENOTSUP)
+			err = -ENODATA;
+	}
+
+	if (chdir(cwd)) {
+		pr_perror("failed to chdir to %s", cwd);
+		return -errno;
+	}
+
+	return err;
+
 }
