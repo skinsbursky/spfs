@@ -485,6 +485,9 @@ static int process_replace_cmd(int sock, struct spfs_manager_context_s *ctx,
 	if (err)
 		return err;
 
+	/* TODO: there can be races in spfs replacement. Is it a problem? */
+	info->replacer = getpid();
+
 	return replace_spfs(sock, info, opt_source, opt_type, opt_flags, opts);
 }
 

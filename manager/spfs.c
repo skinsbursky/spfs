@@ -115,11 +115,29 @@ static bool spfs_pid_match(const struct mount_info_s *mnt, const void *data)
 	return info->pid == pid;
 }
 
+static bool spfs_replacer_match(const struct mount_info_s *mnt, const void *data)
+{
+	pid_t pid = (pid_t)(unsigned long)data;
+	const struct spfs_info_s *info = container_of(mnt, const struct spfs_info_s, mnt);
+
+	return info->replacer == pid;
+}
+
 struct spfs_info_s *find_spfs_by_pid(struct shared_list *mounts, pid_t pid)
 {
 	struct mount_info_s *mnt;
 
 	mnt = iterate_mounts(mounts, (void *)(unsigned long)pid, spfs_pid_match);
+	if (mnt)
+		return container_of(mnt, struct spfs_info_s, mnt);
+	return NULL;
+}
+
+struct spfs_info_s *find_spfs_by_replacer(struct shared_list *mounts, pid_t pid)
+{
+	struct mount_info_s *mnt;
+
+	mnt = iterate_mounts(mounts, (void *)(unsigned long)pid, spfs_replacer_match);
 	if (mnt)
 		return container_of(mnt, struct spfs_info_s, mnt);
 	return NULL;

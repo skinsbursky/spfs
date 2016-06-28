@@ -42,6 +42,7 @@ struct spfs_info_s {
 	const char		*ovz_id;
 	int			*mgr_ns_fds;
 	spfs_replace_mode_t	mode __attribute__((aligned(sizeof(int))));
+	int			replacer;
 };
 
 int create_spfs_info(const char *id, const char *mountpoint,
@@ -54,6 +55,7 @@ int umount_spfs(struct spfs_info_s *info);
 
 struct spfs_info_s *find_spfs_by_id(struct shared_list *mounts, const char *id);
 struct spfs_info_s *find_spfs_by_pid(struct shared_list *mounts, pid_t pid);
+struct spfs_info_s *find_spfs_by_replacer(struct shared_list *mounts, pid_t pid);
 int add_spfs_info(struct shared_list *mounts, struct spfs_info_s *info);
 void del_spfs_info(struct shared_list *mounts, struct spfs_info_s *info);
 
