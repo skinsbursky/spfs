@@ -446,28 +446,28 @@ close_local_fd:
 	return err;
 }
 
-static int is_mnt_fd(const struct fd_info_s *fdi, const struct mounts_info_s *mi)
+static int is_mnt_fd(const struct fd_info_s *fdi, const struct replace_info_s *ri)
 {
 	/* First check, that link points to the desired mount (if any).
 	 * This is required to be able to switch between 2 different mounts
 	 * with the same superblock.
 	 */
-	if (mi->source_mnt) {
-		if (strncmp(fdi->path, mi->source_mnt, strlen(mi->source_mnt)))
+	if (ri->source_mnt) {
+		if (strncmp(fdi->path, ri->source_mnt, strlen(ri->source_mnt)))
 			return false;
 
-		if (fdi->path[strlen(mi->source_mnt)] != '/')
+		if (fdi->path[strlen(ri->source_mnt)] != '/')
 			return false;
 	}
 
-	return fdi->st.st_dev == mi->src_dev;
+	return fdi->st.st_dev == ri->src_dev;
 }
 
 static int collect_process_fd(struct process_info *p, int dir,
 			      const char *process_fd, const void *data)
 {
 	int err, target_fd;
-	const struct mounts_info_s *mi = data;
+	const struct replace_info_s *ri = data;
 	struct replace_fd *rfd;
 	char path[PATH_MAX];
 	struct fd_info_s fdi;
@@ -478,7 +478,7 @@ static int collect_process_fd(struct process_info *p, int dir,
 	 * other checks.
 	 */
 	if (fstatat(dir, process_fd, &fdi.st, 0) == 0) {
-		if (fdi.st.st_dev != mi->src_dev)
+		if (fdi.st.st_dev != ri->src_dev)
 			return 0;
 	}
 
@@ -486,7 +486,7 @@ static int collect_process_fd(struct process_info *p, int dir,
 	if (err)
 		return err;
 
-	if (!is_mnt_fd(&fdi, mi))
+	if (!is_mnt_fd(&fdi, ri))
 		return 0;
 
 	err = collect_fd(p->pid, fdi.fd, &rfd);
@@ -495,7 +495,7 @@ static int collect_process_fd(struct process_info *p, int dir,
 		return err;
 	}
 
-	err = fixup_source_path(fdi.path, mi->source_mnt, mi->target_mnt,
+	err = fixup_source_path(fdi.path, ri->source_mnt, ri->target_mnt,
 				path, sizeof(path));
 	if (err)
 		return err;
@@ -572,12 +572,12 @@ close_dir:
 }
 
 static int collect_process_open_fds(struct process_info *p,
-				    const struct mounts_info_s *mi)
+				    const struct replace_info_s *ri)
 {
 	char dpath[PATH_MAX];
 
 	snprintf(dpath, PATH_MAX, "/proc/%d/fd", p->pid);
-	return iterate_dir_name(dpath, p, collect_process_fd, mi, "collect_process_fd");
+	return iterate_dir_name(dpath, p, collect_process_fd, ri, "collect_process_fd");
 }
 
 static int collect_map_file(struct process_info *p,
@@ -644,12 +644,12 @@ static int map_open_mode(int map_files_fd,
 
 static bool is_mnt_map(struct process_info *p, int dir,
 		       unsigned long start, unsigned long end,
-		       const struct mounts_info_s *mi)
+		       const struct replace_info_s *ri)
 {
 	char path[PATH_MAX];
 
 	snprintf(path, PATH_MAX, "%lx-%lx", start, end);
-	return is_mnt_file(p, dir, path, mi->source_mnt, mi->src_dev);
+	return is_mnt_file(p, dir, path, ri->source_mnt, ri->src_dev);
 }
 
 static int map_prot(char r, char w, char x)
@@ -667,7 +667,7 @@ static int map_prot(char r, char w, char x)
 }
 
 static int collect_process_maps(struct process_info *p,
-				const struct mounts_info_s *mi)
+				const struct replace_info_s *ri)
 {
 	char map[PATH_MAX];
 	FILE *fmap;
@@ -712,13 +712,13 @@ static int collect_process_maps(struct process_info *p,
 		if (!ino)
 			continue;
 
-		if (!is_mnt_map(p, dir, start, end, mi))
+		if (!is_mnt_map(p, dir, start, end, ri))
 			continue;
 
 		map_file = map + path_off;
 
 		err = fixup_source_path(map_file,
-					mi->source_mnt, mi->target_mnt,
+					ri->source_mnt, ri->target_mnt,
 					path, sizeof(path));
 		if (err)
 			goto close_fmap;
@@ -744,23 +744,23 @@ close_dir:
 }
 
 static int get_process_env(struct process_info *p,
-			   const struct mounts_info_s *mi,
+			   const struct replace_info_s *ri,
 			   const char *dentry, char *path, size_t size)
 {
 	char link[PATH_MAX];
 
 	snprintf(link, PATH_MAX, "/proc/%d/%s", p->pid, dentry);
-	return get_link_path(link, mi->source_mnt, mi->target_mnt, path, size);
+	return get_link_path(link, ri->source_mnt, ri->target_mnt, path, size);
 }
 
 static int open_process_env(struct process_info *p,
-			    const struct mounts_info_s *mi,
+			    const struct replace_info_s *ri,
 			    const char *dentry)
 {
 	char path[PATH_MAX];
 	int err, fd;
 
-	err = get_process_env(p, mi, dentry, path, sizeof(path));
+	err = get_process_env(p, ri, dentry, path, sizeof(path));
 	if (err)
 		return err;
 
@@ -776,15 +776,15 @@ static int open_process_env(struct process_info *p,
 }
 
 static int collect_process_fs(struct process_info *p,
-			       const struct mounts_info_s *mi,
+			       const struct replace_info_s *ri,
 			       int dir)
 {
 	bool mnt_cwd, mnt_root;
 	int err;
 	bool exists;
 
-	mnt_cwd = is_mnt_file(p, dir, "cwd", mi->source_mnt, mi->src_dev);
-	mnt_root = is_mnt_file(p, dir, "root", mi->source_mnt, mi->src_dev);
+	mnt_cwd = is_mnt_file(p, dir, "cwd", ri->source_mnt, ri->src_dev);
+	mnt_root = is_mnt_file(p, dir, "root", ri->source_mnt, ri->src_dev);
 
 	if (!mnt_cwd && ! mnt_root)
 		return 0;
@@ -800,7 +800,7 @@ static int collect_process_fs(struct process_info *p,
 	}
 
 	if (mnt_cwd) {
-		p->fs.cwd_fd = open_process_env(p, mi, "cwd");
+		p->fs.cwd_fd = open_process_env(p, ri, "cwd");
 		if (p->fs.cwd_fd < 0)
 			return p->fs.cwd_fd;
 	}
@@ -808,7 +808,7 @@ static int collect_process_fs(struct process_info *p,
 	if (mnt_root) {
 		char path[PATH_MAX];
 
-		err = get_process_env(p, mi, "root", path, sizeof(path));
+		err = get_process_env(p, ri, "root", path, sizeof(path));
 		if (err)
 			return err;
 
@@ -820,13 +820,13 @@ static int collect_process_fs(struct process_info *p,
 }
 
 static int collect_process_exe(struct process_info *p,
-			       const struct mounts_info_s *mi,
+			       const struct replace_info_s *ri,
 			       int dir)
 {
-	if (!is_mnt_file(p, dir, "exe", mi->source_mnt, mi->src_dev))
+	if (!is_mnt_file(p, dir, "exe", ri->source_mnt, ri->src_dev))
 		return 0;
 
-	p->exe_fd = open_process_env(p, mi, "exe");
+	p->exe_fd = open_process_env(p, ri, "exe");
 	if (p->exe_fd < 0)
 		return p->exe_fd;
 
@@ -834,7 +834,7 @@ static int collect_process_exe(struct process_info *p,
 }
 
 static int collect_process_env(struct process_info *p,
-			       const struct mounts_info_s *mi)
+			       const struct replace_info_s *ri)
 {
 	int dir, err;
 	char path[PATH_MAX];
@@ -846,11 +846,11 @@ static int collect_process_env(struct process_info *p,
 		return -errno;
 	}
 
-	err = collect_process_exe(p, mi, dir);
+	err = collect_process_exe(p, ri, dir);
 	if (err)
 		goto close_dir;
 
-	err = collect_process_fs(p, mi, dir);
+	err = collect_process_fs(p, ri, dir);
 
 close_dir:
 	close(dir);
@@ -858,7 +858,7 @@ close_dir:
 }
 
 static int collect_process_fds(struct process_info *p,
-			       const struct mounts_info_s *mi)
+			       const struct replace_info_s *ri)
 {
 	int err;
 
@@ -867,7 +867,7 @@ static int collect_process_fds(struct process_info *p,
 		return 0;
 	}
 
-	err = collect_process_open_fds(p, mi);
+	err = collect_process_open_fds(p, ri);
 	if (err)
 		return err;
 
@@ -877,21 +877,21 @@ static int collect_process_fds(struct process_info *p,
 	return err;
 }
 
-static int examine_one_process(struct process_info *p, const struct mounts_info_s *mi)
+static int examine_one_process(struct process_info *p, const struct replace_info_s *ri)
 {
 	int err;
 
 	pr_debug("Process %d: examining...\n", p->pid);
 
-	err = collect_process_env(p, mi);
+	err = collect_process_env(p, ri);
 	if (err)
 		return err;
 
-	err = collect_process_fds(p, mi);
+	err = collect_process_fds(p, ri);
 	if (err)
 		goto destroy_process_fds;
 
-	err = collect_process_maps(p, mi);
+	err = collect_process_maps(p, ri);
 	if (err)
 		goto destroy_process_maps;
 
@@ -905,13 +905,13 @@ destroy_process_fds:
 }
 
 int examine_processes(struct list_head *collection,
-		      const struct mounts_info_s *mi)
+		      const struct replace_info_s *ri)
 {
 	struct process_info *p;
 	int err;
 
 	list_for_each_entry(p, collection, list) {
-		err = examine_one_process(p, mi);
+		err = examine_one_process(p, ri);
 		if (err)
 			return err;
 	}
