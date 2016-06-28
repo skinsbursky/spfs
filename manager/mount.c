@@ -1,6 +1,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <sys/mount.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include "include/log.h"
 #include "include/shm.h"

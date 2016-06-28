@@ -1,4 +1,7 @@
 #include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include "include/util.h"
 #include "include/log.h"
@@ -69,12 +72,13 @@ free_pids:
 }
 
 int __replace_resources(struct freeze_cgroup_s *fg, int *ns_fds,
-		      const char *source_mnt, dev_t src_dev,
+		      const char *source_mnt, dev_t src_dev, int src_mnt_ref,
 		      const char *target_mnt)
 {
 	int err, status, pid;
 	struct replace_info_s ri = {
 		.src_dev = src_dev,
+		.src_mnt_ref = src_mnt_ref,
 		.source_mnt = source_mnt,
 		.target_mnt = target_mnt,
 	};
@@ -109,7 +113,7 @@ int replace_resources(struct freeze_cgroup_s *fg,
 		      const char *target_mnt,
 		      pid_t ns_pid)
 {
-	int res, err;
+	int res, err, src_mnt_ref = -1;
 	int ct_ns_fds[NS_MAX], *ns_fds = NULL;
 
 	if (ns_pid) {
@@ -121,6 +125,15 @@ int replace_resources(struct freeze_cgroup_s *fg,
 		ns_fds = ct_ns_fds;
 	}
 
+	if (source_mnt) {
+		src_mnt_ref = open(source_mnt, O_PATH);
+		if (src_mnt_ref < 0) {
+			res = -errno;
+			pr_perror("failed to open %s", source_mnt);
+			goto close_ns_fds;
+		}
+	}
+
 	res = lock_cgroup(fg);
 	if (!res) {
 		res = freeze_cgroup(fg);
@@ -128,14 +141,18 @@ int replace_resources(struct freeze_cgroup_s *fg,
 			(void) unlock_cgroup(fg);
 	}
 	if (res)
-		goto close_ns_fds;
+		goto close_mnt_ref;
 
-	err = __replace_resources(fg, ns_fds, source_mnt, src_dev, target_mnt);
+	err = __replace_resources(fg, ns_fds, source_mnt, src_dev, src_mnt_ref,
+				  target_mnt);
 
 	res = thaw_cgroup(fg);
 	if (!res)
 		(void) unlock_cgroup(fg);
 
+close_mnt_ref:
+	if (src_mnt_ref != -1)
+		close(src_mnt_ref);
 close_ns_fds:
 	if (ns_fds)
 		close_namespaces(ns_fds);

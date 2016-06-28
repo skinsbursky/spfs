@@ -6,7 +6,7 @@
 struct freeze_cgroup_s;
 
 int __replace_resources(struct freeze_cgroup_s *fg, int *ns_fds,
-			const char *source_mnt, dev_t src_dev,
+		        const char *source_mnt, dev_t src_dev, int src_mnt_ref,
 			const char *target_mnt);
 
 int replace_resources(struct freeze_cgroup_s *fg,
