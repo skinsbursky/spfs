@@ -153,12 +153,6 @@ repeat:
 		goto umount_spfs;
 	}
 
-	info->sock = seqpacket_sock(info->socket_path, true, false, NULL);
-	if (info->sock < 0) {
-		pr_err("failed to connect to spfs with id %s\n", info->mnt.id);
-		goto umount_spfs;
-	}
-
 	status = 0;
 	pr_info("%s: spfs on %s with pid %d started successfully\n", __func__,
 			info->mnt.mountpoint, pid);
@@ -174,6 +168,7 @@ close_pipe:
 kill_spfs:
 	kill_child_and_collect(pid);
 umount_spfs:
+	/* TODO this umount won't work */
 	umount(info->mnt.mountpoint);
 	spfs_cleanup_env(info);
 	goto close_pipe;
@@ -238,12 +233,10 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 		}
 	}
 
-	err = create_spfs_info(opt_id, opt_mountpoint, ns_pid, opt_root, &info);
+	err = create_spfs_info(opt_id, opt_mountpoint, ns_pid, opt_root,
+			       ctx->ns_fds, ctx->ovz_id, &info);
 	if (err)
 		return err;
-
-	info->ovz_id = ctx->ovz_id;
-	info->orig_ns_fds = ctx->ns_fds;
 
 	err = mount_spfs(ctx, info, opt_mode, opt_proxy_dir);
 	if (err) {
@@ -251,7 +244,21 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 		return err;
 	}
 
-	return add_spfs_info(ctx->spfs_mounts, info);
+	err = update_spfs_info(info);
+	if (err)
+		goto umount_spfs;
+
+	err = add_spfs_info(ctx->spfs_mounts, info);
+	if (err)
+		goto release_spfs;
+
+	return 0;
+
+release_spfs:
+	release_spfs_info(info);
+umount_spfs:
+	umount_spfs(info);
+	return err;
 }
 
 static int change_spfs_mode(struct spfs_manager_context_s *ctx,
