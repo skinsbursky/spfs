@@ -555,12 +555,21 @@ static int process_switch_cmd(int sock, struct spfs_manager_context_s *ctx,
 	}
 
 	if (source_mnt) {
+		struct stat st;
+
 		source_mnt = canonicalize_file_name(source_mnt);
 		if (!source_mnt) {
 			pr_perror("failed to get %s canonical view", opt_array[0].value);
 			err = -errno;
 			goto free_target_mnt;
 		}
+
+		if (stat(source_mnt, &st) < 0) {
+			pr_perror("failed to stat %s", source_mnt);
+			err = -errno;
+			goto free_target_mnt;
+		}
+		src_dev = st.st_dev;
 	}
 
 	err = replace_resources(fg, source_mnt, src_dev, target_mnt, ns_pid);

@@ -20,12 +20,6 @@
 #include "file_obj.h"
 #include "swapfd.h"
 
-struct mounts_info_s {
-	dev_t			src_dev;
-	const char		*source_mnt;
-	const char		*target_mnt;
-};
-
 struct fd_info_s {
 	int             fd;
 	struct stat     st;
@@ -922,37 +916,6 @@ int examine_processes(struct list_head *collection,
 			return err;
 	}
 	return 0;
-}
-
-int examine_processes_by_dev(struct list_head *collection,
-			     dev_t src_dev, const char *target_mnt)
-{
-	struct mounts_info_s mi = {
-		.src_dev = src_dev,
-		.source_mnt = NULL,
-		.target_mnt = target_mnt,
-	};
-
-	return examine_processes(collection, &mi);
-}
-
-int examine_processes_by_mnt(struct list_head *collection,
-			     const char *source_mnt, const char *target_mnt)
-{
-	struct mounts_info_s mi = {
-		.source_mnt = source_mnt,
-		.target_mnt = target_mnt,
-	};
-	struct stat st;
-
-	if (stat(source_mnt, &st) < 0) {
-		pr_perror("failed to stat %s", source_mnt);
-		return -errno;
-	}
-
-	mi.src_dev = st.st_dev;
-
-	return examine_processes(collection, &mi);
 }
 
 static struct process_info *create_process_info(pid_t pid)
