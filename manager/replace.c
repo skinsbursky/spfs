@@ -11,9 +11,7 @@
 #include "context.h"
 
 static int do_replace_resources(struct freeze_cgroup_s *fg,
-				const char *source_mnt,
-				dev_t src_dev,
-				const char *target_mnt,
+				struct mounts_info_s *mi,
 				int *ns_fds)
 {
 	char *pids;
@@ -57,12 +55,7 @@ static int do_replace_resources(struct freeze_cgroup_s *fg,
 	if (err)
 		goto release_processes;
 
-	if (source_mnt)
-		err = examine_processes_by_mnt(&processes,
-					       source_mnt, target_mnt);
-	else
-		err = examine_processes_by_dev(&processes,
-					       src_dev, target_mnt);
+	err = examine_processes(&processes, mi);
 	if (err)
 		goto release_processes;
 
@@ -80,6 +73,11 @@ int __replace_resources(struct freeze_cgroup_s *fg, int *ns_fds,
 		      const char *target_mnt)
 {
 	int err, status, pid;
+	struct mounts_info_s mi = {
+		.src_dev = src_dev,
+		.source_mnt = source_mnt,
+		.target_mnt = target_mnt,
+	};
 
 	/* Join target pid namespace to extract virtual pids from freezer cgroup.
 	 * This is required, because resources reopen must be performed in
@@ -97,8 +95,7 @@ int __replace_resources(struct freeze_cgroup_s *fg, int *ns_fds,
 			pr_perror("failed to fork");
 			err = -errno;
 		case 0:
-			_exit(do_replace_resources(fg, source_mnt, src_dev,
-						   target_mnt, ns_fds));
+			_exit(do_replace_resources(fg, &mi, ns_fds));
 	}
 
 	if (pid > 0)
