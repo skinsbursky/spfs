@@ -13,23 +13,9 @@
 #include "include/namespaces.h"
 
 #include "spfs.h"
-#include "context.h"
 #include "freeze.h"
 #include "replace.h"
 #include "cgroup.h"
-
-void cleanup_spfs_mount(struct spfs_info_s *info, int status)
-{
-	pr_debug("removing info %s from the list\n", info->mnt.id);
-	info->dead = true;
-	list_del(&info->mnt.list);
-	unlink(info->socket_path);
-
-	if (WIFEXITED(status) && (WEXITSTATUS(status) == 0))
-		spfs_cleanup_env(info);
-
-	close_namespaces(info->ns_fds);
-}
 
 int create_spfs_info(const char *id, const char *mountpoint,
 		     pid_t ns_pid, const char *root,

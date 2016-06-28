@@ -44,7 +44,6 @@ struct spfs_info_s {
 	spfs_replace_mode_t	mode __attribute__((aligned(sizeof(int))));
 };
 
-void cleanup_spfs_mount(struct spfs_info_s *info, int status);
 int create_spfs_info(const char *id, const char *mountpoint,
 		     pid_t ns_pid, const char *root,
 		     int *ctx_ns_fds, const char *ovz_id,

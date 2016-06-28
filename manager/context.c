@@ -32,6 +32,19 @@ const int *ctx_ns_fds(void)
 	return spfs_manager_context.ns_fds;
 }
 
+static void cleanup_spfs_mount(struct spfs_manager_context_s *ctx,
+			       struct spfs_info_s *info, int status)
+{
+	pr_debug("removing info %s from the list\n", info->mnt.id);
+	info->dead = true;
+	unlink(info->socket_path);
+
+	if (WIFEXITED(status) && (WEXITSTATUS(status) == 0))
+		spfs_cleanup_env(info);
+
+	del_spfs_info(ctx->spfs_mounts, info);
+}
+
 static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)
 {
 	struct spfs_manager_context_s *ctx = &spfs_manager_context;
@@ -48,7 +61,7 @@ static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)
 
 		info = find_spfs_by_pid(ctx->spfs_mounts, pid);
 		if (info) {
-			cleanup_spfs_mount(info, status);
+			cleanup_spfs_mount(ctx, info, status);
 			if (list_empty(&ctx->spfs_mounts->list) && ctx->exit_with_spfs) {
 				pr_info("spfs list is empty. Exiting.\n");
 				exit(0);
