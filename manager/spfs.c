@@ -33,6 +33,7 @@ void cleanup_spfs_mount(struct spfs_info_s *info, int status)
 
 int create_spfs_info(const char *id, const char *mountpoint,
 		     pid_t ns_pid, const char *root,
+		     int *ctx_ns_fds, const char *ovz_id,
 		     struct spfs_info_s **i)
 {
 	struct spfs_info_s *info;
@@ -109,6 +110,9 @@ int create_spfs_info(const char *id, const char *mountpoint,
 
 	INIT_LIST_HEAD(&info->mnt.list);
 	INIT_LIST_HEAD(&info->processes);
+
+	info->ovz_id = ovz_id;
+	info->orig_ns_fds = ctx_ns_fds;
 
 	info->mode = SPFS_REPLACE_MODE_HOLD;
 
@@ -444,11 +448,6 @@ static int __do_replace_spfs_mounts(struct spfs_info_s *info, const char *source
 	struct mount_info_s *mnt = &info->mnt;
 	int spfs_ref;
 
-	if (stat(mnt->mountpoint, &mnt->st)) {
-		pr_perror("failed to stat %s", mnt->mountpoint);
-		return -errno;
-	}
-
 	spfs_ref = open(mnt->mountpoint, O_RDONLY | O_DIRECTORY);
 	if (spfs_ref < 0) {
 		pr_perror("failed to open %s", mnt->mountpoint);
@@ -722,4 +721,60 @@ free_mountpoint:
 free_cwd:
 	free(cwd);
 	return err;
+}
+
+int update_spfs_info(struct spfs_info_s *info)
+{
+	struct mount_info_s *mnt = &info->mnt;
+	int err, res;
+
+	info->sock = seqpacket_sock(info->socket_path, true, false, NULL);
+	if (info->sock < 0) {
+		pr_err("failed to connect to spfs with id %s\n", mnt->id);
+		return info->sock;
+	}
+
+	res = join_spfs_context(info, NS_MNT_MASK);
+	if (res)
+		return res;
+
+	err = stat(mnt->mountpoint, &mnt->st);
+	if (err) {
+		pr_perror("failed to stat spfs %s mount point (%s)", mnt->id,
+				mnt->mountpoint);
+		err = -errno;
+	}
+
+	res = set_namespaces(info->orig_ns_fds, NS_MNT_MASK);
+
+	return err ? err : res;
+}
+
+int release_spfs_info(struct spfs_info_s *info)
+{
+	close(info->sock);
+	return 0;
+}
+
+int umount_spfs(struct spfs_info_s *info)
+{
+	struct mount_info_s *mnt = &info->mnt;
+	int err, res;
+
+	res = join_spfs_context(info, NS_MNT_MASK);
+	if (res)
+		return res;
+
+	err = umount(info->mnt.mountpoint);
+	if (err) {
+		pr_perror("failed to unmount spfs %s (%s)", mnt->id,
+				mnt->mountpoint);
+		err = -errno;
+	}
+	if (!err)
+		err = __spfs_cleanup_env(info);
+
+	res = set_namespaces(info->orig_ns_fds, NS_MNT_MASK);
+
+	return err ? err : res;
 }
