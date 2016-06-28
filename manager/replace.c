@@ -11,7 +11,7 @@
 #include "context.h"
 
 static int do_replace_resources(struct freeze_cgroup_s *fg,
-				struct mounts_info_s *mi,
+				struct replace_info_s *ri,
 				int *ns_fds)
 {
 	char *pids;
@@ -55,7 +55,7 @@ static int do_replace_resources(struct freeze_cgroup_s *fg,
 	if (err)
 		goto release_processes;
 
-	err = examine_processes(&processes, mi);
+	err = examine_processes(&processes, ri);
 	if (err)
 		goto release_processes;
 
@@ -73,7 +73,7 @@ int __replace_resources(struct freeze_cgroup_s *fg, int *ns_fds,
 		      const char *target_mnt)
 {
 	int err, status, pid;
-	struct mounts_info_s mi = {
+	struct replace_info_s ri = {
 		.src_dev = src_dev,
 		.source_mnt = source_mnt,
 		.target_mnt = target_mnt,
@@ -95,7 +95,7 @@ int __replace_resources(struct freeze_cgroup_s *fg, int *ns_fds,
 			pr_perror("failed to fork");
 			err = -errno;
 		case 0:
-			_exit(do_replace_resources(fg, &mi, ns_fds));
+			_exit(do_replace_resources(fg, &ri, ns_fds));
 	}
 
 	if (pid > 0)

@@ -3,7 +3,7 @@
 
 #include "include/list.h"
 
-struct mounts_info_s {
+struct replace_info_s {
 	dev_t			src_dev;
 	const char		*source_mnt;
 	const char		*target_mnt;
@@ -14,7 +14,7 @@ int get_pids_list(const char *tasks_file, char **list);
 int collect_processes(const char *pids, struct list_head *collection);
 
 int examine_processes(struct list_head *collection,
-		      const struct mounts_info_s *mi);
+		      const struct replace_info_s *ri);
 
 int iterate_pids_list_name(const char *pids_list, void *data,
 			   int (*actor)(pid_t pid, void *data),
