@@ -40,13 +40,13 @@ struct spfs_info_s {
 	struct shared_list	mountpaths;
 	struct list_head	processes;
 	const char		*ovz_id;
-	int			*orig_ns_fds;
+	int			*mgr_ns_fds;
 	spfs_replace_mode_t	mode __attribute__((aligned(sizeof(int))));
 };
 
 int create_spfs_info(const char *id, const char *mountpoint,
 		     pid_t ns_pid, const char *root,
-		     int *ctx_ns_fds, const char *ovz_id,
+		     int *mgr_ns_fds, const char *ovz_id,
 		     struct spfs_info_s **i);
 int update_spfs_info(struct spfs_info_s *info);
 int release_spfs_info(struct spfs_info_s *info);

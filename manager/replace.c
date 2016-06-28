@@ -35,7 +35,7 @@ static int do_replace_resources(struct freeze_cgroup_s *fg,
 
 	/* And we also want to revert mount namespace bask, so we can find the
 	 * freezer cgroup to thaw before seize. */
-	ret = set_namespaces(ctx_ns_fds(), NS_MNT_MASK);
+	ret = set_namespaces(mgr_ns_fds(), NS_MNT_MASK);
 	if (ret)
 		goto release_processes;
 
