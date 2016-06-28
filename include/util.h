@@ -33,4 +33,6 @@ bool unlinked_path(const char *path);
 
 void strip_deleted(char *path);
 
+bool sillyrenamed_path(const char *path);
+
 #endif
