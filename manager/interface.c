@@ -625,7 +625,11 @@ const struct spfs_manager_cmd_handler_s *get_cmd_handler(const char *cmd)
 
 static int spfs_manager_handle_packet(cmd_handler_t handler, int sock, void *data, void *package, size_t psize)
 {
-	return send_status(sock, handler(sock, data, package, psize));
+	int ret;
+
+	ret = handler(sock, data, package, psize);
+	(void) send_status(sock, ret);
+	return ret;
 }
 
 int spfs_manager_packet_handler(int sock, void *data, void *package, size_t psize)
