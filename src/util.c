@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <dirent.h>
+#include <ctype.h>
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -14,6 +15,14 @@
 
 #include "include/log.h"
 #include "include/util.h"
+
+#define SILLYNAME_PREFIX ".nfs"
+#define SILLYNAME_PREFIX_LEN ((unsigned)sizeof(SILLYNAME_PREFIX) - 1)
+#define SILLYNAME_FILEID_LEN ((unsigned)sizeof(uint64_t) << 1)
+#define SILLYNAME_COUNTER_LEN ((unsigned)sizeof(unsigned int) << 1)
+#define SILLYNAME_LEN (SILLYNAME_PREFIX_LEN + \
+		                SILLYNAME_FILEID_LEN + \
+		                SILLYNAME_COUNTER_LEN)
 
 /*
  * This function reallocates passed str pointer.
@@ -335,6 +344,25 @@ char **exec_options(int dummy, ...)
 	va_end(args);
 
 	return new;
+}
+
+bool sillyrenamed_path(const char *path)
+{
+	const char *name;
+	int i;
+
+	name = strrchr(path, '/');
+	name++;
+
+	if (strncmp(name, SILLYNAME_PREFIX, SILLYNAME_PREFIX_LEN))
+		return false;
+
+	name += SILLYNAME_PREFIX_LEN;
+	for (i = 0; i < SILLYNAME_FILEID_LEN + SILLYNAME_COUNTER_LEN; i++)
+		if (!isxdigit(name[i]))
+			return false;
+
+	return true;
 }
 
 bool unlinked_path(const char *path)
