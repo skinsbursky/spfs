@@ -69,7 +69,7 @@ static int gateway_create_fh(struct gateway_fh_s **gw_fh, unsigned open_flags)
 	*gw_fh = fh;
 	return 0;
 }
-
+#if 0
 static bool path_is_hidden(const char *path)
 {
 	const char *basename;
@@ -83,23 +83,20 @@ static bool path_is_hidden(const char *path)
 
 	return !strncmp(basename + 1, deleted, strlen(deleted));
 }
-
+#endif
 static const char *gateway_real_path(const char *path, char *buf, size_t rsize)
 {
 	const char *real = path;
+	ssize_t size;
 
-	if (path_is_hidden(path)) {
-		ssize_t size;
-
-		size = spfs_getxattr(path, SPFS_XATTR_LINK_REMAP, buf, rsize);
-		if (size < 0) {
-			pr_err("failed to find xattr %s for file %s: %ld\n",
-					SPFS_XATTR_LINK_REMAP, path, size);
-			return path;
-		}
-		real = buf;
-		pr_debug("found real path %s for file %s\n", real, path);
+	size = spfs_getxattr(path, SPFS_XATTR_LINK_REMAP, buf, rsize);
+	if (size < 0) {
+		pr_err("failed to find xattr %s for file %s: %ld\n",
+				SPFS_XATTR_LINK_REMAP, path, size);
+		return path;
 	}
+	real = buf;
+	pr_debug("found real path %s for file %s\n", real, path);
 	return real;
 }
 
