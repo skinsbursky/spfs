@@ -489,10 +489,18 @@ static int do_replace_spfs_mounts(struct spfs_info_s *info, const char *source)
 	return err ? err : res;
 }
 
+static int do_replace_spfs_resources(struct spfs_info_s *info)
+{
+	struct mount_info_s *mnt = &info->mnt;
+
+	return __replace_resources(info->fg, info->ns_fds, NULL,
+				   mnt->st.st_dev, info->mnt_ref,
+				   mnt->mountpoint);
+}
+
 static int do_replace_spfs(struct spfs_info_s *info, const char *source)
 {
 	int err, res;
-	struct mount_info_s *mnt = &info->mnt;
 
 	if (info->ovz_id) {
 		err = move_to_cgroup("ve", "/");
@@ -506,9 +514,7 @@ static int do_replace_spfs(struct spfs_info_s *info, const char *source)
 
 	err = do_replace_spfs_mounts(info, source);
 	if (!err)
-		err = __replace_resources(info->fg, info->ns_fds, NULL,
-					  mnt->st.st_dev, info->mnt_ref,
-					  mnt->mountpoint);
+		err = do_replace_spfs_resources(info);
 
 	res = spfs_thaw_and_unlock(info);
 
