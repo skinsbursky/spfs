@@ -400,7 +400,8 @@ static int parse_fdinfo(pid_t pid, int fd, unsigned *flags, long long *pos)
 }
 
 static int get_fd_info(struct process_info *p, int dir,
-		const char *process_fd, struct fd_info_s *fdi)
+		const char *process_fd, const struct replace_info_s *ri,
+		struct fd_info_s *fdi)
 {
 	int local_fd, err;
 	ssize_t bytes;
@@ -415,7 +416,6 @@ static int get_fd_info(struct process_info *p, int dir,
 	local_fd = copy_process_fd(p, fdi->fd);
 	if (local_fd < 0) {
 		pr_err("failed to copy /proc/%d/fd/%d\n", p->pid, fdi->fd);
-		sleep(1000);
 		return local_fd;
 	}
 
@@ -433,13 +433,16 @@ static int get_fd_info(struct process_info *p, int dir,
 	}
 
 	snprintf(link, PATH_MAX, "/proc/%d/fd/%d", p->pid, fdi->fd);
-	bytes = readlink(link, fdi->path, PATH_MAX - 1);
+	bytes = readlink(link, link, PATH_MAX - 1);
 	if (bytes < 0) {
 		pr_perror("failed to read link %s\n", link);
 		err = -errno;
 		goto close_local_fd;
 	}
-	fdi->path[bytes] = '\0';
+	link[bytes] = '\0';
+
+	err = fixup_source_path(link, ri->source_mnt, ri->target_mnt,
+				fdi->path, sizeof(fdi->path));
 
 close_local_fd:
 	close(local_fd);
@@ -469,7 +472,6 @@ static int collect_process_fd(struct process_info *p, int dir,
 	int err, target_fd;
 	const struct replace_info_s *ri = data;
 	struct replace_fd *rfd;
-	char path[PATH_MAX];
 	struct fd_info_s fdi;
 
 	/* Fast path. In most of the cases opened file is accessible and
@@ -482,7 +484,7 @@ static int collect_process_fd(struct process_info *p, int dir,
 			return 0;
 	}
 
-	err = get_fd_info(p, dir, process_fd, &fdi);
+	err = get_fd_info(p, dir, process_fd, ri, &fdi);
 	if (err)
 		return err;
 
@@ -495,11 +497,6 @@ static int collect_process_fd(struct process_info *p, int dir,
 		return err;
 	}
 
-	err = fixup_source_path(fdi.path, ri->source_mnt, ri->target_mnt,
-				path, sizeof(path));
-	if (err)
-		return err;
-
 	if (!rfd->file_obj) {
 		char link[PATH_MAX];
 
@@ -509,7 +506,7 @@ static int collect_process_fd(struct process_info *p, int dir,
 		/* TODO it makes sense to create file objects (open files) only
 		 * shared files here.
 		 * Private files can be opened by the process itself */
-		err = create_file_obj(path, fdi.flags, fdi.st.st_mode,
+		err = create_file_obj(fdi.path, fdi.flags, fdi.st.st_mode,
 				      link, &rfd->file_obj);
 		if (err) {
 			pr_err("failed to open file object for /proc/%d/fd/%d\n",
@@ -523,7 +520,7 @@ static int collect_process_fd(struct process_info *p, int dir,
 		return target_fd;
 
 	pr_debug("\t/proc/%d/fd/%d ---> %s (fd: %d, flags: 0%o)\n",
-			p->pid, fdi.fd, path, target_fd, fdi.flags);
+			p->pid, fdi.fd, fdi.path, target_fd, fdi.flags);
 
 	return process_add_fd(p, &fdi, target_fd);
 }
