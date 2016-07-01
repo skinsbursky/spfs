@@ -37,6 +37,18 @@ TESTS_LIST="	\
 		static/chroot			\
 		static/chroot-file		\
 						\
+		static/unlink_fstat01		\
+		static/unlink_fstat02		\
+		static/unlink_fstat03		\
+		static/unlink_mmap00		\
+		static/unlink_mmap01		\
+		static/link10			\
+		static/unlink_fifo		\
+		static/unlink_fifo_wronly	\
+		static/write_read10		\
+		static/file_attr		\
+		static/fifo-ghost		\
+						\
 		transition/fifo_loop		\
 		transition/fifo_dyn		\
 		transition/epoll		\
@@ -61,22 +73,11 @@ NOT_DUMPABLE_OVERMOUNT_TEST_LIST="		\
 NOT_DUMPABLE_STALE_TEST_LIST="			\
 		static/rmdir_open		\
 		static/cwd02			\
+		static/cwd01			\
 		"
 
 NOT_DUMPABLE_UNLINKED_TEST_LIST="		\
-		static/cwd01			\
-		static/unlink_fstat01		\
-		static/unlink_fstat02		\
-		static/unlink_fstat03		\
-		static/unlink_mmap01		\
 		static/unlink_mmap02		\
-		static/unlink_mmap00		\
-		static/link10			\
-		static/unlink_fifo		\
-		static/unlink_fifo_wronly	\
-		static/write_read10		\
-		static/file_attr		\
-		static/fifo-ghost		\
 		"
 
 NOT_DUMPABLE_SOCKETS_TEST_LIST="		\
