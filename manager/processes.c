@@ -267,47 +267,65 @@ free_pids_list:
 	goto close_fd;
 }
 
-static int fixup_source_path(const char *source_path,
-			     const char *source_mnt, const char *target_mnt,
-			     char *path, size_t size)
+static int transform_path(const char *source_path,
+			  const char *source_mnt, const char *target_mnt,
+			  char *dest_path, size_t size)
 {
 	const char *sp = source_path;
-	ssize_t bytes;
+
+	if (source_path == dest_path) {
+		pr_err("source and destination are the same\n");
+		return -EINVAL;
+	}
 
 	if (source_mnt) {
 		size_t len = strlen(source_mnt);
 
-		if (strncmp(source_path, source_mnt, len)) {
+		if (strncmp(sp, source_mnt, len)) {
 			pr_err("link %s doesn't start with source mnt %s\n",
-					source_path, source_mnt);
+					sp, source_mnt);
 			return -EINVAL;
 		}
 		sp += len;
 	}
 
-	bytes = snprintf(path, size, "%s%s", target_mnt, sp);
-	if (bytes > size) {
-		pr_err("target path is too long (%ld > %ld)\n",	bytes, size);
+	if (size <= strlen(target_mnt) + strlen(sp)) {
+		pr_err("target dest_path is too long (%ld >= %ld)\n",
+				strlen(target_mnt) + strlen(sp), size);
 		return -ENOMEM;
 	}
+
+	strcpy(dest_path, target_mnt);
+	strcat(dest_path, sp);
+
 	return 0;
+}
+
+static int fixup_source_path(char *source_path, size_t source_size,
+			     const char *source_mnt, const char *target_mnt)
+{
+	char buf[PATH_MAX];
+
+	strcpy(buf, source_path);
+
+	return transform_path(buf, source_mnt, target_mnt,
+			      source_path, source_size);
 }
 
 static int get_link_path(const char *link,
 			 const char *source_mnt, const char *target_mnt,
 			 char *path, size_t size)
 {
-	char source_path[PATH_MAX];
 	ssize_t bytes;
 
-	bytes = readlink(link, source_path, PATH_MAX - 1);
+	bytes = readlink(link, path, PATH_MAX - 1);
 	if (bytes < 0) {
 		pr_perror("failed to read link %s\n", link);
 		return -errno;
 	}
-	source_path[bytes] = '\0';
+	path[bytes] = '\0';
 
-	return fixup_source_path(source_path, source_mnt, target_mnt, path, size);
+	return fixup_source_path(path, size, source_mnt, target_mnt);
 }
 
 static int process_add_fd(struct process_info *p, const struct fd_info_s *fdi,
@@ -405,7 +423,6 @@ static int get_fd_info(struct process_info *p, int dir,
 {
 	int local_fd, err;
 	ssize_t bytes;
-	char link[PATH_MAX];
 
 	err = xatol(process_fd, (long *)&fdi->fd);
 	if (err) {
@@ -432,17 +449,17 @@ static int get_fd_info(struct process_info *p, int dir,
 		goto close_local_fd;
 	}
 
-	snprintf(link, PATH_MAX, "/proc/%d/fd/%d", p->pid, fdi->fd);
-	bytes = readlink(link, link, PATH_MAX - 1);
+	snprintf(fdi->path, PATH_MAX, "/proc/%d/fd/%d", p->pid, fdi->fd);
+	bytes = readlink(fdi->path, fdi->path, PATH_MAX - 1);
 	if (bytes < 0) {
-		pr_perror("failed to read link %s\n", link);
+		pr_perror("failed to read link %s\n", fdi->path);
 		err = -errno;
 		goto close_local_fd;
 	}
-	link[bytes] = '\0';
+	fdi->path[bytes] = '\0';
 
-	err = fixup_source_path(link, ri->source_mnt, ri->target_mnt,
-				fdi->path, sizeof(fdi->path));
+	err = fixup_source_path(fdi->path, sizeof(fdi->path),
+				ri->source_mnt, ri->target_mnt);
 
 close_local_fd:
 	close(local_fd);
@@ -714,9 +731,8 @@ static int collect_process_maps(struct process_info *p,
 
 		map_file = map + path_off;
 
-		err = fixup_source_path(map_file,
-					ri->source_mnt, ri->target_mnt,
-					path, sizeof(path));
+		err = transform_path(map_file, ri->source_mnt, ri->target_mnt,
+				     path, sizeof(path));
 		if (err)
 			goto close_fmap;
 
