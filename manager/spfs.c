@@ -516,6 +516,16 @@ static int do_replace_spfs(struct spfs_info_s *info, const char *source)
 	if (res)
 		return res;
 
+	/* TODO: this should be done in a different way:
+	 * 1) Place target FS on top of spfs.
+	 * 2) Do resources collection.
+	 * 3) If succeeded, unmount both and place target back.
+	 * 4) Do resources swap.
+	 * 5) If failed - unmount only target.
+	 *
+	 * This will allow to keep access stable and repeat the sequence.
+	 * But what to do, if failed to repalce
+	 */
 	err = do_replace_spfs_mounts(info, source);
 	if (!err)
 		err = do_replace_spfs_resources(info);
