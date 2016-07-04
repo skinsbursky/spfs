@@ -135,13 +135,13 @@ static swap_handler_t get_swap_handler(swap_resource_t type)
 	return swap_resources_handlers[type];
 }
 
-static int do_swap_process_resources(struct process_info *p)
+static int process_do_swap_handlers(struct process_info *p,
+				    swap_resource_t start,
+				    swap_resource_t end)
 {
 	swap_resource_t type;
 
-	pr_debug("Swapping process %d resources:\n", p->pid);
-
-	for (type = SWAP_RESOURCE_FDS; type < SWAP_RESOURCE_MAX; type++) {
+	for (type = start; type < end; type++) {
 		swap_handler_t handler;
 		int err;
 
@@ -156,19 +156,36 @@ static int do_swap_process_resources(struct process_info *p)
 	return 0;
 }
 
-static bool process_needs_swap(struct process_info *p)
+static int do_swap_process_resources(struct process_info *p)
+{
+	pr_debug("Swapping process %d resources:\n", p->pid);
+
+	return process_do_swap_handlers(p, SWAP_RESOURCE_FDS, SWAP_RESOURCE_EXE);
+}
+
+static int do_swap_exe_resources(struct process_info *p)
+{
+	pr_debug("Swapping process %d exe:\n", p->pid);
+
+	return process_do_swap_handlers(p, SWAP_RESOURCE_EXE, SWAP_RESOURCE_MAX);
+}
+
+static bool process_needs_resources_swap(struct process_info *p)
 {
 	if (p->fds_nr)
 		return true;
 	if (p->maps_nr)
-		return true;
-	if (p->exe_fd != -1)
 		return true;
 	if (p->fs.cwd_fd != -1)
 		return true;
 	if (p->fs.root)
 		return true;
 	return false;
+}
+
+static bool process_needs_exe_swap(struct process_info *p)
+{
+	return (p->exe_fd == -1) ? false : true;
 }
 
 int do_swap_resources(const struct list_head *processes)
@@ -178,10 +195,17 @@ int do_swap_resources(const struct list_head *processes)
 	pr_debug("Swapping resources:\n");
 
 	list_for_each_entry(p, processes, list) {
-		if (!process_needs_swap(p))
+		if (!process_needs_resources_swap(p))
 			continue;
 		if (do_swap_process_resources(p))
 			pr_err("failed to swap resources for process %d\n", p->pid);
+	}
+
+	list_for_each_entry(p, processes, list) {
+		if (!process_needs_exe_swap(p))
+			continue;
+		if (do_swap_exe_resources(p))
+			pr_err("failed to swap exe for process %d\n", p->pid);
 	}
 
 	return 0;
