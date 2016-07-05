@@ -590,18 +590,18 @@ static int collect_process_open_fds(struct process_info *p,
 
 static int collect_map_file(struct process_info *p,
 			    unsigned long start, unsigned long end,
-			    mode_t mode, const char *path,
-			    int prot, int flags, unsigned long long pgoff)
+			    unsigned open_flags, const char *path,
+			    int prot, int map_flags, unsigned long long pgoff)
 {
 	int fd, map_fd = -1, err;
 
-	fd = open(path, mode);
+	fd = open(path, open_flags);
 	if (fd < 0) {
 		pr_perror("failed to open %s", path);
 		return -errno;
 	}
 
-	err = collect_map_fd(fd, path, mode, &map_fd);
+	err = collect_map_fd(fd, path, open_flags, &map_fd);
 	if (err) {
 		pr_err("failed to collect map fd for path %s\n", path);
 		goto close_fd;
@@ -610,7 +610,7 @@ static int collect_map_file(struct process_info *p,
 	pr_debug("\t/proc/%d/map_files/%lx-%lx ---> %s (fd: %d)\n",
 			p->pid, start, end, path, map_fd);
 
-	err = process_add_mapping(p, map_fd, start, end, prot, flags, pgoff);
+	err = process_add_mapping(p, map_fd, start, end, prot, map_flags, pgoff);
 
 close_fd:
 	if ((fd != map_fd) || err)
@@ -618,9 +618,9 @@ close_fd:
 	return err;
 }
 
-static int map_open_mode(int map_files_fd,
-			    unsigned long start, unsigned long end,
-			    mode_t *mode)
+static int map_open_flags(int map_files_fd,
+			  unsigned long start, unsigned long end,
+			  unsigned *flags)
 {
 	char map_file[64];
 	struct stat st;
@@ -634,17 +634,17 @@ static int map_open_mode(int map_files_fd,
 
 	switch(st.st_mode & 0600) {
 		case 0200:
-			*mode = O_WRONLY;
+			*flags = O_WRONLY;
 			break;
 		case 0400:
-			*mode = O_RDONLY;
+			*flags = O_RDONLY;
 			break;
 		case 0600:
-			*mode = O_RDWR;
+			*flags = O_RDWR;
 			break;
 		default:
 			pr_err("unsupported mode for map file: 0%o\n",
-			st.st_mode & 0600);
+					st.st_mode & 0600);
 			return -EINVAL;
 	}
 	return 0;
@@ -703,7 +703,7 @@ static int collect_process_maps(struct process_info *p,
 		unsigned long start, end, ino;
 		int ret, path_off;
 		char *map_file;
-		mode_t mode = 0;
+		unsigned flags = O_RDONLY;
 		char r, w, x, s;
 		unsigned long long pgoff;
 
@@ -730,11 +730,11 @@ static int collect_process_maps(struct process_info *p,
 		if (err)
 			goto close_fmap;
 
-		err = map_open_mode(dir, start, end, &mode);
+		err = map_open_flags(dir, start, end, &flags);
 		if (err)
 			goto close_fmap;
 
-		err = collect_map_file(p, start, end, mode, path,
+		err = collect_map_file(p, start, end, flags, path,
 				       map_prot(r, w, x),
 				       s == 's' ? MAP_SHARED : MAP_PRIVATE,
 				       pgoff);
