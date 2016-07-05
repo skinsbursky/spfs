@@ -33,7 +33,7 @@ struct replace_fd {
 struct map_fd_s {
 	int map_fd;
 	char *path;
-	mode_t mode;
+	unsigned flags;
 };
 
 struct fd_table_s {
@@ -275,47 +275,47 @@ static int compare_map_fd(const void *a, const void *b)
 	ret = strcmp(f->path, s->path);
 	if (ret)
 		return ret;
-	if (f->mode < s->mode)
+	if (f->flags < s->flags)
 		return -1;
-	else if (f->mode > s->mode)
+	else if (f->flags > s->flags)
 		return 1;
 	return 0;
 }
 
-int collect_map_fd(int fd, const char *path, mode_t mode, int *map_fd)
+int collect_map_fd(int fd, const char *path, unsigned flags, int *map_fd)
 {
-	struct map_fd_s *new_map_fd, **found_map_fd;
+	struct map_fd_s *new_mfd, **found_mfd;
 	int err = -ENOMEM;
 
-	new_map_fd = malloc(sizeof(*new_map_fd));
-	if (!new_map_fd) {
+	new_mfd = malloc(sizeof(*new_mfd));
+	if (!new_mfd) {
 		pr_err("failed to allocate\n");
 		return -ENOMEM;
 	}
-	new_map_fd->path = strdup(path);
-	if (!new_map_fd->path) {
+	new_mfd->path = strdup(path);
+	if (!new_mfd->path) {
 		pr_err("failed to allocate\n");
-		goto free_new_map_fd;
+		goto free_new_mfd;
 	}
-	new_map_fd->map_fd = fd;
-	new_map_fd->mode = mode;
+	new_mfd->map_fd = fd;
+	new_mfd->flags = flags;
 
-	found_map_fd = tsearch(new_map_fd, &map_fd_tree_root, compare_map_fd);
-	if (!found_map_fd) {
+	found_mfd = tsearch(new_mfd, &map_fd_tree_root, compare_map_fd);
+	if (!found_mfd) {
 		pr_err("failed to add new map fd object to the tree\n");
-		goto free_new_map_fd_map_fd;
+		goto free_new_mfd_path;
 	}
 
-	*map_fd = (*found_map_fd)->map_fd;
+	*map_fd = (*found_mfd)->map_fd;
 	err = 0;
 
-	if (*found_map_fd == new_map_fd)
+	if (*found_mfd == new_mfd)
 		goto exit;
 
-free_new_map_fd_map_fd:
-	free(new_map_fd->path);
-free_new_map_fd:
-	free(new_map_fd);
+free_new_mfd_path:
+	free(new_mfd->path);
+free_new_mfd:
+	free(new_mfd);
 exit:
 	return err;
 }
