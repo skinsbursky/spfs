@@ -28,7 +28,7 @@ int iterate_pids_list_name(const char *pids_list, void *data,
 	iterate_pids_list_name(pids_list, data, actor, stringify(actor))
 
 int seize_processes(struct list_head *processes);
-int release_processes(struct list_head *processes);
+void release_processes(struct list_head *processes);
 
 struct replace_fd;
 

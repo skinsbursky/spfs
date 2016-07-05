@@ -18,7 +18,7 @@ static int do_replace_resources(struct freeze_cgroup_s *fg,
 				int *ns_fds)
 {
 	char *pids;
-	int err, ret;
+	int err;
 	LIST_HEAD(processes);
 
 	err = cgroup_pids(fg, &pids);
@@ -38,8 +38,8 @@ static int do_replace_resources(struct freeze_cgroup_s *fg,
 
 	/* And we also want to revert mount namespace bask, so we can find the
 	 * freezer cgroup to thaw before seize. */
-	ret = set_namespaces(mgr_ns_fds(), NS_MNT_MASK);
-	if (ret)
+	err = set_namespaces(mgr_ns_fds(), NS_MNT_MASK);
+	if (err)
 		goto release_processes;
 
 	err = thaw_cgroup(fg);
@@ -65,10 +65,10 @@ static int do_replace_resources(struct freeze_cgroup_s *fg,
 	err = do_swap_resources(&processes);
 
 release_processes:
-	ret = release_processes(&processes);
+	release_processes(&processes);
 free_pids:
 	free(pids);
-	return err ? err : ret;
+	return err;
 }
 
 int __replace_resources(struct freeze_cgroup_s *fg, int *ns_fds,
