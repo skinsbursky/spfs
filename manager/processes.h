@@ -33,39 +33,39 @@ int release_processes(struct list_head *processes);
 struct replace_fd;
 
 struct process_fd {
-	struct list_head list;
-	int source_fd;
-	int target_fd;
-	unsigned long cloexec;
-	long long pos;
+	struct list_head	list;
+	int			source_fd;
+	int			target_fd;
+	unsigned long		cloexec;
+	long long		pos;
 };
 
 struct process_map {
-	struct list_head list;
-	int map_fd;
-	off_t start;
-	off_t end;
-	int prot;
-	int flags;
-	unsigned long long pgoff;
+	struct list_head	list;
+	int			map_fd;
+	off_t			start;
+	off_t			end;
+	int			prot;
+	int			flags;
+	unsigned long long	pgoff;
 };
 
 struct parasite_ctl;
 
 struct process_info {
-	struct list_head list;
-	int pid;
-	int fds_nr;
-	int maps_nr;
-	int exe_fd;
+	struct list_head	list;
+	int			pid;
+	int			fds_nr;
+	int			maps_nr;
+	int			exe_fd;
 	struct process_fs {
-		int cwd_fd;
-		char *root;
-	} fs;
-	struct list_head fds;
-	struct list_head maps;
-	struct parasite_ctl *pctl;
-	int orig_st;
+		int	cwd_fd;
+		char	*root;
+	}			fs;
+	struct list_head	fds;
+	struct list_head	maps;
+	struct parasite_ctl	*pctl;
+	int			orig_st;
 };
 
 #endif
