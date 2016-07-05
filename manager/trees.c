@@ -157,15 +157,16 @@ static int compare_fd_tables(const void *a, const void *b)
 	return kcmp(KCMP_FILES, f->pid, s->pid, 0, 0);
 }
 
-bool fd_table_exists(pid_t pid)
+pid_t fd_table_exists(pid_t pid)
 {
 	struct fd_table_s fdt = {
 		.pid = pid,
-	};
+	}, **found_fdt;
 
-	if (tfind(&fdt, &fd_table_tree_root, compare_fd_tables))
-		return true;
-	return false;
+	found_fdt = tfind(&fdt, &fd_table_tree_root, compare_fd_tables);
+	if (!found_fdt)
+		return 0;
+	return (*found_fdt)->pid;
 }
 
 int collect_fd_table(pid_t pid)
