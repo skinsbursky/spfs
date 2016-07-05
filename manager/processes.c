@@ -337,6 +337,7 @@ static int process_add_fd(struct process_info *p, const struct fd_info_s *fdi,
 	pfd->target_fd = target_fd;
 	pfd->cloexec = (fdi->flags & O_CLOEXEC) ? FD_CLOEXEC : 0;
 	pfd->pos = fdi->pos;
+	pfd->replaced = false;
 	list_add_tail(&pfd->list, &p->fds);
 	p->fds_nr++;
 
@@ -361,6 +362,7 @@ static int process_add_mapping(struct process_info *p, int map_fd,
 	pm->prot = prot;
 	pm->flags = flags;
 	pm->pgoff = pgoff;
+	pm->replaced = false;
 	list_add_tail(&pm->list, &p->maps);
 	p->maps_nr++;
 

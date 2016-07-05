@@ -40,6 +40,8 @@ static int do_swap_process_fds(struct process_info *p)
 			      pfd->cloexec, pfd->pos);
 		if (err)
 			return err;
+
+		pfd->replaced = true;
 	}
 	return 0;
 }
@@ -61,6 +63,8 @@ static int do_swap_process_maps(struct process_info *p)
 			       pm->prot, pm->flags, pm->pgoff);
 		if (err)
 			return err;
+
+		pm->replaced = true;
 	}
 
 	return 0;
