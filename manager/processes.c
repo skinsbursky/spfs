@@ -613,34 +613,42 @@ static int collect_process_open_fds(struct process_info *p,
 	return iterate_dir_name(dpath, p, collect_process_fd, ri, "collect_process_fd");
 }
 
-static int collect_map_file(struct process_info *p,
-			    unsigned long start, unsigned long end,
-			    unsigned open_flags, const char *path,
-			    int prot, int map_flags, unsigned long long pgoff)
+static int create_map_obj(const char *path, unsigned flags, mode_t mode,
+			  const char *parent, void *file_obj)
 {
-	int fd, map_fd = -1, err;
+	int fd;
 
-	fd = open(path, open_flags);
+	fd = open(path, flags);
 	if (fd < 0) {
 		pr_perror("failed to open %s", path);
 		return -errno;
 	}
+	*(int *)file_obj = fd;
+	return 0;
+}
 
-	err = collect_map_fd(fd, path, open_flags, &map_fd);
-	if (err) {
-		pr_err("failed to collect map fd for path %s\n", path);
-		goto close_fd;
-	}
+static int collect_map_file(struct process_info *p, const struct replace_info_s *ri,
+			    unsigned long start, unsigned long end,
+			    unsigned open_flags, const char *map_path,
+			    int prot, int map_flags, unsigned long long pgoff)
+{
+	int err, fd, map_fd;
 
-	pr_debug("\t/proc/%d/map_files/%lx-%lx ---> %s (fd: %d)\n",
-			p->pid, start, end, path, map_fd);
+	err = create_file_obj(ri, map_path, open_flags, 0, NULL, &fd, create_map_obj);
+	if (err)
+		return err;
 
-	err = process_add_mapping(p, map_fd, start, end, prot, map_flags, pgoff);
+	err = collect_map_fd(fd, map_path, open_flags, &map_fd);
+	if (err)
+		pr_err("failed to collect map fd for path %s\n", map_path);
 
-close_fd:
-	if ((fd != map_fd) || err)
+	if (fd != map_fd)
 		close(fd);
-	return err;
+
+	pr_debug("\t/proc/%d/map_files/%lx-%lx ---> %s (fd: %d, flags: 0%o)\n",
+			p->pid, start, end, map_path, map_fd, open_flags);
+
+	return process_add_mapping(p, map_fd, start, end, prot, map_flags, pgoff);
 }
 
 static int map_open_flags(int map_files_fd,
@@ -759,7 +767,7 @@ static int collect_process_maps(struct process_info *p,
 		if (err)
 			goto close_fmap;
 
-		err = collect_map_file(p, start, end, flags, path,
+		err = collect_map_file(p, ri, start, end, flags, path,
 				       map_prot(r, w, x),
 				       s == 's' ? MAP_SHARED : MAP_PRIVATE,
 				       pgoff);
