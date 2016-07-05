@@ -30,8 +30,6 @@ int iterate_pids_list_name(const char *pids_list, void *data,
 int seize_processes(struct list_head *processes);
 void release_processes(struct list_head *processes);
 
-struct replace_fd;
-
 struct process_fd {
 	struct list_head	list;
 	int			source_fd;
