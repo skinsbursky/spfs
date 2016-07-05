@@ -788,7 +788,6 @@ static int collect_process_fs(struct process_info *p,
 {
 	bool mnt_cwd, mnt_root;
 	int err;
-	bool exists;
 
 	mnt_cwd = is_mnt_file(p, dir, "cwd", ri->source_mnt, ri->src_dev);
 	mnt_root = is_mnt_file(p, dir, "root", ri->source_mnt, ri->src_dev);
@@ -796,14 +795,14 @@ static int collect_process_fs(struct process_info *p,
 	if (!mnt_cwd && ! mnt_root)
 		return 0;
 
-	err = collect_fs_struct(p->pid, &exists);
+	err = collect_fs_struct(p->pid);
+	if (err == -EEXIST) {
+		pr_info("ignoring process %d fs\n", p->pid);
+		return 0;
+	}
 	if (err) {
 		pr_err("failed to collect process %d fs\n", p->pid);
 		return err;
-	}
-	if (exists) {
-		pr_info("ignoring process %d fs\n", p->pid);
-		return 0;
 	}
 
 	if (mnt_cwd) {

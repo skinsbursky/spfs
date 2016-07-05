@@ -204,7 +204,7 @@ static int compare_fs_struct(const void *a, const void *b)
 	return kcmp(KCMP_FS, f->pid, s->pid, 0, 0);
 }
 
-int collect_fs_struct(pid_t pid, bool *exists)
+int collect_fs_struct(pid_t pid)
 {
 	struct fs_struct_s *new_fs, **found_fs;
 	int err = -ENOMEM;
@@ -219,20 +219,15 @@ int collect_fs_struct(pid_t pid, bool *exists)
 	found_fs = tsearch(new_fs, &fs_struct_tree_root, compare_fs_struct);
 	if (!found_fs) {
 		pr_err("failed to add new fs object to the tree\n");
-		*exists = false;
 		goto free_new_fs;
 	}
 
-	if (*found_fs == new_fs) {
-		*exists = false;
+	if (*found_fs == new_fs)
 		return 0;
-	}
 
 	pr_info("process %d shares fs struct with process %d\n", pid,
 			(*found_fs)->pid);
-	*exists = true;
-
-	err = 0;
+	err = -EEXIST;
 
 free_new_fs:
 	free(new_fs);
