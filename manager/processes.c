@@ -19,6 +19,7 @@
 #include "processes.h"
 #include "file_obj.h"
 #include "swapfd.h"
+#include "link_remap.h"
 
 struct fd_info_s {
 	int             fd;
@@ -72,6 +73,8 @@ static void release_process_maps(struct process_info *p)
 
 	list_for_each_entry_safe(pm, tmp, &p->maps, list) {
 		list_del(&pm->list);
+		if (pm->replaced && pm->link_remap)
+			put_link_remap(pm->link_remap);
 		free(pm);
 	}
 }
@@ -85,6 +88,8 @@ static void release_process_fds(struct process_info *p)
 
 	list_for_each_entry_safe(pfd, tmp, &p->fds, list) {
 		list_del(&pfd->list);
+		if (pfd->replaced && pfd->link_remap)
+			put_link_remap(pfd->link_remap);
 		free(pfd);
 	}
 }
@@ -323,7 +328,7 @@ static int get_link_path(const char *link,
 }
 
 static int process_add_fd(struct process_info *p, const struct fd_info_s *fdi,
-			  int target_fd)
+			  int target_fd, struct link_remap_s *link_remap)
 {
 	struct process_fd *pfd;
 
@@ -338,6 +343,7 @@ static int process_add_fd(struct process_info *p, const struct fd_info_s *fdi,
 	pfd->cloexec = (fdi->flags & O_CLOEXEC) ? FD_CLOEXEC : 0;
 	pfd->pos = fdi->pos;
 	pfd->replaced = false;
+	pfd->link_remap = link_remap;
 	list_add_tail(&pfd->list, &p->fds);
 	p->fds_nr++;
 
@@ -346,7 +352,8 @@ static int process_add_fd(struct process_info *p, const struct fd_info_s *fdi,
 
 static int process_add_mapping(struct process_info *p, int map_fd,
 			       off_t start, off_t end,
-			       int prot, int flags, unsigned long long pgoff)
+			       int prot, int flags, unsigned long long pgoff,
+			       struct link_remap_s *link_remap)
 {
 	struct process_map *pm;
 
@@ -363,6 +370,7 @@ static int process_add_mapping(struct process_info *p, int map_fd,
 	pm->flags = flags;
 	pm->pgoff = pgoff;
 	pm->replaced = false;
+	pm->link_remap = link_remap;
 	list_add_tail(&pm->list, &p->maps);
 	p->maps_nr++;
 
@@ -410,6 +418,57 @@ static int parse_fdinfo(pid_t pid, int fd, unsigned *flags, long long *pos)
 	}
 	if (err < 0)
 		pr_err("failed to parse %s: %d\n", path, err);
+	return err;
+}
+
+static int rename_link_to_path(const char *path, const char *link_remap)
+{
+	int err;
+
+	err = link(link_remap, path);
+	if (err) {
+		pr_perror("failed to rename %s to %s", link_remap, path);
+		return -errno;
+	}
+	pr_debug("        (%s ---> %s)\n", link_remap, path);
+	return 0;
+}
+
+static int handle_sillyrenamed(const char *path, const struct replace_info_s *ri,
+			       struct link_remap_s **link_remap)
+{
+	char remap[PATH_MAX];
+	int err;
+
+	err = spfs_link_remap(ri->src_mnt_ref,
+			      path + strlen(ri->target_mnt) + 1,
+			      remap, PATH_MAX);
+	if (err) {
+		if (err == -ENODATA)
+			err = 0;
+		return err;
+	}
+
+	err = fixup_source_path(remap, PATH_MAX,
+				ri->source_mnt, ri->target_mnt);
+	if (err)
+		return err;
+
+	err = rename_link_to_path(path, remap);
+	if (err)
+		return err;
+
+	err = get_link_remap(remap, link_remap);
+	if (err) {
+		pr_err("failed to get link_remap %s\n", remap);
+		goto unlink_path;
+	}
+
+	return 0;
+
+unlink_path:
+	if (unlink(path))
+		pr_perror("failed to unlink %s", path);
 	return err;
 }
 
@@ -482,11 +541,20 @@ static int is_mnt_fd(const struct fd_info_s *fdi, const struct replace_info_s *r
 static int create_file_obj(const struct replace_info_s *ri,
 			   const char *path, unsigned flags, mode_t mode,
 			   const char *parent, void *file_obj,
+			   struct link_remap_s **link_remap,
 			   int (*create_obj)(const char *path, unsigned flags,
 					     mode_t mode, const char *parent,
 					     void *file_obj))
 {
 	int err;
+	bool sillyrenamed = sillyrenamed_path(path);
+
+	if (sillyrenamed) {
+		err = handle_sillyrenamed(path, ri, link_remap);
+		if (err)
+			return err;
+	} else
+		*link_remap = NULL;
 
 	/* TODO it makes sense to create file objects (open files) only
 	 * shared files here.
@@ -496,17 +564,26 @@ static int create_file_obj(const struct replace_info_s *ri,
 		pr_err("failed to open file object for %s\n", path);
 		return err;
 	}
+
+	if (sillyrenamed) {
+		if (unlink(path)) {
+			pr_perror("failed to unlink %s", path);
+			return err;
+		}
+	}
 	return 0;
 }
 
 static int collect_fd_obj(const struct replace_info_s *ri, pid_t pid,
-			  const struct fd_info_s *fdi, const char *parent)
+			  const struct fd_info_s *fdi, const char *parent,
+			  struct link_remap_s **link_remap)
 {
 	void *file_obj, *real_file_obj;
 	int err;
 
 	err = create_file_obj(ri, fdi->path, fdi->flags, fdi->st.st_mode, parent,
-			      &file_obj, create_fd_obj);
+			      &file_obj, link_remap,
+			      create_fd_obj);
 	if (err)
 		return err;
 
@@ -529,6 +606,7 @@ static int collect_process_fd(struct process_info *p, int dir,
 	const struct replace_info_s *ri = data;
 	struct fd_info_s fdi;
 	char link[PATH_MAX];
+	struct link_remap_s *link_remap;
 
 	/* Fast path. In most of the cases opened file is accessible and
 	 * shouldn't be replaced.
@@ -550,14 +628,14 @@ static int collect_process_fd(struct process_info *p, int dir,
 	/* TODO This is a temporary solution !!! */
 	snprintf(link, PATH_MAX, "/proc/%d/fd/%d", p->pid, fdi.fd);
 
-	target_fd = collect_fd_obj(ri, p->pid, &fdi, link);
+	target_fd = collect_fd_obj(ri, p->pid, &fdi, link, &link_remap);
 	if (target_fd < 0)
 		return target_fd;
 
 	pr_debug("\t/proc/%d/fd/%d ---> %s (fd: %d, flags: 0%o)\n",
 			p->pid, fdi.fd, fdi.path, target_fd, fdi.flags);
 
-	return process_add_fd(p, &fdi, target_fd);
+	return process_add_fd(p, &fdi, target_fd, link_remap);
 }
 
 static int iterate_dir_name(const char *dpath, struct process_info *p,
@@ -632,8 +710,10 @@ static int collect_map_file(struct process_info *p, const struct replace_info_s 
 			    int prot, int map_flags, unsigned long long pgoff)
 {
 	int err, fd, map_fd;
+	struct link_remap_s *link_remap;
 
-	err = create_file_obj(ri, map_path, open_flags, 0, NULL, &fd, create_map_obj);
+	err = create_file_obj(ri, map_path, open_flags, 0, NULL, &fd, &link_remap,
+			      create_map_obj);
 	if (err)
 		return err;
 
@@ -647,7 +727,7 @@ static int collect_map_file(struct process_info *p, const struct replace_info_s 
 	pr_debug("\t/proc/%d/map_files/%lx-%lx ---> %s (fd: %d, flags: 0%o)\n",
 			p->pid, start, end, map_path, map_fd, open_flags);
 
-	return process_add_mapping(p, map_fd, start, end, prot, map_flags, pgoff);
+	return process_add_mapping(p, map_fd, start, end, prot, map_flags, pgoff, link_remap);
 }
 
 static int map_open_flags(int map_files_fd,
