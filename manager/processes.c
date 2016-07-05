@@ -502,7 +502,7 @@ static int collect_process_fd(struct process_info *p, int dir,
 	if (!is_mnt_fd(&fdi, ri))
 		return 0;
 
-	err = collect_fd(p->pid, fdi.fd, &rfd);
+	err = collect_fd(p->pid, fdi.fd, NULL, &rfd);
 	if (err) {
 		pr_err("failed to add /proc/%d/fd/%d to tree\n", p->pid, fdi.fd);
 		return err;

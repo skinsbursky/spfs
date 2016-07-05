@@ -117,7 +117,7 @@ static int compare_fds(const void *a, const void *b)
 	return kcmp(KCMP_FILE, f->pid, s->pid, f->fd, s->fd);
 }
 
-int collect_fd(pid_t pid, int fd, struct replace_fd **rfd)
+int collect_fd(pid_t pid, int fd, void *file_obj, struct replace_fd **rfd)
 {
 	struct replace_fd *new_fd, **found_fd;
 	int err = -ENOMEM;
@@ -130,7 +130,7 @@ int collect_fd(pid_t pid, int fd, struct replace_fd **rfd)
 	new_fd->pid = pid;
 	new_fd->fd = fd;
 	new_fd->shared = false;
-	new_fd->file_obj = NULL;
+	new_fd->file_obj = file_obj;
 
 	found_fd = tsearch(new_fd, &fd_tree_root, compare_fds);
 	if (!found_fd) {
@@ -219,19 +219,23 @@ int collect_fs_struct(pid_t pid, bool *exists)
 	found_fs = tsearch(new_fs, &fs_struct_tree_root, compare_fs_struct);
 	if (!found_fs) {
 		pr_err("failed to add new fs object to the tree\n");
+		*exists = false;
 		goto free_new_fs;
 	}
+
+	if (*found_fs == new_fs) {
+		*exists = false;
+		return 0;
+	}
+
+	pr_info("process %d shares fs struct with process %d\n", pid,
+			(*found_fs)->pid);
+	*exists = true;
 
 	err = 0;
 
 free_new_fs:
-	if (*found_fs != new_fs) {
-		pr_info("process %d shares fs struct with process %d\n", pid,
-				(*found_fs)->pid);
-		free(new_fs);
-		*exists = true;
-	} else
-		*exists = false;
+	free(new_fs);
 	return err;
 }
 
