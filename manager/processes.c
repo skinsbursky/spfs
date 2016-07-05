@@ -477,13 +477,59 @@ static int is_mnt_fd(const struct fd_info_s *fdi, const struct replace_info_s *r
 	return fdi->st.st_dev == ri->src_dev;
 }
 
+static int create_file_obj(const struct replace_info_s *ri,
+			   const char *path, unsigned flags, mode_t mode,
+			   const char *parent, void *file_obj,
+			   int (*create_obj)(const char *path, unsigned flags,
+					     mode_t mode, const char *parent,
+					     void *file_obj))
+{
+	int err;
+
+	/* TODO it makes sense to create file objects (open files) only
+	 * shared files here.
+	 * Private files can be opened by the process itself */
+	err = create_obj(path, flags, mode, parent, file_obj);
+	if (err) {
+		pr_err("failed to open file object for %s\n", path);
+		return err;
+	}
+	return 0;
+}
+
+static int collect_fd_obj(const struct replace_info_s *ri, pid_t pid,
+			  const struct fd_info_s *fdi, const char *parent)
+{
+	void *file_obj;
+	struct replace_fd *rfd;
+	int err;
+
+	err = create_file_obj(ri, fdi->path, fdi->flags, fdi->st.st_mode, parent,
+			      &file_obj, create_fd_obj);
+	if (err)
+		return err;
+
+	err = collect_fd(pid, fdi->fd, file_obj, &rfd);
+	if (err) {
+		pr_err("failed to add /proc/%d/fd/%d to tree\n", pid, fdi->fd);
+		return err;
+	}
+
+	if (file_obj != rfd->file_obj) {
+		/* TODO do real release of new fresh object */
+		close(get_file_obj_fd(file_obj, fdi->flags));
+	}
+
+	return get_file_obj_fd(rfd->file_obj, fdi->flags);
+}
+
 static int collect_process_fd(struct process_info *p, int dir,
 			      const char *process_fd, const void *data)
 {
 	int err, target_fd;
 	const struct replace_info_s *ri = data;
-	struct replace_fd *rfd;
 	struct fd_info_s fdi;
+	char link[PATH_MAX];
 
 	/* Fast path. In most of the cases opened file is accessible and
 	 * shouldn't be replaced.
@@ -502,31 +548,10 @@ static int collect_process_fd(struct process_info *p, int dir,
 	if (!is_mnt_fd(&fdi, ri))
 		return 0;
 
-	err = collect_fd(p->pid, fdi.fd, NULL, &rfd);
-	if (err) {
-		pr_err("failed to add /proc/%d/fd/%d to tree\n", p->pid, fdi.fd);
-		return err;
-	}
+	/* TODO This is a temporary solution !!! */
+	snprintf(link, PATH_MAX, "/proc/%d/fd/%d", p->pid, fdi.fd);
 
-	if (!rfd->file_obj) {
-		char link[PATH_MAX];
-
-		/* TODO This is a temporary solution !!! */
-		snprintf(link, PATH_MAX, "/proc/%d/fd/%d", p->pid, fdi.fd);
-
-		/* TODO it makes sense to create file objects (open files) only
-		 * shared files here.
-		 * Private files can be opened by the process itself */
-		err = create_fd_obj(fdi.path, fdi.flags, fdi.st.st_mode,
-				      link, &rfd->file_obj);
-		if (err) {
-			pr_err("failed to open file object for /proc/%d/fd/%d\n",
-					rfd->pid, rfd->fd);
-			return err;
-		}
-	}
-
-	target_fd = get_file_obj_fd(rfd->file_obj, fdi.flags);
+	target_fd = collect_fd_obj(ri, p->pid, &fdi, link);
 	if (target_fd < 0)
 		return target_fd;
 
