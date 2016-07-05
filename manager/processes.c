@@ -870,28 +870,27 @@ static int collect_process_maps(struct process_info *p,
 	return err;
 }
 
-static int collect_process_fs(struct process_info *p,
-			       const struct replace_info_s *ri,
-			       int dir)
+static int collect_process_cwd_root(struct process_info *p,
+				    const struct replace_info_s *ri)
 {
 	bool mnt_cwd, mnt_root;
-	int err;
+	int dir, err;
+	char path[PATH_MAX];
+
+	snprintf(path, PATH_MAX, "/proc/%d", p->pid);
+	dir = open(path, O_RDONLY | O_DIRECTORY);
+	if (dir < 0) {
+		pr_perror("failed to open %s", path);
+		return -errno;
+	}
 
 	mnt_cwd = is_mnt_file(p, dir, "cwd", ri->source_mnt, ri->src_dev);
 	mnt_root = is_mnt_file(p, dir, "root", ri->source_mnt, ri->src_dev);
 
+	close(dir);
+
 	if (!mnt_cwd && ! mnt_root)
 		return 0;
-
-	err = collect_fs_struct(p->pid);
-	if (err == -EEXIST) {
-		pr_info("ignoring process %d fs\n", p->pid);
-		return 0;
-	}
-	if (err) {
-		pr_err("failed to collect process %d fs\n", p->pid);
-		return err;
-	}
 
 	if (mnt_cwd) {
 		p->fs.cwd_fd = open_process_env(p, ri, "cwd");
@@ -913,22 +912,29 @@ static int collect_process_fs(struct process_info *p,
 	return 0;
 }
 
-static int collect_process_env(struct process_info *p,
-			       const struct replace_info_s *ri)
+static int collect_process_fs(struct process_info *p,
+			      const struct replace_info_s *ri)
 {
-	int dir, err;
-	char path[PATH_MAX];
+	int err;
+	pid_t pid;
 
-	snprintf(path, PATH_MAX, "/proc/%d", p->pid);
-	dir = open(path, O_RDONLY | O_DIRECTORY);
-	if (dir < 0) {
-		pr_perror("failed to open %s", path);
-		return -errno;
+	pid = fs_struct_exists(p->pid);
+	if (pid) {
+		pr_info("\t/proc/%d/<root,cwd> ---> ignoring (shared with process %d)\n",
+				p->pid, pid);
+		return 0;
 	}
 
-	err = collect_process_fs(p, ri, dir);
+	err = collect_process_cwd_root(p, ri);
+	if (err)
+		return err;
 
-	close(dir);
+	if ((p->fs.cwd_fd >= 0) || p->fs.root) {
+		err = collect_fs_struct(p->pid);
+		if (err)
+			pr_err("failed to collect process %d fs\n", p->pid);
+	}
+
 	return err;
 }
 
@@ -961,7 +967,7 @@ static int examine_one_process(struct process_info *p, const struct replace_info
 
 	pr_debug("Process %d: examining...\n", p->pid);
 
-	err = collect_process_env(p, ri);
+	err = collect_process_fs(p, ri);
 	if (err)
 		return err;
 

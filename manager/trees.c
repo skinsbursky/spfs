@@ -218,6 +218,18 @@ static int compare_fs_struct(const void *a, const void *b)
 	return kcmp(KCMP_FS, f->pid, s->pid, 0, 0);
 }
 
+pid_t fs_struct_exists(pid_t pid)
+{
+	struct fs_struct_s fs = {
+		.pid = pid,
+	}, **found_fs;
+
+	found_fs = tfind(&fs, &fs_struct_tree_root, compare_fs_struct);
+	if (!found_fs)
+		return 0;
+	return (*found_fs)->pid;
+}
+
 int collect_fs_struct(pid_t pid)
 {
 	struct fs_struct_s *new_fs, **found_fs;
