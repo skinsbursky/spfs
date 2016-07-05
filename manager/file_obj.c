@@ -218,7 +218,7 @@ static int get_file_ops(mode_t mode, fobj_ops_t **ops)
 	return -ENOTSUP;
 }
 
-int create_file_obj(const char *path, unsigned flags, mode_t mode,
+int create_fd_obj(const char *path, unsigned flags, mode_t mode,
 		    const char *parent, void **file_obj)
 {
 	file_obj_t *fobj;
