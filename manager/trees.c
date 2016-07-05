@@ -282,7 +282,7 @@ static int compare_map_fd(const void *a, const void *b)
 	return 0;
 }
 
-int collect_map_fd(int fd, const char *path, unsigned flags, int *map_fd)
+int collect_map_fd(int fd, const char *path, unsigned flags)
 {
 	struct map_fd_s *new_mfd, **found_mfd;
 	int err = -ENOMEM;
@@ -306,7 +306,6 @@ int collect_map_fd(int fd, const char *path, unsigned flags, int *map_fd)
 		goto free_new_mfd_path;
 	}
 
-	*map_fd = (*found_mfd)->map_fd;
 	err = 0;
 
 	if (*found_mfd == new_mfd)
@@ -317,7 +316,7 @@ free_new_mfd_path:
 free_new_mfd:
 	free(new_mfd);
 exit:
-	return err;
+	return err ? err :(*found_mfd)->map_fd;
 }
 
 static int compare_paths(const void *a, const void *b)
