@@ -639,8 +639,8 @@ static int collect_map_file(struct process_info *p, const struct replace_info_s 
 	if (err)
 		return err;
 
-	err = collect_map_fd(fd, map_path, open_flags, &map_fd);
-	if (err)
+	map_fd = collect_map_fd(fd, map_path, open_flags);
+	if (map_fd < 0)
 		pr_err("failed to collect map fd for path %s\n", map_path);
 
 	if (fd != map_fd)
