@@ -815,6 +815,34 @@ static int open_process_env(struct process_info *p,
 	return fd;
 }
 
+static int collect_process_exe(struct process_info *p,
+			       const struct replace_info_s *ri)
+{
+	int dir;
+	char path[PATH_MAX];
+	bool mnt_exe;
+
+	snprintf(path, PATH_MAX, "/proc/%d", p->pid);
+	dir = open(path, O_RDONLY | O_DIRECTORY);
+	if (dir < 0) {
+		pr_perror("failed to open %s", path);
+		return -errno;
+	}
+
+	mnt_exe = is_mnt_file(p, dir, "exe", ri->source_mnt, ri->src_dev);
+
+	close(dir);
+
+	if (!mnt_exe)
+		return 0;
+
+	p->exe_fd = open_process_env(p, ri, "exe");
+	if (p->exe_fd < 0)
+		return p->exe_fd;
+
+	return 0;
+}
+
 static int collect_process_maps(struct process_info *p,
 				const struct replace_info_s *ri)
 {
@@ -827,6 +855,10 @@ static int collect_process_maps(struct process_info *p,
 				p->pid, pid);
 		return 0;
 	}
+
+	err = collect_process_exe(p, ri);
+	if (err)
+		return err;
 
 	err = collect_process_map_files(p, ri);
 	if (err)
@@ -881,20 +913,6 @@ static int collect_process_fs(struct process_info *p,
 	return 0;
 }
 
-static int collect_process_exe(struct process_info *p,
-			       const struct replace_info_s *ri,
-			       int dir)
-{
-	if (!is_mnt_file(p, dir, "exe", ri->source_mnt, ri->src_dev))
-		return 0;
-
-	p->exe_fd = open_process_env(p, ri, "exe");
-	if (p->exe_fd < 0)
-		return p->exe_fd;
-
-	return 0;
-}
-
 static int collect_process_env(struct process_info *p,
 			       const struct replace_info_s *ri)
 {
@@ -908,13 +926,8 @@ static int collect_process_env(struct process_info *p,
 		return -errno;
 	}
 
-	err = collect_process_exe(p, ri, dir);
-	if (err)
-		goto close_dir;
-
 	err = collect_process_fs(p, ri, dir);
 
-close_dir:
 	close(dir);
 	return err;
 }
