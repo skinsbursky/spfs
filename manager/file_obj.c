@@ -219,7 +219,7 @@ static int get_file_ops(mode_t mode, fobj_ops_t **ops)
 }
 
 int create_fd_obj(const char *path, unsigned flags, mode_t mode,
-		    const char *parent, void **file_obj)
+		  const char *parent, void *file_obj)
 {
 	file_obj_t *fobj;
 	fobj_ops_t *ops = NULL;
@@ -244,7 +244,7 @@ int create_fd_obj(const char *path, unsigned flags, mode_t mode,
 	fobj->fd = fd;
 	fobj->ops = ops;
 
-	*file_obj = fobj;
+	*(void **)file_obj = fobj;
 	return 0;
 
 free_fobj:
