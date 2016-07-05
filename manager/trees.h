@@ -1,14 +1,7 @@
 #ifndef __SPFS_MANAGER_TREES_H_
 #define __SPFS_MANAGER_TREES_H_
 
-struct replace_fd {
-	pid_t pid;
-	int fd;
-	void *file_obj;
-	bool shared;
-};
-
-int collect_fd(pid_t pid, int fd, void *file_obj, struct replace_fd **rfd);
+int collect_fd(pid_t pid, int fd, void *file_obj, void **real_file_obj);
 pid_t fd_table_exists(pid_t pid);
 int collect_fd_table(pid_t pid);
 pid_t fs_struct_exists(pid_t pid);
