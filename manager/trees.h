@@ -8,7 +8,7 @@ struct replace_fd {
 	bool shared;
 };
 
-int collect_fd(pid_t pid, int fd, struct replace_fd **rfd);
+int collect_fd(pid_t pid, int fd, void *file_obj, struct replace_fd **rfd);
 bool fd_table_exists(pid_t pid);
 int collect_fd_table(pid_t pid);
 int collect_fs_struct(pid_t pid, bool *exists);
