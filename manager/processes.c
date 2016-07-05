@@ -284,7 +284,7 @@ static int transform_path(const char *source_path,
 	}
 
 	if (size <= strlen(target_mnt) + strlen(sp)) {
-		pr_err("target dest_path is too long (%ld >= %ld)\n",
+		pr_err("resulting path is too long (%ld >= %ld)\n",
 				strlen(target_mnt) + strlen(sp), size);
 		return -ENOMEM;
 	}
