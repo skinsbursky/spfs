@@ -341,6 +341,7 @@ static int collect_path(const char *path, void **root)
 	fp = tsearch(p, root, compare_paths);
 	if (!fp) {
 		pr_err("failed to add new path object to the tree\n");
+		free(p);
 		return -ENOMEM;
 	}
 
