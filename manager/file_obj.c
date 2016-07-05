@@ -37,8 +37,11 @@ char *file_types[FTYPE_MAX] = {
 	"block device",
 };
 
+struct file_obj_s;
+
 typedef struct fobj_ops_s {
 	int (*open)(const char *path, unsigned flags, const char *parent);
+	void (*close)(struct file_obj_s *fobj);
 } fobj_ops_t;
 
 static int fifo_file_fill(const char *source, unsigned fd)
@@ -159,15 +162,24 @@ static int reg_file_open(const char *path, unsigned flags, const char *parent)
 	return fd;
 }
 
+static void reg_file_close(struct file_obj_s *fobj)
+{
+	if (close(fobj->fd))
+		pr_perror("failed to close fd %d", fobj->fd);
+}
+
 fobj_ops_t fobj_ops[] = {
 	[FTYPE_REG] = {
 		.open = reg_file_open,
+		.close = reg_file_close,
 	},
 	[FTYPE_DIR] = {
 		.open = reg_file_open,
+		.close = reg_file_close,
 	},
 	[FTYPE_FIFO] = {
 		.open = fifo_file_open,
+		.close = reg_file_close,
 	},
 };
 
@@ -252,10 +264,17 @@ free_fobj:
 	return err;
 }
 
-
 int get_file_obj_fd(void *file_obj, unsigned flags)
 {
 	file_obj_t *fobj = file_obj;
 
 	return fobj->fd;
+}
+
+void destroy_fd_obj(void *file_obj)
+{
+	file_obj_t *fobj = file_obj;
+
+	fobj->ops->close(fobj);
+	free(fobj);
 }
