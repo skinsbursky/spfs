@@ -65,14 +65,14 @@ static int detach_from_process(const struct process_info *p)
 
 static int destroy_process_maps(struct process_info *p)
 {
-	struct process_map *mfd, *tmp;
+	struct process_map *pm, *tmp;
 
 	if (!p->maps_nr)
 		return 0;
 
-	list_for_each_entry_safe(mfd, tmp, &p->maps, list) {
-		list_del(&mfd->list);
-		free(mfd);
+	list_for_each_entry_safe(pm, tmp, &p->maps, list) {
+		list_del(&pm->list);
+		free(pm);
 	}
 
 	return 0;
@@ -353,21 +353,21 @@ static int process_add_mapping(struct process_info *p, int map_fd,
 			       off_t start, off_t end,
 			       int prot, int flags, unsigned long long pgoff)
 {
-	struct process_map *mfd;
+	struct process_map *pm;
 
-	mfd = malloc(sizeof(*mfd));
-	if (!mfd) {
-		pr_err("failed to allocate mfd\n");
+	pm = malloc(sizeof(*pm));
+	if (!pm) {
+		pr_err("failed to allocate pm\n");
 		return -ENOMEM;
 	}
 
-	mfd->map_fd = map_fd;
-	mfd->start = start;
-	mfd->end = end;
-	mfd->prot = prot;
-	mfd->flags = flags;
-	mfd->pgoff = pgoff;
-	list_add_tail(&mfd->list, &p->maps);
+	pm->map_fd = map_fd;
+	pm->start = start;
+	pm->end = end;
+	pm->prot = prot;
+	pm->flags = flags;
+	pm->pgoff = pgoff;
+	list_add_tail(&pm->list, &p->maps);
 	p->maps_nr++;
 
 	return 0;
