@@ -500,8 +500,7 @@ static int create_file_obj(const struct replace_info_s *ri,
 static int collect_fd_obj(const struct replace_info_s *ri, pid_t pid,
 			  const struct fd_info_s *fdi, const char *parent)
 {
-	void *file_obj;
-	struct replace_fd *rfd;
+	void *file_obj, *real_file_obj;
 	int err;
 
 	err = create_file_obj(ri, fdi->path, fdi->flags, fdi->st.st_mode, parent,
@@ -509,18 +508,18 @@ static int collect_fd_obj(const struct replace_info_s *ri, pid_t pid,
 	if (err)
 		return err;
 
-	err = collect_fd(pid, fdi->fd, file_obj, &rfd);
+	err = collect_fd(pid, fdi->fd, file_obj, &real_file_obj);
 	if (err) {
 		pr_err("failed to add /proc/%d/fd/%d to tree\n", pid, fdi->fd);
 		return err;
 	}
 
-	if (file_obj != rfd->file_obj) {
+	if (file_obj != real_file_obj) {
 		/* TODO do real release of new fresh object */
 		close(get_file_obj_fd(file_obj, fdi->flags));
 	}
 
-	return get_file_obj_fd(rfd->file_obj, fdi->flags);
+	return get_file_obj_fd(real_file_obj, fdi->flags);
 }
 
 static int collect_process_fd(struct process_info *p, int dir,

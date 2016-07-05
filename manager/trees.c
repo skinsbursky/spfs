@@ -23,6 +23,13 @@ enum kcmp_type {
 	KCMP_TYPES,
 };
 
+struct replace_fd {
+	pid_t pid;
+	int fd;
+	void *file_obj;
+	bool shared;
+};
+
 struct map_fd_s {
 	int map_fd;
 	char *path;
@@ -128,7 +135,7 @@ static int compare_fds(const void *a, const void *b)
 	return kcmp(KCMP_FILE, f->pid, s->pid, f->fd, s->fd);
 }
 
-int collect_fd(pid_t pid, int fd, void *file_obj, struct replace_fd **rfd)
+int collect_fd(pid_t pid, int fd, void *file_obj, void **real_file_obj)
 {
 	struct replace_fd *new_fd, **found_fd;
 	int err = -ENOMEM;
@@ -152,7 +159,7 @@ int collect_fd(pid_t pid, int fd, void *file_obj, struct replace_fd **rfd)
 	if (*found_fd != new_fd)
 		(*found_fd)->shared = true;
 
-	*rfd = *found_fd;
+	*real_file_obj = (*found_fd)->file_obj;
 	err = 0;
 
 free_new_fd:
