@@ -49,15 +49,18 @@ static void *find_mapping(pid_t pid, struct parasite_ctl *ctl)
 
 	while (getline(&line, &size, fp) != -1) {
 		unsigned long start;
-		char x;
+		char x, p;
 		int ret;
 
-		ret = sscanf(line, "%lx-%*x %*c%*c%c", &start, &x);
-		if (ret != 2) {
+		ret = sscanf(line, "%lx-%*x %*c%*c%c%c", &start, &x, &p);
+		if (ret != 3) {
 			pr_err("Can't parse line: %s", line);
 			result = MAP_FAILED;
 			break;
 		}
+
+		if (p != 'p')
+			continue;
 
 		if (x != 'x' || start > TASK_SIZE)
 			continue;
