@@ -707,8 +707,8 @@ static int map_prot(char r, char w, char x)
 	return prot;
 }
 
-static int collect_process_maps(struct process_info *p,
-				const struct replace_info_s *ri)
+static int collect_process_map_files(struct process_info *p,
+				     const struct replace_info_s *ri)
 {
 	char map[PATH_MAX];
 	FILE *fmap;
@@ -813,6 +813,29 @@ static int open_process_env(struct process_info *p,
 	pr_debug("\t/proc/%d/%s ---> %s (fd %d)\n", p->pid, dentry, path, fd);
 
 	return fd;
+}
+
+static int collect_process_maps(struct process_info *p,
+				const struct replace_info_s *ri)
+{
+	int err;
+	pid_t pid;
+
+	pid = mm_exists(p->pid);
+	if (pid) {
+		pr_info("\t/proc/%d/map_files ---> ignoring (shared with process %d)\n",
+				p->pid, pid);
+		return 0;
+	}
+
+	err = collect_process_map_files(p, ri);
+	if (err)
+		return err;
+
+	if (p->maps_nr)
+		err = collect_mm(p->pid);
+
+	return err;
 }
 
 static int collect_process_fs(struct process_info *p,
