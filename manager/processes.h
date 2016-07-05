@@ -38,6 +38,7 @@ struct process_fd {
 	int			target_fd;
 	unsigned long		cloexec;
 	long long		pos;
+	bool			replaced;
 };
 
 struct process_map {
@@ -48,6 +49,7 @@ struct process_map {
 	int			prot;
 	int			flags;
 	unsigned long long	pgoff;
+	bool			replaced;
 };
 
 struct parasite_ctl;
