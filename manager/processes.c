@@ -516,10 +516,8 @@ static int collect_fd_obj(const struct replace_info_s *ri, pid_t pid,
 		return err;
 	}
 
-	if (file_obj != real_file_obj) {
-		/* TODO do real release of new fresh object */
-		close(get_file_obj_fd(file_obj, fdi->flags));
-	}
+	if (file_obj != real_file_obj)
+		destroy_fd_obj(file_obj);
 
 	return get_file_obj_fd(real_file_obj, fdi->flags);
 }
