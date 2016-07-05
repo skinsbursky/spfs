@@ -37,11 +37,16 @@ struct fs_struct_s {
 	pid_t pid;
 };
 
+struct mm_struct_s {
+	pid_t pid;
+};
+
 static void *fd_tree_root = NULL;
 static void *fd_table_tree_root = NULL;
 static void *fs_struct_tree_root = NULL;
 static void *map_fd_tree_root = NULL;
 static void *fifo_tree_root = NULL;
+static void *mm_tree_root = NULL;
 
 static void free_fd_node(void *nodep)
 {
@@ -74,6 +79,11 @@ static void free_fifo_node(void *nodep)
 	free(nodep);
 }
 
+static void free_mm_node(void *nodep)
+{
+	free(nodep);
+}
+
 void destroy_obj_trees(void)
 {
 	tdestroy(fd_tree_root, free_fd_node);
@@ -81,6 +91,7 @@ void destroy_obj_trees(void)
 	tdestroy(fs_struct_tree_root, free_fs_struct_node);
 	tdestroy(map_fd_tree_root, free_map_fd_node);
 	tdestroy(fifo_tree_root, free_fifo_node);
+	tdestroy(mm_tree_root, free_mm_node);
 }
 
 static int kcmp(int type, pid_t pid1, pid_t pid2, unsigned long idx1, unsigned long idx2)
@@ -324,4 +335,54 @@ static int collect_path(const char *path, void **root)
 int collect_fifo(const char *path)
 {
 	return collect_path(path, &fifo_tree_root);
+}
+
+static int compare_mm_struct(const void *a, const void *b)
+{
+	const struct mm_struct_s *f = a, *s = b;
+
+	return kcmp(KCMP_VM, f->pid, s->pid, 0, 0);
+}
+
+pid_t mm_exists(pid_t pid)
+{
+	struct mm_struct_s mm = {
+		.pid = pid,
+	}, **found_mm;
+
+
+	found_mm = tfind(&mm, &mm_tree_root, compare_mm_struct);
+	if (!found_mm)
+		return 0;
+	return (*found_mm)->pid;
+}
+
+int collect_mm(pid_t pid)
+{
+	struct mm_struct_s *new_mm, **found_mm;
+	int err = -ENOMEM;
+
+	new_mm = malloc(sizeof(*new_mm));
+	if (!new_mm) {
+		pr_err("failed to allocate\n");
+		return -ENOMEM;
+	}
+	new_mm->pid = pid;
+
+	found_mm = tsearch(new_mm, &mm_tree_root, compare_mm_struct);
+	if (!found_mm) {
+		pr_err("failed to add new mm object to the tree\n");
+		goto free_new_mm;
+	}
+
+	if (*found_mm == new_mm)
+		return 0;
+
+	pr_info("process %d shares mm struct with process %d\n", pid,
+			(*found_mm)->pid);
+	err = -EEXIST;
+
+free_new_mm:
+	free(new_mm);
+	return err;
 }
