@@ -187,14 +187,16 @@ int collect_fd_table(pid_t pid)
 		goto free_new_fdt;
 	}
 
-	err = 0;
+	if (*found_fdt == new_fdt)
+		return 0;
+
+	pr_info("process %d shares fd table with process %d\n", pid,
+			(*found_fdt)->pid);
+
+	err = -EEXIST;
 
 free_new_fdt:
-	if (*found_fdt != new_fdt) {
-		pr_info("process %d shares fd table with process %d\n", pid,
-				(*found_fdt)->pid);
-		free(new_fdt);
-	}
+	free(new_fdt);
 	return err;
 }
 
