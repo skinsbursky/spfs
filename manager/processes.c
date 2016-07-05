@@ -900,9 +900,12 @@ static int collect_process_fds(struct process_info *p,
 			       const struct replace_info_s *ri)
 {
 	int err;
+	pid_t pid;
 
-	if (fd_table_exists(p->pid)) {
-		pr_info("\t/proc/%d/fd ---> ignoring (shared)\n", p->pid);
+	pid = fd_table_exists(p->pid);
+	if (pid) {
+		pr_info("\t/proc/%d/fd ---> ignoring (shared with process %d)\n",
+				p->pid, pid);
 		return 0;
 	}
 
