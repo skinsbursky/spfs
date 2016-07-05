@@ -63,64 +63,58 @@ static int detach_from_process(const struct process_info *p)
 	return 0;
 }
 
-static int destroy_process_maps(struct process_info *p)
+static void release_process_maps(struct process_info *p)
 {
 	struct process_map *pm, *tmp;
 
 	if (!p->maps_nr)
-		return 0;
+		return;
 
 	list_for_each_entry_safe(pm, tmp, &p->maps, list) {
 		list_del(&pm->list);
 		free(pm);
 	}
-
-	return 0;
 }
 
-static int destroy_process_fds(struct process_info *p)
+static void release_process_fds(struct process_info *p)
 {
 	struct process_fd *pfd, *tmp;
 
 	if (!p->fds_nr)
-		return 0;
+		return;
 
 	list_for_each_entry_safe(pfd, tmp, &p->fds, list) {
 		list_del(&pfd->list);
 		free(pfd);
 	}
-
-	return 0;
 }
 
-static void destroy_one_process(struct process_info *p)
+static void release_process_resources(struct process_info *p)
 {
-	destroy_process_maps(p);
-	destroy_process_fds(p);
-	list_del(&p->list);
-	free(p);
+	release_process_maps(p);
+	release_process_fds(p);
 }
 
-static void release_one_process(struct process_info *p)
+static void detach_one_process(struct process_info *p)
 {
 	if (p->pctl)
 		(void) destroy_parasite_ctl(p->pid, p->pctl);
 	(void) detach_from_process(p);
+	list_del(&p->list);
+	free(p);
 }
 
-int release_processes(struct list_head *processes)
+void release_processes(struct list_head *processes)
 {
 	struct process_info *p, *tmp;
 
 	list_for_each_entry(p, processes, list)
-		release_one_process(p);
-
-	list_for_each_entry_safe(p, tmp, processes, list)
-		destroy_one_process(p);
+		release_process_resources(p);
 
 	destroy_obj_trees();
 
-	return 0;
+	list_for_each_entry_safe(p, tmp, processes, list)
+		detach_one_process(p);
 }
 
 static int attach_to_process(const struct process_info *p)
@@ -911,9 +905,9 @@ static int examine_one_process(struct process_info *p, const struct replace_info
 	return 0;
 
 destroy_process_maps:
-	destroy_process_maps(p);
+	release_process_maps(p);
 destroy_process_fds:
-	destroy_process_fds(p);
+	release_process_fds(p);
 	return err;
 }
 
