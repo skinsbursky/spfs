@@ -410,7 +410,7 @@ function start_zdtm_tests {
 }
 
 function stop_zdtm_tests {
-	[ -n "$running_tests" ] || return 0
+	[ -n "$running_tests" ] || running_tests="$tests_list"
 
 	echo "Stop tests:"
 	stop_tests $ZDTM_DIR "$running_tests"
