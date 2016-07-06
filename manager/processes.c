@@ -109,6 +109,12 @@ static void detach_one_process(struct process_info *p)
 	free(p);
 }
 
+static void release_shared_resources(void)
+{
+	destroy_obj_trees();
+	destroy_link_remap_tree();
+}
+
 void release_processes(struct list_head *processes)
 {
 	struct process_info *p, *tmp;
@@ -116,10 +122,10 @@ void release_processes(struct list_head *processes)
 	list_for_each_entry(p, processes, list)
 		release_process_resources(p);
 
-	destroy_obj_trees();
-
 	list_for_each_entry_safe(p, tmp, processes, list)
 		detach_one_process(p);
+
+	release_shared_resources();
 }
 
 static int attach_to_process(const struct process_info *p)
