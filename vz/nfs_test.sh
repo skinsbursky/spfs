@@ -396,8 +396,6 @@ function set_env {
 		echo "Path to ZDTM tests must be provided"
 		exit 1
 	fi
-
-	set_test_print_len "$tests_list"
 }
 
 function start_zdtm_tests {
@@ -468,32 +466,25 @@ while [ "$*" ] ; do
 			shift
 			;;
 		run)
-			cmd="run"
-			shift
+			cmd_list="$cmd_list run"
 			;;
 		cr)
-			cmd="cr"
-			shift
+			cmd_list="$cmd_list cr"
 			;;
 		start)
-			cmd="start"
-			shift
+			cmd_list="$cmd_list start"
 			;;
 		stop)
-			cmd="stop"
-			shift
+			cmd_list="$cmd_list stop"
 			;;
 		kill)
-			cmd="kill"
-			shift
+			cmd_list="$cmd_list kill"
 			;;
 		clean)
-			cmd="clean"
-			shift
+			cmd_list="$cmd_list clean"
 			;;
 		list)
-			cmd="list"
-			shift
+			cmd_list="$cmd_list list"
 			;;
 		*)
 			echo "unknown $arg"
@@ -502,35 +493,37 @@ while [ "$*" ] ; do
 	esac
 done
 
-[ -n "$cmd" ] || cmd="run"
+[ -n "$cmd_list" ] || cmd_list="run"
 [ -n "$tests_list" ] || tests_list="$TESTS_LIST"
 
-running_tests="$tests_list"
+set_test_print_len "$tests_list"
 
-case $cmd in
-	run)
-		set_env
-		run_zdtm_tests
-		;;
-	start)
-		set_env
-		start_zdtm_tests
-		;;
-	stop)
-		set_env
-		stop_zdtm_tests
-		;;
-	list)
-		list_tests
-		;;
-	clean)
-		set_env
-		clean_tests_out
-		;;
-	cr)
-		suspend_restore
-		;;
-	kill)
-		kill_tests "$tests_list"
-		;;
-esac
+for cmd in $cmd_list; do
+	case $cmd in
+		run)
+			set_env
+			run_zdtm_tests
+			;;
+		start)
+			set_env
+			start_zdtm_tests
+			;;
+		stop)
+			set_env
+			stop_zdtm_tests
+			;;
+		list)
+			list_tests
+			;;
+		clean)
+			set_env
+			clean_tests_out
+			;;
+		cr)
+			suspend_restore
+			;;
+		kill)
+			kill_tests "$tests_list"
+			;;
+	esac
+done
