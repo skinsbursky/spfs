@@ -252,6 +252,7 @@ function stop_tests {
 
 function kill_tests {
 	local list=$1
+	local pnames=""
 
 	[ -n "$list" ] || return 0
 
@@ -259,8 +260,11 @@ function kill_tests {
 
 	for t in $list; do
 		IFS='/' read -ra array <<< "$t"
-		killall -9 ${array[1]} > /dev/null 2>&1
+		pnames="${array[1]} $pnames"
 	done
+
+	killall -9 $pnames > /dev/null 2>&1
+
 	echo "done"
 }
 
