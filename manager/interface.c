@@ -168,9 +168,7 @@ close_pipe:
 kill_spfs:
 	kill_child_and_collect(pid);
 umount_spfs:
-	/* TODO this umount won't work */
-	umount(info->mnt.mountpoint);
-	spfs_cleanup_env(info);
+	umount_spfs(info);
 	goto close_pipe;
 }
 
