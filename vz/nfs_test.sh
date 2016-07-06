@@ -49,6 +49,8 @@ TESTS_LIST="	\
 		static/file_attr		\
 		static/fifo-ghost		\
 						\
+		static/deleted_dev		\
+						\
 		transition/fifo_loop		\
 		transition/fifo_dyn		\
 		transition/epoll		\
@@ -57,13 +59,8 @@ TESTS_LIST="	\
 		"
 
 NOT_STARTING_TEST_LIST="			\
-		static/deleted_dev		\
-		static/fanotify00		\
-		static/unlink_fstat00		\
 		static/maps04			\
 		static/maps03			\
-		static/sockets00		\
-		static/vt			\
 		"
 
 NOT_DUMPABLE_OVERMOUNT_TEST_LIST="		\
@@ -74,6 +71,9 @@ NOT_DUMPABLE_STALE_TEST_LIST="			\
 		static/rmdir_open		\
 		static/cwd02			\
 		static/cwd01			\
+		static/fanotify00		\
+		static/unlink_fstat00		\
+		static/vt			\
 		"
 
 NOT_DUMPABLE_UNLINKED_TEST_LIST="		\
@@ -81,6 +81,7 @@ NOT_DUMPABLE_UNLINKED_TEST_LIST="		\
 		"
 
 NOT_DUMPABLE_SOCKETS_TEST_LIST="		\
+		static/sockets00		\
 		static/sk-unix-rel		\
 		"
 ALWAYS_FAIL_TEST_LIST="				\
