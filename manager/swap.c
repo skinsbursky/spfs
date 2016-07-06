@@ -139,6 +139,17 @@ static swap_handler_t get_swap_handler(swap_resource_t type)
 	return swap_resources_handlers[type];
 }
 
+static int process_do_swap_handler(struct process_info *p, swap_resource_t type)
+{
+	swap_handler_t handler;
+
+	handler = get_swap_handler(type);
+	if (handler < 0)
+		return -EINVAL;
+
+	return handler(p);
+}
+
 static int process_do_swap_handlers(struct process_info *p,
 				    swap_resource_t start,
 				    swap_resource_t end)
@@ -146,14 +157,9 @@ static int process_do_swap_handlers(struct process_info *p,
 	swap_resource_t type;
 
 	for (type = start; type < end; type++) {
-		swap_handler_t handler;
 		int err;
 
-		handler = get_swap_handler(type);
-		if (handler < 0)
-			return -EINVAL;
-
-		err = handler(p);
+		err = process_do_swap_handler(p, type);
 		if (err)
 			return err;
 	}
@@ -169,9 +175,7 @@ static int do_swap_process_resources(struct process_info *p)
 
 static int do_swap_exe_resources(struct process_info *p)
 {
-	pr_debug("Swapping process %d exe:\n", p->pid);
-
-	return process_do_swap_handlers(p, SWAP_RESOURCE_EXE, SWAP_RESOURCE_MAX);
+	return process_do_swap_handler(p, SWAP_RESOURCE_EXE);
 }
 
 static bool process_needs_resources_swap(struct process_info *p)
