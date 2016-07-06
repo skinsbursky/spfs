@@ -205,7 +205,7 @@ function start_tests {
 function test_result {
 	local test_dir=$1
 	local t=$2
-	local attempts=15
+	local attempts=50
 
 	while [ -n "$list" ]; do
 		attempts=$((attempts - 1))
