@@ -389,7 +389,7 @@ int spfs_prepare_env(struct spfs_info_s *info, const char *proxy_dir)
 
 static int __spfs_cleanup_env(struct spfs_info_s *info)
 {
-	if (umount2(info->work_dir, MNT_DETACH)) {
+	if (umount(info->work_dir)) {
 		pr_perror("failed to umount %s", info->work_dir);
 		return -errno;
 	}
