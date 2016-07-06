@@ -173,14 +173,16 @@ function start_tests {
 		printf "\t%-*s: " $printf_test_len "$t"
 		test_file_exist $test_dir $t "c"
 		if [ $? -eq 0 ]; then
-			test_file_exist $test_dir $t "pid"
-			if [ $? -eq 0 ]; then
+			pid=$(test_is_running $test_dir $t)
+			if [ -n "$pid" ]; then
 				echo "already running"
 				running_tests="$running_tests $t"
 				continue
 			fi
 
-			test_file_exist $test_dir $t "out"
+			test_file_exist $test_dir $t "pid" || 
+			test_file_exist $test_dir $t "out" ||
+			test_file_exist $test_dir $t "out.inprogress"
 			if [ $? -eq 0 ]; then
 				echo "dirty"
 				return 1
