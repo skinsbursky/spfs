@@ -54,7 +54,12 @@ free_new_lr:
 
 void put_link_remap(struct link_remap_s *link_remap)
 {
-	link_remap->users--;
+	if (--link_remap->users)
+		return;
+
+	pr_debug("unlinking %s\n", link_remap->path);
+	if (unlink(link_remap->path))
+		pr_perror("failed to unlink link_remap %s", link_remap->path);
 }
 
 int get_link_remap(const char *path, struct link_remap_s **link_remap)
@@ -75,16 +80,11 @@ static void free_link_remap_node(void *nodep)
 {
 	struct link_remap_s *lr = nodep;
 
-	if (lr->users == 0) {
-		pr_debug("unlinking %s\n", lr->path);
-		if (unlink(lr->path))
-			pr_perror("failed to unlink link_remap %s", lr->path);
-	}
 	free(lr->path);
 	free(lr);
 }
 
-void cleanup_link_remaps(void)
+void destroy_link_remap_tree(void)
 {
 	tdestroy(link_remap_tree_root, free_link_remap_node);
 }
