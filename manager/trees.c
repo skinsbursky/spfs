@@ -10,6 +10,7 @@
 #include "include/log.h"
 
 #include "trees.h"
+#include "file_obj.h"
 
 enum kcmp_type {
 	KCMP_FILE,
@@ -58,8 +59,8 @@ static void *mm_tree_root = NULL;
 static void free_fd_node(void *nodep)
 {
 	struct replace_fd *rfd = nodep;
-	/*TODO close file_obj somehow... */
 
+	destroy_fd_obj(rfd->file_obj);
 	free(rfd);
 }
 
