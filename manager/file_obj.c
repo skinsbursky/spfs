@@ -40,50 +40,51 @@ char *file_types[FTYPE_MAX] = {
 struct file_obj_s;
 
 typedef struct fobj_ops_s {
-	int (*open)(const char *path, unsigned flags, const char *parent);
+	int (*open)(const char *path, unsigned flags, int source_fd);
 	void (*close)(struct file_obj_s *fobj);
 } fobj_ops_t;
 
-static int fifo_file_fill(const char *source, unsigned fd)
+static int fifo_file_fill(int source_fd, int destination_fd)
 {
-	char path[PATH_MAX];
-	int fifo;
-	int source_fd, err = 0;
+	char dest_path[PATH_MAX];
+	char src_path[PATH_MAX];
+	int fifo_src, fifo_dst, err = 0;
 	ssize_t bytes;
 
-	snprintf(path, PATH_MAX, "/proc/%d/fd/%d", getpid(), fd);
+	snprintf(src_path, PATH_MAX, "/proc/%d/fd/%d", getpid(), source_fd);
+	snprintf(dest_path, PATH_MAX, "/proc/%d/fd/%d", getpid(), destination_fd);
 
-	fifo = open(path, O_RDWR);
-	if (fifo < 0) {
-		pr_perror("failed to open fifo %s in read/write mode", path);
+	fifo_src = open(src_path, O_RDONLY | O_NONBLOCK);
+	if (fifo_src < 0) {
+		pr_perror("failed to open source fifo %s", src_path);
 		return -errno;
 	}
 
-	source_fd = open(source, O_RDONLY | O_NONBLOCK);
-	if (source_fd < 0) {
-		pr_perror("failed to open source fifo %s", source);
+	fifo_dst = open(dest_path, O_RDWR);
+	if (fifo_dst < 0) {
+		pr_perror("failed to open destination fifo %s", dest_path);
 		err = -errno;
-		goto close_fifo_rw;
+		goto close_fifo_src;
 	}
 
-	bytes = fcntl(source_fd, F_GETPIPE_SZ);
+	bytes = fcntl(fifo_src, F_GETPIPE_SZ);
 	if (bytes < 0) {
-		pr_perror("failed to discover %s capacity", source);
+		pr_perror("failed to discover fd %d capacity", fifo_src);
 		err = -errno;
-		goto close_source_fd;
+		goto close_fifo_dst;
 	}
 
-	bytes = tee(source_fd, fifo, bytes, SPLICE_F_NONBLOCK);
+	bytes = tee(fifo_src, fifo_dst, bytes, SPLICE_F_NONBLOCK);
 	if ((bytes < 0) && (errno != EAGAIN)) {
-		pr_perror("failed to tee data from %s to %s", source, path);
+		pr_perror("failed to tee data from fd %d to fd %d",
+				fifo_src, fifo_dst);
 		err = -errno;
-		goto close_source_fd;
 	}
 
-close_source_fd:
-	close(source_fd);
-close_fifo_rw:
-	close(fifo);
+close_fifo_dst:
+	close(fifo_dst);
+close_fifo_src:
+	close(fifo_src);
 	return err;
 }
 
@@ -121,7 +122,7 @@ close_fifo_rw:
 	return err ? err : fd;
 }
 
-static int fifo_file_open(const char *path, unsigned flags, const char *parent)
+static int fifo_file_open(const char *path, unsigned flags, int source_fd)
 {
 	int fd, err;
 
@@ -135,7 +136,7 @@ static int fifo_file_open(const char *path, unsigned flags, const char *parent)
 			err = 0;
 			break;
 		case 0:
-			err = fifo_file_fill(parent, fd);
+			err = fifo_file_fill(source_fd, fd);
 			break;
 		default:
 			close(fd);
@@ -149,7 +150,7 @@ typedef struct file_obj_s {
 	fobj_ops_t	*ops;
 } file_obj_t;
 
-static int reg_file_open(const char *path, unsigned flags, const char *parent)
+static int reg_file_open(const char *path, unsigned flags, int source_fd)
 {
 	int fd;
 
@@ -231,7 +232,7 @@ static int get_file_ops(mode_t mode, fobj_ops_t **ops)
 }
 
 int create_fd_obj(const char *path, unsigned flags, mode_t mode,
-		  const char *parent, void *file_obj)
+		  int source_fd, void *file_obj)
 {
 	file_obj_t *fobj;
 	fobj_ops_t *ops = NULL;
@@ -247,7 +248,7 @@ int create_fd_obj(const char *path, unsigned flags, mode_t mode,
 		return -ENOMEM;
 	}
 
-	fd = ops->open(path, flags, parent);
+	fd = ops->open(path, flags, source_fd);
 	if (fd < 0) {
 		err = fd;
 		goto free_fobj;
