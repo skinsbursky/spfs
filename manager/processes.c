@@ -22,7 +22,8 @@
 #include "link_remap.h"
 
 struct fd_info_s {
-	int             fd;
+	int             process_fd;
+	int		local_fd;
 	struct stat     st;
 	unsigned        flags;
 	long long	pos;
@@ -344,7 +345,7 @@ static int process_add_fd(struct process_info *p, const struct fd_info_s *fdi,
 		return -ENOMEM;
 	}
 
-	pfd->source_fd = fdi->fd;
+	pfd->source_fd = fdi->process_fd;
 	pfd->target_fd = target_fd;
 	pfd->cloexec = (fdi->flags & O_CLOEXEC) ? FD_CLOEXEC : 0;
 	pfd->pos = fdi->pos;
@@ -478,39 +479,44 @@ unlink_path:
 	return err;
 }
 
+static void put_fd_info(struct fd_info_s *fdi)
+{
+	close(fdi->local_fd);
+}
+
 static int get_fd_info(struct process_info *p, int dir,
 		const char *process_fd, const struct replace_info_s *ri,
 		struct fd_info_s *fdi)
 {
-	int local_fd, err;
+	int err;
 	ssize_t bytes;
 
-	err = xatol(process_fd, (long *)&fdi->fd);
+	err = xatol(process_fd, (long *)&fdi->process_fd);
 	if (err) {
 		pr_err("failed to convert fd %s to number\n", process_fd);
 		return err;
 	}
 
-	local_fd = copy_process_fd(p, fdi->fd);
-	if (local_fd < 0) {
-		pr_err("failed to copy /proc/%d/fd/%d\n", p->pid, fdi->fd);
-		return local_fd;
+	fdi->local_fd = copy_process_fd(p, fdi->process_fd);
+	if (fdi->local_fd < 0) {
+		pr_err("failed to copy /proc/%d/fd/%d\n", p->pid, fdi->process_fd);
+		return fdi->local_fd;
 	}
 
-	if (fstat(local_fd, &fdi->st)) {
-		pr_perror("failed to stat fd %d", local_fd);
+	if (fstat(fdi->local_fd, &fdi->st)) {
+		pr_perror("failed to stat fd %d", fdi->local_fd);
 		err = -errno;
 		goto close_local_fd;
 	}
 
-	err = parse_fdinfo(p->pid, fdi->fd, &fdi->flags, &fdi->pos);
+	err = parse_fdinfo(p->pid, fdi->process_fd, &fdi->flags, &fdi->pos);
 	if (err) {
 		pr_err("failed to get fd flags for /proc/%d/fd/%d", p->pid,
-				fdi->fd);
+				fdi->process_fd);
 		goto close_local_fd;
 	}
 
-	snprintf(fdi->path, PATH_MAX, "/proc/%d/fd/%d", p->pid, fdi->fd);
+	snprintf(fdi->path, PATH_MAX, "/proc/%d/fd/%d", p->pid, fdi->process_fd);
 	bytes = readlink(fdi->path, fdi->path, PATH_MAX - 1);
 	if (bytes < 0) {
 		pr_perror("failed to read link %s\n", fdi->path);
@@ -523,7 +529,8 @@ static int get_fd_info(struct process_info *p, int dir,
 				ri->source_mnt, ri->target_mnt);
 
 close_local_fd:
-	close(local_fd);
+	if (err)
+		close(fdi->local_fd);
 	return err;
 }
 
@@ -593,9 +600,9 @@ static int collect_fd_obj(const struct replace_info_s *ri, pid_t pid,
 	if (err)
 		return err;
 
-	err = collect_fd(pid, fdi->fd, file_obj, &real_file_obj);
+	err = collect_fd(pid, fdi->process_fd, file_obj, &real_file_obj);
 	if (err) {
-		pr_err("failed to add /proc/%d/fd/%d to tree\n", pid, fdi->fd);
+		pr_err("failed to add /proc/%d/fd/%d to tree\n", pid, fdi->process_fd);
 		return err;
 	}
 
@@ -614,14 +621,14 @@ static int collect_process_fd(struct process_info *p,
 	int local_fd;
 
 	/* TODO This is a temporary solution !!! */
-	snprintf(link, PATH_MAX, "/proc/%d/fd/%d", p->pid, fdi->fd);
+	snprintf(link, PATH_MAX, "/proc/%d/fd/%d", p->pid, fdi->process_fd);
 
 	local_fd = collect_fd_obj(ri, p->pid, fdi, link, &link_remap);
 	if (local_fd < 0)
 		return local_fd;
 
 	pr_debug("\t/proc/%d/fd/%d ---> %s (fd: %d, flags: 0%o)\n",
-			p->pid, fdi->fd, fdi->path, local_fd, fdi->flags);
+			p->pid, fdi->process_fd, fdi->path, local_fd, fdi->flags);
 
 	return process_add_fd(p, fdi, local_fd, link_remap);
 }
@@ -650,6 +657,7 @@ static int examine_process_fd(struct process_info *p, int dir,
 	if (is_mnt_fd(&fdi, ri))
 		err = collect_process_fd(p, ri, &fdi);
 
+	put_fd_info(&fdi);
 	return err;
 }
 
