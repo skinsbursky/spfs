@@ -553,10 +553,10 @@ static int is_mnt_fd(const struct fd_info_s *fdi, const struct replace_info_s *r
 
 static int create_file_obj(const struct replace_info_s *ri,
 			   const char *path, unsigned flags, mode_t mode,
-			   const char *parent, void *file_obj,
+			   int source_fd, void *file_obj,
 			   struct link_remap_s **link_remap,
 			   int (*create_obj)(const char *path, unsigned flags,
-					     mode_t mode, const char *parent,
+					     mode_t mode, int source_fd,
 					     void *file_obj))
 {
 	int err;
@@ -572,7 +572,7 @@ static int create_file_obj(const struct replace_info_s *ri,
 	/* TODO it makes sense to create file objects (open files) only
 	 * shared files here.
 	 * Private files can be opened by the process itself */
-	err = create_obj(path, flags, mode, parent, file_obj);
+	err = create_obj(path, flags, mode, source_fd, file_obj);
 	if (err) {
 		pr_err("failed to open file object for %s\n", path);
 		return err;
@@ -588,14 +588,14 @@ static int create_file_obj(const struct replace_info_s *ri,
 }
 
 static int collect_fd_obj(const struct replace_info_s *ri, pid_t pid,
-			  const struct fd_info_s *fdi, const char *parent,
+			  const struct fd_info_s *fdi,
 			  struct link_remap_s **link_remap)
 {
 	void *file_obj, *real_file_obj;
 	int err;
 
-	err = create_file_obj(ri, fdi->path, fdi->flags, fdi->st.st_mode, parent,
-			      &file_obj, link_remap,
+	err = create_file_obj(ri, fdi->path, fdi->flags, fdi->st.st_mode,
+			      fdi->local_fd, &file_obj, link_remap,
 			      create_fd_obj);
 	if (err)
 		return err;
@@ -616,14 +616,10 @@ static int collect_process_fd(struct process_info *p,
 			      const struct replace_info_s *ri,
 			      struct fd_info_s *fdi)
 {
-	char link[PATH_MAX];
 	struct link_remap_s *link_remap;
 	int local_fd;
 
-	/* TODO This is a temporary solution !!! */
-	snprintf(link, PATH_MAX, "/proc/%d/fd/%d", p->pid, fdi->process_fd);
-
-	local_fd = collect_fd_obj(ri, p->pid, fdi, link, &link_remap);
+	local_fd = collect_fd_obj(ri, p->pid, fdi, &link_remap);
 	if (local_fd < 0)
 		return local_fd;
 
@@ -714,7 +710,7 @@ static int collect_process_open_fds(struct process_info *p,
 }
 
 static int create_map_obj(const char *path, unsigned flags, mode_t mode,
-			  const char *parent, void *file_obj)
+			  int source_fd, void *file_obj)
 {
 	int fd;
 
@@ -735,7 +731,7 @@ static int collect_map_file(struct process_info *p, const struct replace_info_s 
 	int err, fd, map_fd;
 	struct link_remap_s *link_remap;
 
-	err = create_file_obj(ri, map_path, open_flags, 0, NULL, &fd, &link_remap,
+	err = create_file_obj(ri, map_path, open_flags, 0, -1, &fd, &link_remap,
 			      create_map_obj);
 	if (err)
 		return err;
