@@ -605,14 +605,33 @@ static int collect_fd_obj(const struct replace_info_s *ri, pid_t pid,
 	return get_file_obj_fd(real_file_obj, fdi->flags);
 }
 
-static int collect_process_fd(struct process_info *p, int dir,
-			      const char *process_fd, const void *data)
+static int collect_process_fd(struct process_info *p,
+			      const struct replace_info_s *ri,
+			      struct fd_info_s *fdi)
 {
-	int err, target_fd;
-	const struct replace_info_s *ri = data;
-	struct fd_info_s fdi;
 	char link[PATH_MAX];
 	struct link_remap_s *link_remap;
+	int local_fd;
+
+	/* TODO This is a temporary solution !!! */
+	snprintf(link, PATH_MAX, "/proc/%d/fd/%d", p->pid, fdi->fd);
+
+	local_fd = collect_fd_obj(ri, p->pid, fdi, link, &link_remap);
+	if (local_fd < 0)
+		return local_fd;
+
+	pr_debug("\t/proc/%d/fd/%d ---> %s (fd: %d, flags: 0%o)\n",
+			p->pid, fdi->fd, fdi->path, local_fd, fdi->flags);
+
+	return process_add_fd(p, fdi, local_fd, link_remap);
+}
+
+static int examine_process_fd(struct process_info *p, int dir,
+			      const char *process_fd, const void *data)
+{
+	int err;
+	const struct replace_info_s *ri = data;
+	struct fd_info_s fdi;
 
 	/* Fast path. In most of the cases opened file is accessible and
 	 * shouldn't be replaced.
@@ -628,20 +647,10 @@ static int collect_process_fd(struct process_info *p, int dir,
 	if (err)
 		return err;
 
-	if (!is_mnt_fd(&fdi, ri))
-		return 0;
+	if (is_mnt_fd(&fdi, ri))
+		err = collect_process_fd(p, ri, &fdi);
 
-	/* TODO This is a temporary solution !!! */
-	snprintf(link, PATH_MAX, "/proc/%d/fd/%d", p->pid, fdi.fd);
-
-	target_fd = collect_fd_obj(ri, p->pid, &fdi, link, &link_remap);
-	if (target_fd < 0)
-		return target_fd;
-
-	pr_debug("\t/proc/%d/fd/%d ---> %s (fd: %d, flags: 0%o)\n",
-			p->pid, fdi.fd, fdi.path, target_fd, fdi.flags);
-
-	return process_add_fd(p, &fdi, target_fd, link_remap);
+	return err;
 }
 
 static int iterate_dir_name(const char *dpath, struct process_info *p,
@@ -693,7 +702,7 @@ static int collect_process_open_fds(struct process_info *p,
 	char dpath[PATH_MAX];
 
 	snprintf(dpath, PATH_MAX, "/proc/%d/fd", p->pid);
-	return iterate_dir_name(dpath, p, collect_process_fd, ri, "collect_process_fd");
+	return iterate_dir_name(dpath, p, examine_process_fd, ri, "examine_process_fd");
 }
 
 static int create_map_obj(const char *path, unsigned flags, mode_t mode,
