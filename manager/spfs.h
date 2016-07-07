@@ -80,4 +80,6 @@ int do_mount_spfs(struct spfs_info_s *info,
 
 int spfs_link_remap(int mnt_fd, const char *rel_path, char *link_remap, size_t size);
 
+void spfs_release_mnt(struct spfs_info_s *info);
+
 #endif

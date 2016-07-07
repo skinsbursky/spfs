@@ -36,6 +36,11 @@ static void cleanup_spfs_mount(struct spfs_manager_context_s *ctx,
 			       struct spfs_info_s *info, int status)
 {
 	pr_debug("removing info %s from the list\n", info->mnt.id);
+
+	if (WIFSIGNALED(status))
+		/* SPFS master was killed. We need to release the reference */
+		spfs_release_mnt(info);
+
 	info->dead = true;
 	unlink(info->socket_path);
 
@@ -60,13 +65,13 @@ static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)
 			pr_err("%d killed by signal %d (%s)\n", pid, WTERMSIG(status), strsignal(WTERMSIG(status)));
 
 		info = find_spfs_by_replacer(ctx->spfs_mounts, pid);
-		if (info && (WEXITSTATUS(status) == 0)) {
-			/* SPFS has been successfully replaced.
-			 * Now we can release spfs mount by closing
-			 * corresponding fd.
-			 */
-			pr_info("releasing spfs %s mount reference\n", info->mnt.id);
-			close(info->mnt_ref);
+		if (info) {
+			if (WEXITSTATUS(status) == 0)
+				/* SPFS has been successfully replaced.
+				 * Now we can release spfs mount by closing
+				 * corresponding fd.
+				 */
+				spfs_release_mnt(info);
 		} else {
 			info = find_spfs_by_pid(ctx->spfs_mounts, pid);
 			if (info) {

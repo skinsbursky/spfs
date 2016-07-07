@@ -841,3 +841,9 @@ int spfs_link_remap(int mnt_fd, const char *rel_path, char *link_remap, size_t s
 	return err;
 
 }
+
+void spfs_release_mnt(struct spfs_info_s *info)
+{
+	pr_info("releasing spfs %s mount reference\n", info->mnt.id);
+	close(info->mnt_ref);
+}
