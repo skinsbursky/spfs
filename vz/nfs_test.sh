@@ -528,4 +528,7 @@ for cmd in $cmd_list; do
 			kill_tests "$tests_list"
 			;;
 	esac
+	if [ $? -ne 0 ]; then
+		exit 1
+	fi
 done
