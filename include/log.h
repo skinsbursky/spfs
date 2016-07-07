@@ -57,8 +57,7 @@ int print_on_level_ts(unsigned int level, const char *format, ...);
 #define pr_perror(fmt, ...)					\
 ({								\
 	int _errno = errno;					\
-	print_with_header(ERR, fmt": %s\n", ##__VA_ARGS__,	\
-					strerror(errno));	\
+	pr_err(fmt": %s\n", ##__VA_ARGS__, strerror(errno));	\
 	errno = _errno;						\
 })
 
