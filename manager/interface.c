@@ -643,7 +643,8 @@ int spfs_manager_packet_handler(int sock, void *data, void *package, size_t psiz
 	if (err)
 		return err;
 
-	pr_debug("Received command request: '%s', options: '%s'\n", cmd, options);
+	pr_debug("received request: \"%s\"\n", cmd);
+	pr_debug("    options: %s\n", options);
 
 	handler = get_cmd_handler(cmd);
 	if (!handler)

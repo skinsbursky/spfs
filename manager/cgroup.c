@@ -72,7 +72,7 @@ int move_to_cgroup(const char *controller, const char *cg)
 	if (err)
 		pr_err("failed to move self to root %s%s cgroup\n", controller, cg);
 	else
-		pr_info("joined %s%s cgroup\n", controller, cg);
+		pr_debug("joined \"%s%s\" cgroup\n", controller, cg);
 
 	close(fd);
 	return err;

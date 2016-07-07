@@ -117,8 +117,10 @@ int mount_loop(const char *source, const char *mnt, const char *fstype,
 	int err;
 	int timeout = 1;
 
-	pr_debug("trying to mount %s, source %s, flags %ld, options '%s' to %s\n",
-			fstype, source, mountflags, options, mnt);
+	pr_debug("trying to mount \"%s\", source: \"%s\" to \"%s\":\n",
+			fstype, source, mnt);
+	pr_debug("    flags  : %#lx\n", mountflags);
+	pr_debug("    options: \"%s\"\n", options);
 
 	while (1) {
 		err = do_mount(source, mnt, fstype, mountflags, options);
@@ -135,6 +137,6 @@ int mount_loop(const char *source, const char *mnt, const char *fstype,
 	if (err)
 		pr_perror("failed to mount %s to %s", fstype, mnt);
 	else
-		pr_info("Successfully mounted %s to %s\n", fstype, mnt);
+		pr_info("mounted %s (%s) to %s\n", fstype, source, mnt);
 	return err;
 }

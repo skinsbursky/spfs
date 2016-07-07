@@ -32,7 +32,7 @@ static int do_swap_process_fds(struct process_info *p)
 	pr_debug("Swapping process %d file descriptors:\n", p->pid);
 
 	list_for_each_entry(pfd, &p->fds, list) {
-		pr_debug("\t/proc/%d/fd/%d --> /proc/%d/fd/%d (%s%lli)\n",
+		pr_debug("    /proc/%d/fd/%d --> /proc/%d/fd/%d (%s%lli)\n",
 				getpid(), pfd->target_fd,
 				p->pid, pfd->source_fd,
 				pfd->cloexec ? "O_CLOEXEC, " : "", pfd->pos);
@@ -57,7 +57,7 @@ static int do_swap_process_maps(struct process_info *p)
 	pr_debug("Swapping process %d mappings:\n", p->pid);
 
 	list_for_each_entry(pm, &p->maps, list) {
-		pr_debug("\t/proc/%d/fd/%d --> /proc/%d/map_files/%lx-%lx\n",
+		pr_debug("    /proc/%d/fd/%d --> /proc/%d/map_files/%lx-%lx\n",
 				getpid(), pm->map_fd, p->pid, pm->start, pm->end);
 		err = swap_map(p->pctl, pm->map_fd, pm->start, pm->end,
 			       pm->prot, pm->flags, pm->pgoff);
@@ -82,7 +82,7 @@ static int do_swap_process_fs(struct process_info *p)
 
 
 	if (p->fs.root) {
-		pr_debug("\t%s --> /proc/%d/root\n", p->fs.root, p->pid);
+		pr_debug("    %s --> /proc/%d/root\n", p->fs.root, p->pid);
 		cwd_fd = open("/", O_PATH);
 		if (cwd_fd < 0) {
 			pr_perror("failed to open /");
@@ -95,7 +95,7 @@ static int do_swap_process_fs(struct process_info *p)
 	}
 
 	if (p->fs.cwd_fd >= 0) {
-		pr_debug("\t/proc/%d/fd/%d --> /proc/%d/cwd\n",
+		pr_debug("    /proc/%d/fd/%d --> /proc/%d/cwd\n",
 				getpid(), p->fs.cwd_fd, p->pid);
 		err = swap_cwd(p->pctl, p->fs.cwd_fd);
 		if (err)
@@ -115,7 +115,7 @@ static int do_swap_process_exe(struct process_info *p)
 
 	pr_debug("Swapping process %d exe:\n", p->pid);
 
-	pr_debug("\t/proc/%d/fd/%d --> /proc/%d/exe\n",
+	pr_debug("    /proc/%d/fd/%d --> /proc/%d/exe\n",
 			getpid(), p->exe_fd, p->pid);
 
 	return swap_exe(p->pctl, p->exe_fd);
@@ -168,7 +168,7 @@ static int process_do_swap_handlers(struct process_info *p,
 
 static int do_swap_process_resources(struct process_info *p)
 {
-	pr_debug("Swapping process %d resources:\n", p->pid);
+	pr_info("Swapping process %d resources\n", p->pid);
 
 	return process_do_swap_handlers(p, SWAP_RESOURCE_FDS, SWAP_RESOURCE_EXE);
 }

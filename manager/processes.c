@@ -37,7 +37,7 @@ static int seize_one_process(struct process_info *p)
 		pr_err("failed to seize process %d\n", p->pid);
 		return -EPERM;
 	}
-	pr_debug("\t%d seized\n", p->pid);
+	pr_info("    %d seized\n", p->pid);
 
 	return set_parasite_ctl(p->pid, &p->pctl);
 }
@@ -61,7 +61,7 @@ static int detach_from_process(const struct process_info *p)
 		pr_err("failed to detach from process %d\n", p->pid);
 		return -EPERM;
 	}
-	pr_debug("detached from process %d\n", p->pid);
+	pr_info("    %d released\n", p->pid);
 	return 0;
 }
 
@@ -623,7 +623,7 @@ static int collect_process_fd(struct process_info *p,
 	if (local_fd < 0)
 		return local_fd;
 
-	pr_debug("\t/proc/%d/fd/%d ---> %s (fd: %d, flags: 0%o)\n",
+	pr_debug("    /proc/%d/fd/%d ---> %s (fd: %d, flags: 0%o)\n",
 			p->pid, fdi->process_fd, fdi->path, local_fd, fdi->flags);
 
 	return process_add_fd(p, fdi, local_fd, link_remap);
@@ -743,7 +743,7 @@ static int collect_map_file(struct process_info *p, const struct replace_info_s 
 	if (fd != map_fd)
 		close(fd);
 
-	pr_debug("\t/proc/%d/map_files/%lx-%lx ---> %s (fd: %d, flags: 0%o)\n",
+	pr_debug("    /proc/%d/map_files/%lx-%lx ---> %s (fd: %d, flags: 0%o)\n",
 			p->pid, start, end, map_path, map_fd, open_flags);
 
 	return process_add_mapping(p, map_fd, start, end, prot, map_flags, pgoff, link_remap);
@@ -908,7 +908,7 @@ static int open_process_env(struct process_info *p,
 		return -errno;
 	}
 
-	pr_debug("\t/proc/%d/%s ---> %s (fd %d)\n", p->pid, dentry, path, fd);
+	pr_debug("    /proc/%d/%s ---> %s (fd %d)\n", p->pid, dentry, path, fd);
 
 	return fd;
 }
@@ -949,7 +949,7 @@ static int collect_process_maps(struct process_info *p,
 
 	pid = mm_exists(p->pid);
 	if (pid) {
-		pr_info("\t/proc/%d/map_files ---> ignoring (shared with process %d)\n",
+		pr_info("    /proc/%d/map_files ---> ignoring (shared with process %d)\n",
 				p->pid, pid);
 		return 0;
 	}
@@ -1018,7 +1018,7 @@ static int collect_process_fs(struct process_info *p,
 
 	pid = fs_struct_exists(p->pid);
 	if (pid) {
-		pr_info("\t/proc/%d/<root,cwd> ---> ignoring (shared with process %d)\n",
+		pr_info("    /proc/%d/<root,cwd> ---> ignoring (shared with process %d)\n",
 				p->pid, pid);
 		return 0;
 	}
@@ -1044,7 +1044,7 @@ static int collect_process_fds(struct process_info *p,
 
 	pid = fd_table_exists(p->pid);
 	if (pid) {
-		pr_info("\t/proc/%d/fd ---> ignoring (shared with process %d)\n",
+		pr_info("    /proc/%d/fd ---> ignoring (shared with process %d)\n",
 				p->pid, pid);
 		return 0;
 	}

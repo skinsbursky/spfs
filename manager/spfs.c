@@ -299,7 +299,7 @@ int spfs_send_mode(const struct spfs_info_s *info,
 		pr_err("failed to switch spfs %s to proxy mode to %s: %d\n",
 				info->mnt.id, proxy_dir, err);
 	else
-		pr_debug("spfs %s mode was changed to %d (path: %s)\n",
+		pr_info("spfs %s mode was changed to %d (path: %s)\n",
 				info->mnt.id, mode, proxy_dir);
 
 	free(package);
@@ -312,7 +312,7 @@ static int spfs_freeze_and_lock(struct spfs_info_s *info)
 	int err = 0;
 
 	if (fg) {
-		pr_debug("Freeze %s and lock in favor of spfs %s\n",
+		pr_info("freeze %s and lock in favor of spfs %s\n",
 				fg->path, info->mnt.id);
 		err = lock_cgroup(fg);
 		if (!err) {
@@ -330,7 +330,7 @@ static int spfs_thaw_and_unlock(struct spfs_info_s *info)
 	int err = 0;
 
 	if (fg) {
-		pr_debug("Thaw %s and unlock in favor of spfs %s\n",
+		pr_info("thaw %s and unlock in favor of spfs %s\n",
 				fg->path, info->mnt.id);
 		err = thaw_cgroup(fg);
 		if (!err)
@@ -440,7 +440,7 @@ static int do_replace_one_spfs(const char *source, const char *target)
 
 static int umount_target(const char *mnt)
 {
-	pr_debug("Unmounting %s\n", mnt);
+	pr_info("unmounting %s\n", mnt);
 
 	if (umount2(mnt, MNT_DETACH)) {
 		pr_perror("failed to umount %s", mnt);

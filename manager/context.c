@@ -55,7 +55,7 @@ static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)
 		struct spfs_info_s *info;
 
 		if (WIFEXITED(status))
-			pr_info("%d exited, status=%d\n", pid, WEXITSTATUS(status));
+			pr_debug("%d exited, status=%d\n", pid, WEXITSTATUS(status));
 		else
 			pr_err("%d killed by signal %d (%s)\n", pid, WTERMSIG(status), strsignal(WTERMSIG(status)));
 
@@ -65,11 +65,12 @@ static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)
 			 * Now we can release spfs mount by closing
 			 * corresponding fd.
 			 */
-			pr_debug("releasing spfs %s mount reference\n", info->mnt.id);
+			pr_info("releasing spfs %s mount reference\n", info->mnt.id);
 			close(info->mnt_ref);
 		} else {
 			info = find_spfs_by_pid(ctx->spfs_mounts, pid);
 			if (info) {
+				pr_info("spfs %s master has exited\n", info->mnt.id);
 				cleanup_spfs_mount(ctx, info, status);
 				if (list_empty(&ctx->spfs_mounts->list) && ctx->exit_with_spfs) {
 					pr_info("spfs list is empty. Exiting.\n");
