@@ -42,12 +42,10 @@ static void cleanup_spfs_mount(struct spfs_manager_context_s *ctx,
 		spfs_release_mnt(info);
 
 	info->dead = true;
-	unlink(info->socket_path);
-
-	if (WIFEXITED(status) && (WEXITSTATUS(status) == 0))
-		spfs_cleanup_env(info);
-
 	del_spfs_info(ctx->spfs_mounts, info);
+
+	unlink(info->socket_path);
+	spfs_cleanup_env(info);
 }
 
 static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)
