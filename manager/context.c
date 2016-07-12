@@ -126,6 +126,7 @@ static int configure(struct spfs_manager_context_s *ctx)
 			return -ENOMEM;
 		}
 	}
+	pr_info("working directory: %s\n", ctx->work_dir);
 
 	if (create_dir(ctx->work_dir))
 		return -1;
@@ -141,8 +142,10 @@ static int configure(struct spfs_manager_context_s *ctx)
 			pr_err("failed to allocate\n");
 			return -ENOMEM;
 		}
-		pr_info("socket path wasn't provided: using %s\n", ctx->socket_path);
-	}
+		pr_info("socket path wasn't provided: using %s/%s\n",
+				ctx->work_dir, ctx->socket_path);
+	} else
+		pr_info("socket path: %s\n", ctx->socket_path);
 
 	if (!access(ctx->socket_path, X_OK)) {
 		pr_err("socket %s already exists. Stale?\n", ctx->socket_path);
@@ -155,8 +158,10 @@ static int configure(struct spfs_manager_context_s *ctx)
 			pr_err("failed to allocate\n");
 			return -ENOMEM;
 		}
-		pr_info("log path wasn't provided: using %s\n", ctx->log_file);
-	}
+		pr_info("log path wasn't provided: using %s/%s\n",
+				ctx->work_dir, ctx->log_file);
+	} else
+		pr_info("log path: %s\n", ctx->socket_path);
 
 	if (setup_log(ctx->log_file, ctx->verbosity))
 		return -1;
