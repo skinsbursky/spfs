@@ -54,7 +54,7 @@ int seize_processes(struct list_head *processes)
 	}
 	return 0;
 }
-
+#if 0
 static int detach_from_process(const struct process_info *p)
 {
 	if (detach_from_task(p->pid, p->orig_st)) {
@@ -64,7 +64,7 @@ static int detach_from_process(const struct process_info *p)
 	pr_info("    %d released\n", p->pid);
 	return 0;
 }
-
+#endif
 static void release_process_maps(struct process_info *p)
 {
 	struct process_map *pm, *tmp;
@@ -105,7 +105,7 @@ static void detach_one_process(struct process_info *p)
 {
 	if (p->pctl)
 		(void) destroy_parasite_ctl(p->pid, p->pctl);
-	(void) detach_from_process(p);
+//	(void) detach_from_process(p);
 	list_del(&p->list);
 	free(p);
 }
