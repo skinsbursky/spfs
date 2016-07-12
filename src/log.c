@@ -108,6 +108,7 @@ int setup_log(const char *log_file, int verbosity)
 	setvbuf(log, NULL, _IONBF, 0);
 	set_log_level(log, verbosity);
 	stream = log;
+	pr_info("Log file initialized. Verbosity level: %d\n", verbosity);
 	return 0;
 }
 
