@@ -49,8 +49,6 @@ TESTS_LIST="	\
 		static/file_attr		\
 		static/fifo-ghost		\
 						\
-		static/deleted_dev		\
-						\
 		transition/fifo_loop		\
 		transition/fifo_dyn		\
 		transition/epoll		\
@@ -73,7 +71,6 @@ NOT_DUMPABLE_STALE_TEST_LIST="			\
 		static/cwd01			\
 		static/fanotify00		\
 		static/unlink_fstat00		\
-		static/vt			\
 		"
 
 NOT_DUMPABLE_UNLINKED_TEST_LIST="		\
@@ -84,6 +81,14 @@ NOT_DUMPABLE_SOCKETS_TEST_LIST="		\
 		static/sockets00		\
 		static/sk-unix-rel		\
 		"
+
+NOT_RESTORABLE_DEVICE_LIST="			\
+		static/deleted_dev		\
+		static/vt			\
+		static/console			\
+		static/overmount_dev		\
+		"
+
 ALWAYS_FAIL_TEST_LIST="				\
 		static/file_locks01		\
 		"
