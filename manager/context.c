@@ -46,6 +46,8 @@ static void cleanup_spfs_mount(struct spfs_manager_context_s *ctx,
 
 	unlink(info->socket_path);
 	spfs_cleanup_env(info);
+
+	close_namespaces(info->ns_fds);
 }
 
 static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)
