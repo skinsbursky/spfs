@@ -65,6 +65,13 @@ static int detach_from_process(const struct process_info *p)
 	return 0;
 }
 #endif
+
+static void process_resource_release(struct process_resource *res)
+{
+	if (!res->replaced)
+		put_file_obj(res->fobj);
+}
+
 static void release_process_maps(struct process_info *p)
 {
 	struct process_map *pm, *tmp;
@@ -80,6 +87,12 @@ static void release_process_maps(struct process_info *p)
 	}
 }
 
+static void release_process_fd(struct process_fd *pfd)
+{
+	process_resource_release(&pfd->res);
+	free(pfd);
+}
+
 static void release_process_fds(struct process_info *p)
 {
 	struct process_fd *pfd, *tmp;
@@ -89,9 +102,7 @@ static void release_process_fds(struct process_info *p)
 
 	list_for_each_entry_safe(pfd, tmp, &p->fds, list) {
 		list_del(&pfd->list);
-		if (pfd->replaced && pfd->link_remap)
-			put_link_remap(pfd->link_remap);
-		free(pfd);
+		release_process_fd(pfd);
 	}
 }
 
@@ -335,7 +346,7 @@ static int get_link_path(const char *link,
 }
 
 static int process_add_fd(struct process_info *p, const struct fd_info_s *fdi,
-			  int target_fd, struct link_remap_s *link_remap)
+			  void *fobj)
 {
 	struct process_fd *pfd;
 
@@ -345,12 +356,11 @@ static int process_add_fd(struct process_info *p, const struct fd_info_s *fdi,
 		return -ENOMEM;
 	}
 
-	pfd->source_fd = fdi->process_fd;
-	pfd->target_fd = target_fd;
-	pfd->cloexec = (fdi->flags & O_CLOEXEC) ? FD_CLOEXEC : 0;
-	pfd->pos = fdi->pos;
-	pfd->replaced = false;
-	pfd->link_remap = link_remap;
+	pfd->info.source_fd = fdi->process_fd;
+	pfd->info.cloexec = (fdi->flags & O_CLOEXEC) ? FD_CLOEXEC : 0;
+	pfd->info.pos = fdi->pos;
+	pfd->res.replaced = false;
+	pfd->res.fobj = fobj;
 	list_add_tail(&pfd->list, &p->fds);
 	p->fds_nr++;
 
@@ -500,46 +510,45 @@ static int is_mnt_fd(const struct fd_info_s *fdi, const struct replace_info_s *r
 	return fdi->st.st_dev == ri->src_dev;
 }
 
-static int collect_fd_obj(const struct replace_info_s *ri, pid_t pid,
-			  const struct fd_info_s *fdi,
-			  struct link_remap_s **link_remap)
+struct fd_collect_s {
+	pid_t		pid;
+	int		fd;
+};
+
+static int collect_process_fd_cb(void *cb_data, void *new_fobj, void **res_fobj)
 {
-	void *file_obj, *real_file_obj;
 	int err;
+	struct fd_collect_s *fdc = cb_data;
 
-	err = create_file_object(ri, fdi->path, fdi->flags, fdi->st.st_mode,
-			      fdi->local_fd, &file_obj, link_remap,
-			      create_fd_obj);
+	err = collect_fd(fdc->pid, fdc->fd, new_fobj, res_fobj);
 	if (err)
-		return err;
-
-	err = collect_fd(pid, fdi->process_fd, file_obj, &real_file_obj);
-	if (err) {
-		pr_err("failed to add /proc/%d/fd/%d to tree\n", pid, fdi->process_fd);
-		return err;
-	}
-
-	if (file_obj != real_file_obj)
-		destroy_fd_obj(file_obj);
-
-	return get_file_obj_fd(real_file_obj, fdi->flags);
+		pr_err("failed to add /proc/%d/fd/%d to tree\n",
+				fdc->pid, fdc->fd);
+	return err;
 }
 
 static int collect_process_fd(struct process_info *p,
 			      const struct replace_info_s *ri,
 			      struct fd_info_s *fdi)
 {
-	struct link_remap_s *link_remap;
-	int local_fd;
+	struct fd_collect_s fdc = {
+		.pid = p->pid,
+		.fd = fdi->process_fd,
+	};
+	void *fobj;
+	int err;
 
-	local_fd = collect_fd_obj(ri, p->pid, fdi, &link_remap);
-	if (local_fd < 0)
-		return local_fd;
+	err = get_file_obj(fdi->path, fdi->flags, fdi->st.st_mode,
+			   fdi->local_fd, ri,
+			   &fdc, collect_process_fd_cb,
+			   &fobj);
+	if (err)
+		return err;
 
-	pr_debug("    /proc/%d/fd/%d ---> %s (fd: %d, flags: 0%o)\n",
-			p->pid, fdi->process_fd, fdi->path, local_fd, fdi->flags);
+	pr_debug("    /proc/%d/fd/%d ---> %s (flags: 0%o)\n",
+			p->pid, fdi->process_fd, fdi->path, fdi->flags);
 
-	return process_add_fd(p, fdi, local_fd, link_remap);
+	return process_add_fd(p, fdi, fobj);
 }
 
 static int examine_process_fd(struct process_info *p, int dir,
