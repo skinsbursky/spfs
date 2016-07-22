@@ -239,76 +239,6 @@ static int get_file_ops(mode_t mode, fobj_ops_t **ops)
 	return -ENOTSUP;
 }
 
-int create_fd_obj(const char *path, unsigned flags, mode_t mode,
-		  int source_fd, void **file_obj)
-{
-	file_obj_t *fobj;
-	fobj_ops_t *ops = NULL;
-	int err, fd;
-
-	err = get_file_ops(mode, &ops);
-	if (err)
-		return err;
-
-	fobj = malloc(sizeof(*fobj));
-	if (!fobj) {
-		pr_err("failed to allocate\n");
-		return -ENOMEM;
-	}
-
-	fd = ops->open(path, flags, source_fd);
-	if (fd < 0) {
-		err = fd;
-		goto free_fobj;
-	}
-
-	fobj->fd = fd;
-	fobj->ops = ops;
-
-	*file_obj = fobj;
-	return 0;
-
-free_fobj:
-	free(fobj);
-	return err;
-}
-
-int create_file_object(const struct replace_info_s *ri,
-		    const char *path, unsigned flags, mode_t mode,
-		    int source_fd, void **file_obj,
-		    struct link_remap_s **link_remap,
-		    int (*create_obj)(const char *path, unsigned flags,
-				      mode_t mode, int source_fd,
-				      void **file_obj))
-{
-	int err;
-	bool sillyrenamed = sillyrenamed_path(path);
-
-	if (sillyrenamed) {
-		err = handle_sillyrenamed(path, ri, link_remap);
-		if (err)
-			return err;
-	} else
-		*link_remap = NULL;
-
-	/* TODO it makes sense to create file objects (open files) only
-	 * shared files here.
-	 * Private files can be opened by the process itself */
-	err = create_obj(path, flags, mode, source_fd, file_obj);
-	if (err) {
-		pr_err("failed to open file object for %s\n", path);
-		return err;
-	}
-
-	if (sillyrenamed) {
-		if (unlink(path)) {
-			pr_perror("failed to unlink %s", path);
-			return err;
-		}
-	}
-	return 0;
-}
-
 static bool need_to_open_file(file_obj_t *fobj)
 {
 	/* Silly-renamed files are remapped to some other inode.
@@ -465,21 +395,6 @@ void release_file_obj(void *file_obj)
 	file_obj_t *fobj = file_obj;
 
 	__put_file_obj(fobj, fobj->link_remap);
-}
-
-int get_file_obj_fd(void *file_obj, unsigned flags)
-{
-	file_obj_t *fobj = file_obj;
-
-	return fobj->fd;
-}
-
-void destroy_fd_obj(void *file_obj)
-{
-	file_obj_t *fobj = file_obj;
-
-	fobj->ops->close(fobj);
-	free(fobj);
 }
 
 int get_file_obj(const char *path, unsigned flags, mode_t mode, int source_fd,
