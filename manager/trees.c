@@ -10,7 +10,6 @@
 #include "include/log.h"
 
 #include "trees.h"
-#include "file_obj.h"
 
 enum kcmp_type {
 	KCMP_FILE,
@@ -31,10 +30,10 @@ struct replace_fd {
 	bool shared;
 };
 
-struct map_fd_s {
-	int map_fd;
+struct open_path_s {
 	char *path;
 	unsigned flags;
+	void *file_obj;
 };
 
 struct fd_table_s {
@@ -73,10 +72,7 @@ static void free_fs_struct_node(void *nodep)
 
 static void free_map_fd_node(void *nodep)
 {
-	struct map_fd_s *mfd = nodep;
-
-	close(mfd->map_fd);
-	free(mfd);
+	free(nodep);
 }
 
 static void free_fifo_node(void *nodep)
@@ -267,7 +263,7 @@ free_new_fs:
 
 static int compare_map_fd(const void *a, const void *b)
 {
-	const struct map_fd_s *f = a, *s = b;
+	const struct open_path_s *f = a, *s = b;
 	int ret;
 
 	ret = strcmp(f->path, s->path);
@@ -280,41 +276,43 @@ static int compare_map_fd(const void *a, const void *b)
 	return 0;
 }
 
-int collect_map_fd(int fd, const char *path, unsigned flags)
+int collect_open_path(const char *path, unsigned flags, void *file_obj, void **real_file_obj)
 {
-	struct map_fd_s *new_mfd, **found_mfd;
+	struct open_path_s *new_op, **found_op;
 	int err = -ENOMEM;
 
-	new_mfd = malloc(sizeof(*new_mfd));
-	if (!new_mfd) {
+	new_op = malloc(sizeof(*new_op));
+	if (!new_op) {
 		pr_err("failed to allocate\n");
 		return -ENOMEM;
 	}
-	new_mfd->path = strdup(path);
-	if (!new_mfd->path) {
+	new_op->path = strdup(path);
+	if (!new_op->path) {
 		pr_err("failed to allocate\n");
-		goto free_new_mfd;
+		goto free_new_op;
 	}
-	new_mfd->map_fd = fd;
-	new_mfd->flags = flags;
+	new_op->flags = flags;
+	new_op->file_obj = file_obj;
 
-	found_mfd = tsearch(new_mfd, &map_fd_tree_root, compare_map_fd);
-	if (!found_mfd) {
+	found_op = tsearch(new_op, &map_fd_tree_root, compare_map_fd);
+	if (!found_op) {
 		pr_err("failed to add new map fd object to the tree\n");
-		goto free_new_mfd_path;
+		goto free_new_op_path;
 	}
+
+	*real_file_obj = (*found_op)->file_obj;
 
 	err = 0;
 
-	if (*found_mfd == new_mfd)
+	if (*found_op == new_op)
 		goto exit;
 
-free_new_mfd_path:
-	free(new_mfd->path);
-free_new_mfd:
-	free(new_mfd);
+free_new_op_path:
+	free(new_op->path);
+free_new_op:
+	free(new_op);
 exit:
-	return err ? err :(*found_mfd)->map_fd;
+	return err;
 }
 
 static int compare_paths(const void *a, const void *b)

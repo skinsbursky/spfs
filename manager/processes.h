@@ -49,16 +49,18 @@ struct process_fd {
 	struct process_resource	res;
 };
 
-struct process_map {
-	struct list_head	list;
-	int			map_fd;
+struct map_info {
 	off_t			start;
 	off_t			end;
 	int			prot;
 	int			flags;
 	unsigned long long	pgoff;
-	bool			replaced;
-	void			*link_remap;
+};
+
+struct process_map {
+	struct list_head	list;
+	struct map_info		info;
+	struct process_resource	res;
 };
 
 struct parasite_ctl;

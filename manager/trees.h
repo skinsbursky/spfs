@@ -6,7 +6,7 @@ pid_t fd_table_exists(pid_t pid);
 int collect_fd_table(pid_t pid);
 pid_t fs_struct_exists(pid_t pid);
 int collect_fs_struct(pid_t pid);
-int collect_map_fd(int fd, const char *path, unsigned flags);
+int collect_open_path(const char *path, unsigned flags, void *file_obj, void **real_file_obj);
 int collect_fifo(const char *path);
 pid_t mm_exists(pid_t pid);
 int collect_mm(pid_t pid);
