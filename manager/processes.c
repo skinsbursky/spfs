@@ -500,42 +500,6 @@ static int is_mnt_fd(const struct fd_info_s *fdi, const struct replace_info_s *r
 	return fdi->st.st_dev == ri->src_dev;
 }
 
-static int create_file_obj(const struct replace_info_s *ri,
-			   const char *path, unsigned flags, mode_t mode,
-			   int source_fd, void *file_obj,
-			   struct link_remap_s **link_remap,
-			   int (*create_obj)(const char *path, unsigned flags,
-					     mode_t mode, int source_fd,
-					     void *file_obj))
-{
-	int err;
-	bool sillyrenamed = sillyrenamed_path(path);
-
-	if (sillyrenamed) {
-		err = handle_sillyrenamed(path, ri, link_remap);
-		if (err)
-			return err;
-	} else
-		*link_remap = NULL;
-
-	/* TODO it makes sense to create file objects (open files) only
-	 * shared files here.
-	 * Private files can be opened by the process itself */
-	err = create_obj(path, flags, mode, source_fd, file_obj);
-	if (err) {
-		pr_err("failed to open file object for %s\n", path);
-		return err;
-	}
-
-	if (sillyrenamed) {
-		if (unlink(path)) {
-			pr_perror("failed to unlink %s", path);
-			return err;
-		}
-	}
-	return 0;
-}
-
 static int collect_fd_obj(const struct replace_info_s *ri, pid_t pid,
 			  const struct fd_info_s *fdi,
 			  struct link_remap_s **link_remap)
@@ -543,7 +507,7 @@ static int collect_fd_obj(const struct replace_info_s *ri, pid_t pid,
 	void *file_obj, *real_file_obj;
 	int err;
 
-	err = create_file_obj(ri, fdi->path, fdi->flags, fdi->st.st_mode,
+	err = create_file_object(ri, fdi->path, fdi->flags, fdi->st.st_mode,
 			      fdi->local_fd, &file_obj, link_remap,
 			      create_fd_obj);
 	if (err)
@@ -680,7 +644,7 @@ static int collect_map_file(struct process_info *p, const struct replace_info_s 
 	int err, fd, map_fd;
 	struct link_remap_s *link_remap;
 
-	err = create_file_obj(ri, map_path, open_flags, 0, -1, &fd, &link_remap,
+	err = create_file_object(ri, map_path, open_flags, 0, -1, &fd, &link_remap,
 			      create_map_obj);
 	if (err)
 		return err;
