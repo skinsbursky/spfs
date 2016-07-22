@@ -72,6 +72,12 @@ static void process_resource_release(struct process_resource *res)
 		put_file_obj(res->fobj);
 }
 
+static void release_process_map(struct process_map *pm)
+{
+	process_resource_release(&pm->res);
+	free(pm);
+}
+
 static void release_process_maps(struct process_info *p)
 {
 	struct process_map *pm, *tmp;
@@ -81,9 +87,7 @@ static void release_process_maps(struct process_info *p)
 
 	list_for_each_entry_safe(pm, tmp, &p->maps, list) {
 		list_del(&pm->list);
-		if (pm->replaced && pm->link_remap)
-			put_link_remap(pm->link_remap);
-		free(pm);
+		release_process_map(pm);
 	}
 }
 
@@ -367,10 +371,10 @@ static int process_add_fd(struct process_info *p, const struct fd_info_s *fdi,
 	return 0;
 }
 
-static int process_add_mapping(struct process_info *p, int map_fd,
+static int process_add_mapping(struct process_info *p,
 			       off_t start, off_t end,
 			       int prot, int flags, unsigned long long pgoff,
-			       struct link_remap_s *link_remap)
+			       void *fobj)
 {
 	struct process_map *pm;
 
@@ -380,14 +384,13 @@ static int process_add_mapping(struct process_info *p, int map_fd,
 		return -ENOMEM;
 	}
 
-	pm->map_fd = map_fd;
-	pm->start = start;
-	pm->end = end;
-	pm->prot = prot;
-	pm->flags = flags;
-	pm->pgoff = pgoff;
-	pm->replaced = false;
-	pm->link_remap = link_remap;
+	pm->info.start = start;
+	pm->info.end = end;
+	pm->info.prot = prot;
+	pm->info.flags = flags;
+	pm->info.pgoff = pgoff;
+	pm->res.replaced = false;
+	pm->res.fobj = fobj;
 	list_add_tail(&pm->list, &p->maps);
 	p->maps_nr++;
 
@@ -631,18 +634,22 @@ static int collect_process_open_fds(struct process_info *p,
 	return iterate_dir_name(dpath, p, examine_process_fd, ri, "examine_process_fd");
 }
 
-static int create_map_obj(const char *path, unsigned flags, mode_t mode,
-			  int source_fd, void **file_obj)
-{
-	int fd;
+struct open_path_collect_s {
+	const char	*path;
+	unsigned	flags;
+};
 
-	fd = open(path, flags);
-	if (fd < 0) {
-		pr_perror("failed to open %s", path);
-		return -errno;
+static int collect_open_path_cb(void *cb_data, void *new_fobj, void **res_fobj)
+{
+	int err;
+	struct open_path_collect_s *opath = cb_data;
+
+	err = collect_open_path(opath->path, opath->flags, new_fobj, res_fobj);
+	if (err < 0) {
+		pr_err("failed to collect map fd for path %s\n", opath->path);
+		return err;
 	}
-	*(int *)file_obj = fd;
-	return 0;
+	return err;
 }
 
 static int collect_map_file(struct process_info *p, const struct replace_info_s *ri,
@@ -650,25 +657,22 @@ static int collect_map_file(struct process_info *p, const struct replace_info_s 
 			    unsigned open_flags, const char *map_path,
 			    int prot, int map_flags, unsigned long long pgoff)
 {
-	int err, fd, map_fd;
-	struct link_remap_s *link_remap;
+	struct open_path_collect_s opath = {
+		.path = map_path,
+		.flags = open_flags,
+	};
+	void *fobj;
+	int err;
 
-	err = create_file_object(ri, map_path, open_flags, 0, -1, (void **)&fd, &link_remap,
-			      create_map_obj);
+	err = get_file_obj(map_path, open_flags, S_IFREG, -1, ri,
+			   &opath, collect_open_path_cb, &fobj);
 	if (err)
 		return err;
 
-	map_fd = collect_map_fd(fd, map_path, open_flags);
-	if (map_fd < 0)
-		pr_err("failed to collect map fd for path %s\n", map_path);
+	pr_debug("    /proc/%d/map_files/%lx-%lx ---> %s (flags: 0%o)\n",
+			p->pid, start, end, map_path, open_flags);
 
-	if (fd != map_fd)
-		close(fd);
-
-	pr_debug("    /proc/%d/map_files/%lx-%lx ---> %s (fd: %d, flags: 0%o)\n",
-			p->pid, start, end, map_path, map_fd, open_flags);
-
-	return process_add_mapping(p, map_fd, start, end, prot, map_flags, pgoff, link_remap);
+	return process_add_mapping(p, start, end, prot, map_flags, pgoff, fobj);
 }
 
 static int map_open_flags(int map_files_fd,

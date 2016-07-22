@@ -74,6 +74,17 @@ static int do_swap_process_fds(struct process_info *p)
 	return 0;
 }
 
+static int do_swap_map(const struct process_info *p, int target_fd, const void *data)
+{
+	const struct map_info *info = data;
+
+	pr_debug("    /proc/%d/fd/%d --> /proc/%d/map_files/%lx-%lx\n",
+			getpid(), target_fd, p->pid, info->start, info->end);
+
+	return swap_map(p->pctl, target_fd, info->start, info->end,
+			info->prot, info->flags, info->pgoff);
+}
+
 static int do_swap_process_maps(struct process_info *p)
 {
 	struct process_map *pm;
@@ -85,14 +96,10 @@ static int do_swap_process_maps(struct process_info *p)
 	pr_debug("Swapping process %d mappings:\n", p->pid);
 
 	list_for_each_entry(pm, &p->maps, list) {
-		pr_debug("    /proc/%d/fd/%d --> /proc/%d/map_files/%lx-%lx\n",
-				getpid(), pm->map_fd, p->pid, pm->start, pm->end);
-		err = swap_map(p->pctl, pm->map_fd, pm->start, pm->end,
-			       pm->prot, pm->flags, pm->pgoff);
+		err = do_swap_resource(p, &pm->res, &pm->info, do_swap_map);
 		if (err)
 			return err;
-
-		pm->replaced = true;
+		release_file_obj(pm->res.fobj);
 	}
 
 	return 0;
