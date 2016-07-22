@@ -1,6 +1,8 @@
 #ifndef __SPFS_MANAGER_PROCESSES_H_
 #define __SPFS_MANAGER_PROCESSES_H_
 
+#include <stdbool.h>
+
 #include "include/list.h"
 
 struct replace_info_s {
