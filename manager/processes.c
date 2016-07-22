@@ -110,10 +110,19 @@ static void release_process_fds(struct process_info *p)
 	}
 }
 
+static void release_process_exe(struct process_info *p)
+{
+	struct process_resource *exe = &p->exe;
+
+	if (exe->fobj)
+		process_resource_release(exe);
+}
+
 static void release_process_resources(struct process_info *p)
 {
 	release_process_maps(p);
 	release_process_fds(p);
+	release_process_exe(p);
 }
 
 static void detach_one_process(struct process_info *p)
@@ -839,10 +848,37 @@ static int open_process_env(struct process_info *p,
 	return fd;
 }
 
+static int collect_process_env(struct process_info *p,
+			       const struct replace_info_s *ri,
+			       const char *dentry, mode_t mode,
+			       void **fobj)
+{
+	char path[PATH_MAX];
+	struct open_path_collect_s opath = {
+		.path = path,
+		.flags = O_RDONLY,
+	};
+	int err;
+
+	err = get_process_env(p, ri, dentry, path, sizeof(path));
+	if (err)
+		return err;
+
+	err = get_file_obj(path, O_RDONLY, mode, -1, ri,
+			   &opath, collect_open_path_cb,
+			   fobj);
+	if (err)
+		return err;
+
+	pr_debug("    /proc/%d/%s ---> %s\n", p->pid, dentry, path);
+
+	return 0;
+}
+
 static int collect_process_exe(struct process_info *p,
 			       const struct replace_info_s *ri)
 {
-	int dir;
+	int dir, err;
 	char path[PATH_MAX];
 	bool mnt_exe;
 
@@ -860,10 +896,9 @@ static int collect_process_exe(struct process_info *p,
 	if (!mnt_exe)
 		return 0;
 
-	p->exe_fd = open_process_env(p, ri, "exe");
-	if (p->exe_fd < 0)
-		return p->exe_fd;
-
+	err = collect_process_env(p, ri, "exe", S_IFREG, &p->exe.fobj);
+	if (err)
+		return err;
 	return 0;
 }
 
@@ -1035,14 +1070,10 @@ static struct process_info *create_process_info(pid_t pid)
 		pr_err("failed to allocate process\n");
 		return NULL;
 	}
+	memset(p, 0, sizeof(*p));
 
 	p->pid = pid;
-	p->fds_nr = 0;
-	p->maps_nr = 0;
-	p->exe_fd = -1;
 	p->fs.cwd_fd = -1;
-	p->fs.root = NULL;
-	p->pctl = NULL;
 	p->orig_st = TASK_UNDEF;
 	INIT_LIST_HEAD(&p->fds);
 	INIT_LIST_HEAD(&p->maps);
