@@ -12,6 +12,7 @@
 #include "swap.h"
 #include "processes.h"
 #include "swapfd.h"
+#include "file_obj.h"
 
 typedef enum swap_resource_type {
 	SWAP_RESOURCE_FDS,
@@ -21,9 +22,42 @@ typedef enum swap_resource_type {
 	SWAP_RESOURCE_MAX,
 } swap_resource_t;
 
+static int do_swap_resource(const struct process_info *p, struct process_resource *res,
+			    const void *data,
+			    int (*cb)(const struct process_info *p,
+				      int target_fd,
+				      const void *data))
+{
+	int target_fd, err;
+
+	target_fd = get_fobj_fd(res->fobj);
+	if (target_fd < 0)
+		return target_fd;
+
+	err = cb(p, target_fd, data);
+	if (err)
+		return err;
+
+	res->replaced = true;
+	return 0;
+}
+
+static int do_swap_fd(const struct process_info *p, int target_fd, const void *data)
+{
+	const struct fd_info *info = data;
+
+	pr_debug("    /proc/%d/fd/%d --> /proc/%d/fd/%d (%s%lli)\n",
+			getpid(), target_fd,
+			p->pid, info->source_fd,
+			info->cloexec ? "O_CLOEXEC, " : "", info->pos);
+
+	return swap_fd(p->pctl, info->source_fd, target_fd,
+		       info->cloexec, info->pos);
+}
+
 static int do_swap_process_fds(struct process_info *p)
 {
-	struct process_fd *pfd;
+	struct process_fd *pfd, *tmp;
 	int err;
 
 	if (!p->fds_nr)
@@ -31,17 +65,11 @@ static int do_swap_process_fds(struct process_info *p)
 
 	pr_debug("Swapping process %d file descriptors:\n", p->pid);
 
-	list_for_each_entry(pfd, &p->fds, list) {
-		pr_debug("    /proc/%d/fd/%d --> /proc/%d/fd/%d (%s%lli)\n",
-				getpid(), pfd->target_fd,
-				p->pid, pfd->source_fd,
-				pfd->cloexec ? "O_CLOEXEC, " : "", pfd->pos);
-		err = swap_fd(p->pctl, pfd->source_fd, pfd->target_fd,
-			      pfd->cloexec, pfd->pos);
+	list_for_each_entry_safe(pfd, tmp, &p->fds, list) {
+		err = do_swap_resource(p, &pfd->res, &pfd->info, do_swap_fd);
 		if (err)
 			return err;
-
-		pfd->replaced = true;
+		release_file_obj(pfd->res.fobj);
 	}
 	return 0;
 }

@@ -32,14 +32,21 @@ int iterate_pids_list_name(const char *pids_list, void *data,
 int seize_processes(struct list_head *processes);
 void release_processes(struct list_head *processes);
 
-struct process_fd {
-	struct list_head	list;
+struct process_resource {
+	bool			replaced;
+	void			*fobj;
+};
+
+struct fd_info {
 	int			source_fd;
-	int			target_fd;
 	unsigned long		cloexec;
 	long long		pos;
-	bool			replaced;
-	void			*link_remap;
+};
+
+struct process_fd {
+	struct list_head	list;
+	struct fd_info		info;
+	struct process_resource	res;
 };
 
 struct process_map {

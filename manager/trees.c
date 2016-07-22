@@ -58,10 +58,7 @@ static void *mm_tree_root = NULL;
 
 static void free_fd_node(void *nodep)
 {
-	struct replace_fd *rfd = nodep;
-
-	destroy_fd_obj(rfd->file_obj);
-	free(rfd);
+	free(nodep);
 }
 
 static void free_fd_table_node(void *nodep)
