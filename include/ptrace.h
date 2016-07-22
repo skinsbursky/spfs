@@ -148,6 +148,7 @@ struct parasite_ctl {
 	socklen_t		local_addrlen;
 
 	int			remote_sockfd;
+	int			remote_sock_ino;
 	int			local_sockfd;
 
 	unsigned		map_length;

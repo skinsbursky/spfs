@@ -209,12 +209,20 @@ static void destroy_dgram_socket(struct parasite_ctl *ctl)
 	else
 		ctl->remote_sockfd = -1;
 }
+
+int is_parasite_sock(struct parasite_ctl *ctl, ino_t ino)
+{
+	return ctl->remote_sock_ino == ino;
+}
+
 static int set_dgram_socket(struct parasite_ctl *ctl)
 {
 	struct sockaddr_un *addr = (void *)ctl->local_map;
 	int fd, ret, i, len, len2, err;
 	unsigned long sret;
 	socklen_t addrlen;
+	char *path = (void *)ctl->local_map;
+	struct stat st;
 
 	ret = syscall_seized(ctl, __NR_socket, &sret,
 			     AF_UNIX, SOCK_DGRAM, 0, 0, 0, 0);
@@ -224,6 +232,14 @@ static int set_dgram_socket(struct parasite_ctl *ctl)
 		return -1;
 	}
 	ctl->remote_sockfd = fd;
+
+	sprintf(path, "/proc/%d/fd/%d", ctl->pid, ctl->remote_sockfd);
+	ret = stat(path, &st);
+	if (ret) {
+		pr_perror("failed to stat %s", path);
+		return -errno;
+	}
+	ctl->remote_sock_ino = st.st_ino;
 
 	memset(addr, 0, sizeof(*addr));
 	addr->sun_family = AF_UNIX;
