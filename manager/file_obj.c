@@ -15,6 +15,8 @@
 #include "trees.h"
 #include "swapfd.h"
 #include "processes.h"
+#include "link_remap.h"
+#include "file_obj.h"
 
 typedef enum {
 	FTYPE_REG,
@@ -265,6 +267,42 @@ free_fobj:
 	return err;
 }
 
+int create_file_object(const struct replace_info_s *ri,
+		    const char *path, unsigned flags, mode_t mode,
+		    int source_fd, void *file_obj,
+		    struct link_remap_s **link_remap,
+		    int (*create_obj)(const char *path, unsigned flags,
+				      mode_t mode, int source_fd,
+				      void *file_obj))
+{
+	int err;
+	bool sillyrenamed = sillyrenamed_path(path);
+
+	if (sillyrenamed) {
+		err = handle_sillyrenamed(path, ri, link_remap);
+		if (err)
+			return err;
+	} else
+		*link_remap = NULL;
+
+	/* TODO it makes sense to create file objects (open files) only
+	 * shared files here.
+	 * Private files can be opened by the process itself */
+	err = create_obj(path, flags, mode, source_fd, file_obj);
+	if (err) {
+		pr_err("failed to open file object for %s\n", path);
+		return err;
+	}
+
+	if (sillyrenamed) {
+		if (unlink(path)) {
+			pr_perror("failed to unlink %s", path);
+			return err;
+		}
+	}
+	return 0;
+}
+
 int get_file_obj_fd(void *file_obj, unsigned flags)
 {
 	file_obj_t *fobj = file_obj;
@@ -279,3 +317,5 @@ void destroy_fd_obj(void *file_obj)
 	fobj->ops->close(fobj);
 	free(fobj);
 }
+
+
