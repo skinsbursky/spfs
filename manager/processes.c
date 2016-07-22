@@ -623,7 +623,7 @@ static int collect_process_open_fds(struct process_info *p,
 }
 
 static int create_map_obj(const char *path, unsigned flags, mode_t mode,
-			  int source_fd, void *file_obj)
+			  int source_fd, void **file_obj)
 {
 	int fd;
 
@@ -644,7 +644,7 @@ static int collect_map_file(struct process_info *p, const struct replace_info_s 
 	int err, fd, map_fd;
 	struct link_remap_s *link_remap;
 
-	err = create_file_object(ri, map_path, open_flags, 0, -1, &fd, &link_remap,
+	err = create_file_object(ri, map_path, open_flags, 0, -1, (void **)&fd, &link_remap,
 			      create_map_obj);
 	if (err)
 		return err;

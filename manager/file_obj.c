@@ -234,7 +234,7 @@ static int get_file_ops(mode_t mode, fobj_ops_t **ops)
 }
 
 int create_fd_obj(const char *path, unsigned flags, mode_t mode,
-		  int source_fd, void *file_obj)
+		  int source_fd, void **file_obj)
 {
 	file_obj_t *fobj;
 	fobj_ops_t *ops = NULL;
@@ -259,7 +259,7 @@ int create_fd_obj(const char *path, unsigned flags, mode_t mode,
 	fobj->fd = fd;
 	fobj->ops = ops;
 
-	*(void **)file_obj = fobj;
+	*file_obj = fobj;
 	return 0;
 
 free_fobj:
@@ -269,11 +269,11 @@ free_fobj:
 
 int create_file_object(const struct replace_info_s *ri,
 		    const char *path, unsigned flags, mode_t mode,
-		    int source_fd, void *file_obj,
+		    int source_fd, void **file_obj,
 		    struct link_remap_s **link_remap,
 		    int (*create_obj)(const char *path, unsigned flags,
 				      mode_t mode, int source_fd,
-				      void *file_obj))
+				      void **file_obj))
 {
 	int err;
 	bool sillyrenamed = sillyrenamed_path(path);
