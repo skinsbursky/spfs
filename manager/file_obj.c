@@ -148,8 +148,14 @@ static int fifo_file_open(const char *path, unsigned flags, int source_fd)
 }
 
 typedef struct file_obj_s {
-	int		fd;
-	fobj_ops_t	*ops;
+	char				*path;
+	unsigned			flags;
+	int				source_fd;
+	int				fd;
+	const struct replace_info_s	*ri;
+	struct link_remap_s		*link_remap;
+	fobj_ops_t			*ops;
+	unsigned			users;
 } file_obj_t;
 
 static int reg_file_open(const char *path, unsigned flags, int source_fd)
@@ -303,6 +309,164 @@ int create_file_object(const struct replace_info_s *ri,
 	return 0;
 }
 
+static bool need_to_open_file(file_obj_t *fobj)
+{
+	/* Silly-renamed files are remapped to some other inode.
+	 * And one remmaped inode can be used for multiple opened silly-renamed
+	 * files with the same name, but with different open flags, and thus not shared.
+	 * Thus this is a shared resource which we need to grab on creation.
+	 */
+
+	/* TODO: the restriction above can be removed by more wisely creation
+	 * of link_remap object.
+	 * Say, link_remap contains not only link path, but also path to link
+	 * to.
+	 * It is also required to created final path on link remap creation.
+	 * It this case handing of link remap can be called on file object
+	 * creation, but not opening.
+	 * Which allows to postpone opening of remmaped file till is is required.
+	 * ZDTM test "static/unlink_mmap01" illustrates the advantage: it has
+	 * to fd for the same unlinked path with different flags, so it should
+	 * be only one link_remap object for two different file objects.
+	 * And linkking link_remap file can be done only once on link_remap
+	 * object creation.
+	 */
+	if (sillyrenamed_path(fobj->path))
+		return true;
+	return false;
+}
+
+static int open_file_obj(file_obj_t *fobj)
+{
+	int fd, err;
+	bool sillyrenamed = sillyrenamed_path(fobj->path);
+
+	if (sillyrenamed) {
+		err = handle_sillyrenamed(fobj->path, fobj->ri, &fobj->link_remap);
+		if (err)
+			return err;
+	}
+
+	/* TODO it makes sense to create file objects (open files) only
+	 * shared files here.
+	 * Private files can be opened by the process itself */
+	fd = fobj->ops->open(fobj->path, fobj->flags, fobj->source_fd);
+	if (fd < 0) {
+		pr_err("failed to open file object for %s: %d\n", fobj->path, fd);
+		goto err;
+	}
+
+	if (sillyrenamed) {
+		if (unlink(fobj->path)) {
+			pr_perror("failed to unlink %s", fobj->path);
+			return err;
+		}
+	}
+
+err:
+	return fd;
+}
+
+static int create_file_obj(const char *path, unsigned flags,
+			   mode_t mode, int source_fd,
+			   const struct replace_info_s *ri,
+			   file_obj_t **file_obj)
+{
+	file_obj_t *fobj;
+	fobj_ops_t *ops = NULL;
+	int err;
+
+	err = get_file_ops(mode, &ops);
+	if (err)
+		return err;
+
+	fobj = malloc(sizeof(*fobj));
+	if (!fobj) {
+		pr_err("failed to allocate\n");
+		return -ENOMEM;
+	}
+
+	fobj->path = strdup(path);
+	if (!fobj->path) {
+		pr_err("failed to duplicate\n");
+		err = -ENOMEM;
+		goto free_fobj;
+	}
+
+	fobj->source_fd = -1;
+	if (source_fd >= 0) {
+		fobj->source_fd = dup(source_fd);
+		if (fobj->source_fd < 0) {
+			pr_perror("failed to dup fd %d", source_fd);
+			err = -errno;
+			goto free_fobj_path;
+		}
+	}
+
+	fobj->fd = -1;
+	fobj->flags = flags;
+	fobj->ops = ops;
+	fobj->ri = ri;
+	fobj->link_remap = NULL;
+	fobj->users = 0;
+
+	*file_obj = fobj;
+	return 0;
+
+free_fobj_path:
+	free(fobj->path);
+free_fobj:
+	free(fobj);
+	return err;
+}
+
+int get_fobj_fd(void *file_obj)
+{
+	file_obj_t *fobj = file_obj;
+
+	if (fobj->fd == -1)
+		fobj->fd = open_file_obj(fobj);
+
+	return fobj->fd;
+}
+
+static void destroy_file_obj(void *file_obj)
+{
+	file_obj_t *fobj = file_obj;
+
+	if (fobj->source_fd != -1)
+		close(fobj->source_fd);
+	if (fobj->fd != -1)
+		fobj->ops->close(fobj);
+	free(fobj->path);
+	free(fobj);
+}
+
+static void __put_file_obj(file_obj_t *fobj, void *link_remap)
+{
+	if (--fobj->users)
+		return;
+
+	if (link_remap)
+		put_link_remap(link_remap);
+
+	destroy_file_obj(fobj);
+}
+
+void put_file_obj(void *file_obj)
+{
+	file_obj_t *fobj = file_obj;
+
+	__put_file_obj(fobj, NULL);
+}
+
+void release_file_obj(void *file_obj)
+{
+	file_obj_t *fobj = file_obj;
+
+	__put_file_obj(fobj, fobj->link_remap);
+}
+
 int get_file_obj_fd(void *file_obj, unsigned flags)
 {
 	file_obj_t *fobj = file_obj;
@@ -318,4 +482,37 @@ void destroy_fd_obj(void *file_obj)
 	free(fobj);
 }
 
+int get_file_obj(const char *path, unsigned flags, mode_t mode, int source_fd,
+		 const struct replace_info_s *ri,
+		 void *cb_data, int (*cb)(void *cb_data, void *new_fobj, void **res_fobj),
+		 void **file_obj)
+{
+	file_obj_t *new_fobj = NULL, *res_fobj;
+	int err;
 
+	err = create_file_obj(path, flags, mode, source_fd, ri, &new_fobj);
+	if (err)
+		return err;
+
+	err = cb(cb_data, (void *)new_fobj, (void **)&res_fobj);
+	if (err)
+		goto destroy_new_fobj;
+
+	if (need_to_open_file(res_fobj)) {
+		err = get_fobj_fd(res_fobj);
+		if (err < 0)
+			goto destroy_new_fobj;
+	}
+
+	res_fobj->users++;
+	*file_obj = res_fobj;
+	err = 0;
+
+	if (new_fobj == res_fobj)
+		goto exit;
+
+destroy_new_fobj:
+	destroy_file_obj(new_fobj);
+exit:
+	return err;
+}

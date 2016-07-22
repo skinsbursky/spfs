@@ -15,5 +15,16 @@ int create_file_object(const struct replace_info_s *ri,
 		int (*create_obj)(const char *path, unsigned flags,
 			mode_t mode, int source_fd,
 			void **file_obj));
+int get_file_obj(const char *path, unsigned flags, mode_t mode, int source_fd,
+		 const struct replace_info_s *ri,
+		 void *cb_data, int (*cb)(void *cb_data, void *new_fobj, void **res_fobj),
+		 void **file_obj);
+int get_fobj_fd(void *file_obj);
+/* This helper should be used only to release memory (usually on
+ * error/cleanup paths). */
+void put_file_obj(void *file_obj);
+/* This helper should be used also to put link remap reference (upon
+ * successfull fd replacement). */
+void release_file_obj(void *file_obj);
 
 #endif
