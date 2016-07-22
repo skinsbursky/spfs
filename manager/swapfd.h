@@ -54,4 +54,6 @@ int swap_map(struct parasite_ctl *ctl, int map_fd,
 	     unsigned long start, unsigned long end,
 	     int prot, int flags, unsigned long long pgoff);
 
+int is_parasite_sock(struct parasite_ctl *ctl, ino_t ino);
+
 #endif
