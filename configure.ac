@@ -37,6 +37,13 @@ AC_CHECK_LIB(
 	     [AC_MSG_ERROR([*** libulockmgr not found.])
 	     ])
 
+AC_CHECK_LIB(
+	     [nl-3],
+	     [nla_attr_size],
+	     [],
+	     [AC_MSG_ERROR([*** libnl-3 not found.])
+	     ])
+
 FUSE_USE_VERSION=26
 AC_DEFINE_UNQUOTED(FUSE_USE_VERSION, $FUSE_USE_VERSION, [spfs])
 

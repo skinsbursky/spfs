@@ -1,6 +1,7 @@
 ## Process this file with automake to produce Makefile.in
 CLEANFILES = `find . -name "*~"`
 
+AM_CPPFLAGS = -I/usr/include/libnl3
 AM_CFLAGS = -Wall -Werror -ggdb -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64
 AM_MAKEFLAGS = --no-print-directory
 
@@ -83,6 +84,7 @@ bin_spfs_manager_SOURCES =	manager/main.c			\
 				src/pie-util-fd.c		\
 				src/futex.c			\
 				src/namespaces.c		\
+				src/netlink.c			\
 								\
 				spfs/interface.h		\
 				spfs/context.h			\
@@ -96,7 +98,8 @@ bin_spfs_manager_SOURCES =	manager/main.c			\
 				include/pie-util-fd.h		\
 				include/util.h			\
 				include/namespaces.h		\
-				include/futex.h
+				include/futex.h			\
+				include/netlink.h
 
 bin_swapfd_SOURCES =		main.c				\
 								\
@@ -113,6 +116,8 @@ bin_swapfd_SOURCES =		main.c				\
 				include/util.h
 				include/pie-util-fd.h		\
 				include/ptrace.h
+
+bin_spfs_manager_LDFLAGS = -Wl,--wrap=nla_parse,--wrap=nlmsg_parse
 
 tags: ctags
 
