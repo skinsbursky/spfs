@@ -12,11 +12,6 @@ TESTS_LIST="	\
 		static/file_locks05		\
 		static/file_shared		\
 		static/file_append		\
-		static/socket_queues		\
-		static/socket-ext		\
-		static/sockets_dgram		\
-		static/socket_dgram_data	\
-		static/deleted_unix_sock	\
 		static/pipe02			\
 		static/fdt_shared		\
 		static/maps00			\
@@ -49,6 +44,17 @@ TESTS_LIST="	\
 		static/file_attr		\
 		static/fifo-ghost		\
 						\
+		static/sockets00		\
+		static/sk-unix-rel		\
+		static/socket_close_data01	\
+		static/socket_dgram_data	\
+		static/sockets03		\
+		static/sockets_dgram		\
+		static/socket_queues		\
+		static/socket-ext		\
+		static/deleted_unix_sock	\
+						\
+		transition/unix_sock		\
 		transition/fifo_loop		\
 		transition/fifo_dyn		\
 		transition/epoll		\
@@ -75,11 +81,6 @@ NOT_DUMPABLE_STALE_TEST_LIST="			\
 
 NOT_DUMPABLE_UNLINKED_TEST_LIST="		\
 		static/unlink_mmap02		\
-		"
-
-NOT_DUMPABLE_SOCKETS_TEST_LIST="		\
-		static/sockets00		\
-		static/sk-unix-rel		\
 		"
 
 NOT_RESTORABLE_DEVICE_LIST="			\
