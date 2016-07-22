@@ -13,6 +13,8 @@
 static int log_level = LOG_DEBUG;
 FILE *stream;
 
+static bool print_timestamp;
+
 static char *print_time(char *buf, size_t size)
 {
 	struct timeval tv;
@@ -49,28 +51,21 @@ static int print_on_level_va(unsigned int level, const char *format, va_list arg
 
 int print_on_level(unsigned int loglevel, const char *format, ...)
 {
-	va_list params;
-	int res;
-
-	va_start(params, format);
-	res = print_on_level_va(loglevel, format, params);
-	va_end(params);
-	return res;
-}
-
-int print_on_level_ts(unsigned int loglevel, const char *format, ...)
-{
 	char buffer[4096];
 	char time[64];
 	va_list params;
 	int res;
+	const char *ptr = format;
 
-	snprintf(buffer, sizeof(buffer), "%s  %s",
-			print_time(time, sizeof(time)) ? time : "(none)",
-			format);
+	if (print_timestamp) {
+		snprintf(buffer, sizeof(buffer), "%s  %s",
+				print_time(time, sizeof(time)) ? time : "(none)",
+				format);
+		ptr = buffer;
+	}
 
 	va_start(params, format);
-	res = print_on_level_va(loglevel, buffer, params);
+	res = print_on_level_va(loglevel, ptr, params);
 	va_end(params);
 	return res;
 }
@@ -83,7 +78,12 @@ void set_log_level(FILE *log, int level)
 	pr_info("Log level set to %d\n", log_level);
 }
 
-int setup_log(const char *log_file, int verbosity)
+void log_ts_control(bool enable)
+{
+	print_timestamp = enable;
+}
+
+int setup_log_ts(const char *log_file, int verbosity, bool enable_ts)
 {
 	int fd;
 	FILE *log;
@@ -105,6 +105,7 @@ int setup_log(const char *log_file, int verbosity)
 		close(fd);
 		return -errno;
 	}
+	log_ts_control(enable_ts);
 	setvbuf(log, NULL, _IONBF, 0);
 	set_log_level(log, verbosity);
 	stream = log;
@@ -112,4 +113,7 @@ int setup_log(const char *log_file, int verbosity)
 	return 0;
 }
 
-
+int setup_log(const char *log_file, int verbosity)
+{
+	return setup_log_ts(log_file, verbosity, true);
+}

@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <syscall.h>
 #include <string.h>
+#include <stdbool.h>
 
 static inline pid_t gettid(void)
 {
@@ -17,13 +18,12 @@ static inline pid_t gettid(void)
 extern const char *__progname;
 
 int print_on_level(unsigned int loglevel, const char *format, ...);
-int print_on_level_ts(unsigned int level, const char *format, ...);
 
 #define print_with_header(verbosity, fmt, ...)			\
 ({								\
 	char *v = #verbosity;					\
 								\
-	print_on_level_ts(LOG_ ## verbosity,			\
+	print_on_level(LOG_ ## verbosity,			\
 			"%s(%d): %s%*s: "fmt,			\
 			__progname, gettid(), v,		\
 			7 - strlen(v), "",			\
@@ -62,6 +62,8 @@ int print_on_level_ts(unsigned int level, const char *format, ...);
 })
 
 void set_log_level(FILE *log, int level);
+void log_ts_control(bool enable);
+int setup_log_ts(const char *log_file, int verbosity, bool enable_ts);
 int setup_log(const char *log_file, int verbosity);
 
 #endif
