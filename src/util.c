@@ -352,7 +352,10 @@ bool sillyrenamed_path(const char *path)
 	int i;
 
 	name = strrchr(path, '/');
-	name++;
+	if (name)
+		name++;
+	else
+		name = path;
 
 	if (strncmp(name, SILLYNAME_PREFIX, SILLYNAME_PREFIX_LEN))
 		return false;
