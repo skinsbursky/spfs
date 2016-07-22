@@ -145,15 +145,26 @@ err:
 
 static int do_swap_process_exe(struct process_info *p)
 {
-	if (p->exe_fd < 0)
+	int exe_fd, err;
+
+	if (!p->exe.fobj)
 		return 0;
 
 	pr_debug("Swapping process %d exe:\n", p->pid);
 
-	pr_debug("    /proc/%d/fd/%d --> /proc/%d/exe\n",
-			getpid(), p->exe_fd, p->pid);
+	exe_fd = get_fobj_fd(p->exe.fobj);
+	if (exe_fd < 0)
+		return exe_fd;
 
-	return swap_exe(p->pctl, p->exe_fd);
+	pr_debug("    /proc/%d/fd/%d --> /proc/%d/exe\n",
+			getpid(), exe_fd, p->pid);
+
+	err = swap_exe(p->pctl, exe_fd);
+	if (!err) {
+		p->exe.replaced = true;
+		release_file_obj(p->exe.fobj);
+	}
+	return err;
 }
 
 typedef int (*swap_handler_t)(struct process_info *p);
@@ -226,11 +237,6 @@ static bool process_needs_resources_swap(struct process_info *p)
 	return false;
 }
 
-static bool process_needs_exe_swap(struct process_info *p)
-{
-	return (p->exe_fd == -1) ? false : true;
-}
-
 int do_swap_resources(const struct list_head *processes)
 {
 	struct process_info *p;
@@ -245,9 +251,7 @@ int do_swap_resources(const struct list_head *processes)
 	}
 
 	list_for_each_entry(p, processes, list) {
-		if (!process_needs_exe_swap(p))
-			continue;
-		if (do_swap_exe_resources(p))
+		if (p->exe.fobj && do_swap_exe_resources(p))
 			pr_err("failed to swap exe for process %d\n", p->pid);
 	}
 
