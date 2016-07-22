@@ -428,57 +428,6 @@ static int parse_fdinfo(pid_t pid, int fd, unsigned *flags, long long *pos)
 	return err;
 }
 
-static int rename_link_to_path(const char *path, const char *link_remap)
-{
-	int err;
-
-	err = link(link_remap, path);
-	if (err) {
-		pr_perror("failed to rename %s to %s", link_remap, path);
-		return -errno;
-	}
-	pr_debug("        (%s ---> %s)\n", link_remap, path);
-	return 0;
-}
-
-static int handle_sillyrenamed(const char *path, const struct replace_info_s *ri,
-			       struct link_remap_s **link_remap)
-{
-	char remap[PATH_MAX];
-	int err;
-
-	err = spfs_link_remap(ri->src_mnt_ref,
-			      path + strlen(ri->target_mnt) + 1,
-			      remap, PATH_MAX);
-	if (err) {
-		if (err == -ENODATA)
-			err = 0;
-		return err;
-	}
-
-	err = fixup_source_path(remap, PATH_MAX,
-				ri->source_mnt, ri->target_mnt);
-	if (err)
-		return err;
-
-	err = rename_link_to_path(path, remap);
-	if (err)
-		return err;
-
-	err = get_link_remap(remap, link_remap);
-	if (err) {
-		pr_err("failed to get link_remap %s\n", remap);
-		goto unlink_path;
-	}
-
-	return 0;
-
-unlink_path:
-	if (unlink(path))
-		pr_perror("failed to unlink %s", path);
-	return err;
-}
-
 static void put_fd_info(struct fd_info_s *fdi)
 {
 	close(fdi->local_fd);
