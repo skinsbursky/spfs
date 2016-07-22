@@ -56,6 +56,8 @@ static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)
 	pid_t pid;
 	int status;
 
+	log_ts_control(false);
+
 	while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
 		struct spfs_info_s *info;
 
@@ -87,6 +89,8 @@ static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)
 
 	if ((pid < 0) && (errno != ECHILD))
 		pr_perror("failed to collect pid");
+
+	log_ts_control(true);
 }
 
 static int setup_signal_handlers(struct spfs_manager_context_s *ctx)
