@@ -72,4 +72,7 @@ struct process_info {
 	int			orig_st;
 };
 
+int fixup_source_path(char *source_path, size_t source_size,
+		      const char *source_mnt, const char *target_mnt);
+
 #endif

@@ -307,7 +307,7 @@ static int transform_path(const char *source_path,
 	return 0;
 }
 
-static int fixup_source_path(char *source_path, size_t source_size,
+int fixup_source_path(char *source_path, size_t source_size,
 			     const char *source_mnt, const char *target_mnt)
 {
 	char buf[PATH_MAX];
