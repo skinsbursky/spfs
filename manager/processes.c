@@ -138,7 +138,7 @@ static int attach_to_process(const struct process_info *p)
 	return 0;
 }
 
-static bool is_mnt_file(struct process_info *p, int dir, const char *dentry,
+static bool is_mnt_file(int dir, const char *dentry,
 			const char *source_mnt, dev_t device)
 {
 	struct stat st;
@@ -694,14 +694,14 @@ static int map_open_flags(int map_files_fd,
 	return 0;
 }
 
-static bool is_mnt_map(struct process_info *p, int dir,
+static bool is_mnt_map(int dir,
 		       unsigned long start, unsigned long end,
 		       const struct replace_info_s *ri)
 {
 	char path[PATH_MAX];
 
 	snprintf(path, PATH_MAX, "%lx-%lx", start, end);
-	return is_mnt_file(p, dir, path, ri->source_mnt, ri->src_dev);
+	return is_mnt_file(dir, path, ri->source_mnt, ri->src_dev);
 }
 
 static int map_prot(char r, char w, char x)
@@ -764,7 +764,7 @@ static int collect_process_map_files(struct process_info *p,
 		if (!ino)
 			continue;
 
-		if (!is_mnt_map(p, dir, start, end, ri))
+		if (!is_mnt_map(dir, start, end, ri))
 			continue;
 
 		map_file = map + path_off;
@@ -840,7 +840,7 @@ static int collect_process_exe(struct process_info *p,
 		return -errno;
 	}
 
-	mnt_exe = is_mnt_file(p, dir, "exe", ri->source_mnt, ri->src_dev);
+	mnt_exe = is_mnt_file(dir, "exe", ri->source_mnt, ri->src_dev);
 
 	close(dir);
 
@@ -895,8 +895,8 @@ static int collect_process_cwd_root(struct process_info *p,
 		return -errno;
 	}
 
-	mnt_cwd = is_mnt_file(p, dir, "cwd", ri->source_mnt, ri->src_dev);
-	mnt_root = is_mnt_file(p, dir, "root", ri->source_mnt, ri->src_dev);
+	mnt_cwd = is_mnt_file(dir, "cwd", ri->source_mnt, ri->src_dev);
+	mnt_root = is_mnt_file(dir, "root", ri->source_mnt, ri->src_dev);
 
 	close(dir);
 
