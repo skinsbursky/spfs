@@ -80,13 +80,26 @@ static int copy_private_content(struct parasite_ctl *ctl, unsigned long to,
 				unsigned long from, unsigned long size)
 {
 	char path[] = "/proc/XXXXXXXXXX/mem";
+	int src = -1, dst = -1, ret = -1;
 	ssize_t copied = 0, count;
-	int src, dst, ret = -1;
+	unsigned int size_map;
 	char buf[PAGE_SIZE];
+	uint64_t *map;
 
 	if (size & (PAGE_SIZE - 1)) {
 		pr_err("Not aligned size: %lu\n", size);
 		return -EFAULT;
+	}
+
+	size_map = PAGEMAP_LEN(size);
+	map = malloc(size_map);
+	if (!map) {
+		pr_perror("Can't malloc() %u for %d\n", size_map, ctl->pid);
+		return -ENOMEM;
+	}
+	if (pread(ctl->pagemap_fd, map, size_map, PAGEMAP_PFN_OFF(from)) != size_map) {
+		pr_perror("Can't read %d's pagemap file", ctl->pid);
+		goto out;
 	}
 
 	sprintf(path, "/proc/%d/mem", ctl->pid);
@@ -100,14 +113,16 @@ static int copy_private_content(struct parasite_ctl *ctl, unsigned long to,
 	do {
 		count = PAGE_SIZE;
 
-		count = pread(src, buf, count, from + copied);
-		if (count < 0) {
-			pr_perror("Can't read from tracee's memory");
-			goto out;
-		}
-		if (count != pwrite(dst, buf, count, to + copied)) {
-			pr_perror("Can't write to tracee's memory");
-			goto out;
+		if (map[copied/PAGE_SIZE] & PME_PRESENT) {
+			count = pread(src, buf, count, from + copied);
+			if (count < 0) {
+				pr_perror("Can't read from tracee's memory");
+				goto out;
+			}
+			if (count != pwrite(dst, buf, count, to + copied)) {
+				pr_perror("Can't write to tracee's memory");
+				goto out;
+			}
 		}
 		copied += count;
 	} while (copied != size);
@@ -116,6 +131,7 @@ static int copy_private_content(struct parasite_ctl *ctl, unsigned long to,
 out:
 	close(src);
 	close(dst);
+	free(map);
 	return ret;
 }
 
