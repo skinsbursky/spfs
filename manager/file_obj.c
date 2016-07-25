@@ -15,6 +15,7 @@
 #include "trees.h"
 #include "swapfd.h"
 #include "processes.h"
+#include "unix-sockets.h"
 #include "link_remap.h"
 #include "file_obj.h"
 
@@ -191,6 +192,11 @@ fobj_ops_t fobj_ops[] = {
 		.open = fifo_file_open,
 		.close = reg_file_close,
 	},
+	[FTYPE_SOCK] = {
+		.open = unix_sk_file_open,
+		.early_open = unix_sk_early_open,
+		.close = reg_file_close,
+	},
 };
 
 static file_type_t convert_mode_to_type(mode_t mode)
@@ -225,9 +231,9 @@ static int get_file_ops(mode_t mode, fobj_ops_t **ops)
 		case FTYPE_REG:
 		case FTYPE_DIR:
 		case FTYPE_FIFO:
+		case FTYPE_SOCK:
 			*ops = &fobj_ops[type];
 			return 0;
-		case FTYPE_SOCK:
 		case FTYPE_LINK:
 		case FTYPE_CHR:
 		case FTYPE_BLK:
