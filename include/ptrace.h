@@ -150,6 +150,7 @@ struct parasite_ctl {
 	int			remote_sockfd;
 	int			remote_sock_ino;
 	int			local_sockfd;
+	int			pagemap_fd;
 
 	unsigned		map_length;
 	pid_t			pid;
