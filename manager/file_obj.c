@@ -281,10 +281,8 @@ static int open_file_obj(file_obj_t *fobj)
 	 * shared files here.
 	 * Private files can be opened by the process itself */
 	fd = fobj->ops->open(fobj->path, fobj->flags, fobj->source_fd);
-	if (fd < 0) {
+	if (fd < 0)
 		pr_err("failed to open file object for %s: %d\n", fobj->path, fd);
-		goto err;
-	}
 
 	if (sillyrenamed) {
 		if (unlink(fobj->path)) {
@@ -293,7 +291,6 @@ static int open_file_obj(file_obj_t *fobj)
 		}
 	}
 
-err:
 	return fd;
 }
 
