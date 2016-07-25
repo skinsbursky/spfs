@@ -325,6 +325,13 @@ int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl)
 	ctl->remote_sockfd = -1;
 	ctl->local_sockfd = -1;
 
+	sprintf(path, "/proc/%d/pagemap", pid);
+	ctl->pagemap_fd = open(path, O_RDONLY);
+	if (ctl->pagemap_fd < 0) {
+		pr_perror("Can't open pagemap for %d\n", pid);
+		return -ENOMEM;
+	}
+
         if (get_thread_ctx(pid, &ctl->orig))
 		goto err_free;
 
@@ -407,6 +414,7 @@ void destroy_parasite_ctl(pid_t pid, struct parasite_ctl *ctl)
 	unsigned long sret;
 	int ret;
 
+	close(ctl->pagemap_fd);
 	destroy_dgram_socket(ctl);
 
 	ctl->syscall_ip = ctl->syscall_ip_saved;
