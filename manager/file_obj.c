@@ -43,6 +43,7 @@ struct file_obj_s;
 
 typedef struct fobj_ops_s {
 	int (*open)(const char *path, unsigned flags, int source_fd);
+	bool (*early_open)(const char *path, unsigned flags, int source_fd);
 	void (*close)(struct file_obj_s *fobj);
 } fobj_ops_t;
 
@@ -263,6 +264,8 @@ static bool need_to_open_file(file_obj_t *fobj)
 	 */
 	if (sillyrenamed_path(fobj->path))
 		return true;
+	if (fobj->ops->early_open)
+		return fobj->ops->early_open(fobj->path, fobj->flags, fobj->source_fd);
 	return false;
 }
 
