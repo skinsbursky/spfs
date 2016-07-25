@@ -84,6 +84,11 @@ static int copy_private_content(struct parasite_ctl *ctl, unsigned long to,
 	int src, dst, ret = -1;
 	char buf[PAGE_SIZE];
 
+	if (size & (PAGE_SIZE - 1)) {
+		pr_err("Not aligned size: %lu\n", size);
+		return -EFAULT;
+	}
+
 	sprintf(path, "/proc/%d/mem", ctl->pid);
 	src = open(path, O_RDONLY);
 	dst = open(path, O_WRONLY);
@@ -93,9 +98,7 @@ static int copy_private_content(struct parasite_ctl *ctl, unsigned long to,
 	}
 
 	do {
-		count = size - copied;
-		if (count > PAGE_SIZE)
-			count = PAGE_SIZE;
+		count = PAGE_SIZE;
 
 		count = pread(src, buf, count, from + copied);
 		if (count < 0) {
