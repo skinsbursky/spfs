@@ -118,11 +118,22 @@ static void release_process_exe(struct process_info *p)
 		process_resource_release(exe);
 }
 
+static void release_process_fs(struct process_info *p)
+{
+	struct process_fs *fs = &p->fs;
+	struct process_resource *cwd = &fs->cwd;
+
+	if (cwd->fobj)
+		process_resource_release(cwd);
+	free(fs->root);
+}
+
 static void release_process_resources(struct process_info *p)
 {
 	release_process_maps(p);
 	release_process_fds(p);
 	release_process_exe(p);
+	release_process_fs(p);
 }
 
 static void detach_one_process(struct process_info *p)
@@ -826,28 +837,6 @@ static int get_process_env(struct process_info *p,
 	return get_link_path(link, ri->source_mnt, ri->target_mnt, path, size);
 }
 
-static int open_process_env(struct process_info *p,
-			    const struct replace_info_s *ri,
-			    const char *dentry)
-{
-	char path[PATH_MAX];
-	int err, fd;
-
-	err = get_process_env(p, ri, dentry, path, sizeof(path));
-	if (err)
-		return err;
-
-	fd = open(path, O_RDONLY);
-	if (fd < 0) {
-		pr_perror("failed to open %s", path);
-		return -errno;
-	}
-
-	pr_debug("    /proc/%d/%s ---> %s (fd %d)\n", p->pid, dentry, path, fd);
-
-	return fd;
-}
-
 static int collect_process_env(struct process_info *p,
 			       const struct replace_info_s *ri,
 			       const char *dentry, mode_t mode,
@@ -935,6 +924,7 @@ static int collect_process_cwd_root(struct process_info *p,
 	bool mnt_cwd, mnt_root;
 	int dir, err;
 	char path[PATH_MAX];
+	struct process_fs *fs = &p->fs;
 
 	snprintf(path, PATH_MAX, "/proc/%d", p->pid);
 	dir = open(path, O_RDONLY | O_DIRECTORY);
@@ -952,9 +942,9 @@ static int collect_process_cwd_root(struct process_info *p,
 		return 0;
 
 	if (mnt_cwd) {
-		p->fs.cwd_fd = open_process_env(p, ri, "cwd");
-		if (p->fs.cwd_fd < 0)
-			return p->fs.cwd_fd;
+		err = collect_process_env(p, ri, "cwd", S_IFDIR, &fs->cwd.fobj);
+		if (err)
+			return err;
 	}
 
 	if (mnt_root) {
@@ -964,8 +954,8 @@ static int collect_process_cwd_root(struct process_info *p,
 		if (err)
 			return err;
 
-		p->fs.root= strdup(path);
-		if (!p->fs.root)
+		fs->root= strdup(path);
+		if (!fs->root)
 			return -ENOMEM;
 	}
 	return 0;
@@ -976,6 +966,7 @@ static int collect_process_fs(struct process_info *p,
 {
 	int err;
 	pid_t pid;
+	struct process_fs *fs = &p->fs;
 
 	pid = fs_struct_exists(p->pid);
 	if (pid) {
@@ -988,7 +979,7 @@ static int collect_process_fs(struct process_info *p,
 	if (err)
 		return err;
 
-	if ((p->fs.cwd_fd >= 0) || p->fs.root) {
+	if (fs->cwd.fobj || fs->root) {
 		err = collect_fs_struct(p->pid);
 		if (err)
 			pr_err("failed to collect process %d fs\n", p->pid);
@@ -1073,7 +1064,6 @@ static struct process_info *create_process_info(pid_t pid)
 	memset(p, 0, sizeof(*p));
 
 	p->pid = pid;
-	p->fs.cwd_fd = -1;
 	p->orig_st = TASK_UNDEF;
 	INIT_LIST_HEAD(&p->fds);
 	INIT_LIST_HEAD(&p->maps);

@@ -63,6 +63,11 @@ struct process_map {
 	struct process_resource	res;
 };
 
+struct process_fs {
+	char			*root;
+	struct process_resource	cwd;
+};
+
 struct parasite_ctl;
 
 struct process_info {
@@ -70,11 +75,8 @@ struct process_info {
 	int			pid;
 	int			fds_nr;
 	int			maps_nr;
+	struct process_fs	fs;
 	struct process_resource	exe;
-	struct process_fs {
-		int	cwd_fd;
-		char	*root;
-	}			fs;
 	struct list_head	fds;
 	struct list_head	maps;
 	struct parasite_ctl	*pctl;
