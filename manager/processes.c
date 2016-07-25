@@ -481,7 +481,8 @@ static int get_fd_info(struct process_info *p, int dir,
 
 	fdi->local_fd = copy_process_fd(p, fdi->process_fd);
 	if (fdi->local_fd < 0) {
-		pr_err("failed to copy /proc/%d/fd/%d\n", p->pid, fdi->process_fd);
+		pr_err("failed to copy /proc/%d/fd/%d ---> %s\n",
+				p->pid, fdi->process_fd, fdi->path);
 		return fdi->local_fd;
 	}
 
