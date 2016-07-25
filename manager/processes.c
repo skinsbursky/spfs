@@ -28,6 +28,7 @@ struct fd_info_s {
 	unsigned        flags;
 	long long	pos;
 	char            path[PATH_MAX];
+	char            cwd[PATH_MAX];
 };
 
 static int seize_one_process(struct process_info *p)
@@ -508,8 +509,20 @@ static int get_fd_info(struct process_info *p, int dir,
 	}
 	fdi->path[bytes] = '\0';
 
-	err = fixup_source_path(fdi->path, sizeof(fdi->path),
-				ri->source_mnt, ri->target_mnt);
+	if (S_ISSOCK(fdi->st.st_mode)) {
+		snprintf(fdi->cwd, PATH_MAX, "/proc/%d/cwd", p->pid);
+		bytes = readlink(fdi->cwd, fdi->cwd, PATH_MAX - 1);
+		if (bytes < 0) {
+			pr_perror("failed to read link %s\n", fdi->cwd);
+			err = -errno;
+			goto close_local_fd;
+		}
+		fdi->cwd[bytes] = '\0';
+		err = fixup_source_path(fdi->cwd, sizeof(fdi->cwd),
+					ri->source_mnt, ri->target_mnt);
+	} else
+		err = fixup_source_path(fdi->path, sizeof(fdi->path),
+					ri->source_mnt, ri->target_mnt);
 
 close_local_fd:
 	if (err)
@@ -519,6 +532,15 @@ close_local_fd:
 
 static int is_mnt_fd(const struct fd_info_s *fdi, const struct replace_info_s *ri)
 {
+	if (S_ISSOCK(fdi->st.st_mode)) {
+		void *data;
+
+		if (find_unix_socket(fdi->st.st_ino, &data) != -ENOENT)
+			return true;
+
+		return false;
+	}
+
 	/* First check, that link points to the desired mount (if any).
 	 * This is required to be able to switch between 2 different mounts
 	 * with the same superblock.
@@ -553,7 +575,7 @@ static int collect_process_fd_cb(void *cb_data, void *new_fobj, void **res_fobj)
 
 static int collect_process_fd(struct process_info *p,
 			      const struct replace_info_s *ri,
-			      struct fd_info_s *fdi)
+			      const struct fd_info_s *fdi)
 {
 	struct fd_collect_s fdc = {
 		.pid = p->pid,
@@ -569,8 +591,12 @@ static int collect_process_fd(struct process_info *p,
 	if (err)
 		return err;
 
-	pr_debug("    /proc/%d/fd/%d ---> %s (flags: 0%o)\n",
-			p->pid, fdi->process_fd, fdi->path, fdi->flags);
+	if (!S_ISSOCK(fdi->st.st_mode))
+		pr_debug("    /proc/%d/fd/%d ---> %s (flags: 0%o)\n",
+				p->pid, fdi->process_fd, fdi->path, fdi->flags);
+	else
+		pr_debug("    /proc/%d/fd/%d ---> socket (fd: %d, flags: 0%o)\n",
+				p->pid, fdi->process_fd, fdi->flags);
 
 	return process_add_fd(p, fdi, fobj);
 }
@@ -583,6 +609,12 @@ static bool fd_skip_fast(const struct process_info *p, int dir,
 
 	if (fstatat(dir, process_fd, &st, 0))
 		return false;
+
+	if (S_ISSOCK(st.st_mode)) {
+		if (is_parasite_sock(p->pctl, st.st_ino))
+			return true;
+		return false;
+	}
 
 	return st.st_dev != ri->src_dev;
 }
