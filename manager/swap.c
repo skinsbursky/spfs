@@ -63,8 +63,6 @@ static int do_swap_process_fds(struct process_info *p)
 	if (!p->fds_nr)
 		return 0;
 
-	pr_debug("Swapping process %d file descriptors:\n", p->pid);
-
 	list_for_each_entry_safe(pfd, tmp, &p->fds, list) {
 		err = do_swap_resource(p, &pfd->res, &pfd->info, do_swap_fd);
 		if (err)
@@ -92,8 +90,6 @@ static int do_swap_process_maps(struct process_info *p)
 
 	if (!p->maps_nr)
 		return 0;
-
-	pr_debug("Swapping process %d mappings:\n", p->pid);
 
 	list_for_each_entry(pm, &p->maps, list) {
 		err = do_swap_resource(p, &pm->res, &pm->info, do_swap_map);
@@ -138,8 +134,6 @@ static int do_swap_process_fs(struct process_info *p)
 	if (!fs->cwd.fobj && !fs->root)
 		return 0;
 
-	pr_debug("Swapping process %d fs:\n", p->pid);
-
 	if (p->fs.root) {
 		err = do_swap_root(p, fs->root);
 		if (err)
@@ -162,8 +156,6 @@ static int do_swap_process_exe(struct process_info *p)
 
 	if (!p->exe.fobj)
 		return 0;
-
-	pr_debug("Swapping process %d exe:\n", p->pid);
 
 	exe_fd = get_fobj_fd(p->exe.fobj);
 	if (exe_fd < 0)
@@ -227,7 +219,7 @@ static int process_do_swap_handlers(struct process_info *p,
 
 static int do_swap_process_resources(struct process_info *p)
 {
-	pr_info("Swapping process %d resources\n", p->pid);
+	pr_info("Swapping process %d resources:\n", p->pid);
 
 	return process_do_swap_handlers(p, SWAP_RESOURCE_FDS, SWAP_RESOURCE_EXE);
 }
@@ -262,6 +254,8 @@ int do_swap_resources(const struct list_head *processes)
 		if (do_swap_process_resources(p))
 			pr_err("failed to swap resources for process %d\n", p->pid);
 	}
+
+	pr_info("Swapping exe links:\n");
 
 	list_for_each_entry(p, processes, list) {
 		if (p->exe.fobj && do_swap_exe_resources(p))
