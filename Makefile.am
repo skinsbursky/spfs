@@ -60,6 +60,7 @@ bin_spfs_manager_SOURCES =	manager/main.c			\
 				manager/mount.c			\
 				manager/file_obj.c		\
 				manager/link_remap.c		\
+				manager/unix-sockets.c		\
 								\
 				manager/context.h		\
 				manager/interface.h		\
@@ -74,6 +75,7 @@ bin_spfs_manager_SOURCES =	manager/main.c			\
 				manager/mount.h			\
 				manager/file_obj.h		\
 				manager/link_remap.h		\
+				manager/unix-sockets.h		\
 								\
 				src/util.c			\
 				src/socket.c			\
