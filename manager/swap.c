@@ -105,42 +105,55 @@ static int do_swap_process_maps(struct process_info *p)
 	return 0;
 }
 
+static int do_swap_root(struct process_info *p, const char *root)
+{
+	int err, cwd_fd;
+	struct process_fs *fs = &p->fs;
+
+	pr_debug("    %s --> /proc/%d/root\n", root, p->pid);
+	cwd_fd = open("/", O_PATH);
+	if (cwd_fd < 0) {
+		pr_perror("failed to open /");
+		return -errno;
+	}
+
+	err = swap_root(p->pctl, cwd_fd, root + 1, !!fs->cwd.fobj);
+
+	close(cwd_fd);
+	return err;
+}
+
+static int do_swap_cwd(const struct process_info *p, int target_fd, const void *data)
+{
+	pr_debug("    /proc/%d/fd/%d --> /proc/%d/cwd\n",
+			getpid(), target_fd, p->pid);
+	return swap_cwd(p->pctl, target_fd);
+}
+
 static int do_swap_process_fs(struct process_info *p)
 {
 	int err;
-	int cwd_fd = -1;
+	struct process_fs *fs = &p->fs;
 
-	if ((p->fs.cwd_fd < 0) && !p->fs.root)
+	if (!fs->cwd.fobj && !fs->root)
 		return 0;
 
 	pr_debug("Swapping process %d fs:\n", p->pid);
 
-
 	if (p->fs.root) {
-		pr_debug("    %s --> /proc/%d/root\n", p->fs.root, p->pid);
-		cwd_fd = open("/", O_PATH);
-		if (cwd_fd < 0) {
-			pr_perror("failed to open /");
-			return -errno;
-		}
-
-		err = swap_root(p->pctl, cwd_fd, p->fs.root + 1, p->fs.cwd_fd == -1);
+		err = do_swap_root(p, fs->root);
 		if (err)
-			goto err;
+			return err;
 	}
 
-	if (p->fs.cwd_fd >= 0) {
-		pr_debug("    /proc/%d/fd/%d --> /proc/%d/cwd\n",
-				getpid(), p->fs.cwd_fd, p->pid);
-		err = swap_cwd(p->pctl, p->fs.cwd_fd);
+	if (fs->cwd.fobj) {
+		err = do_swap_resource(p, &fs->cwd, NULL, do_swap_cwd);
 		if (err)
-			goto err;
+			return err;
+		release_file_obj(fs->cwd.fobj);
 	}
 
-err:
-	if (cwd_fd >= 0)
-		close(cwd_fd);
-	return err;
+	return 0;
 }
 
 static int do_swap_process_exe(struct process_info *p)
@@ -230,7 +243,7 @@ static bool process_needs_resources_swap(struct process_info *p)
 		return true;
 	if (p->maps_nr)
 		return true;
-	if (p->fs.cwd_fd != -1)
+	if (p->fs.cwd.fobj)
 		return true;
 	if (p->fs.root)
 		return true;
