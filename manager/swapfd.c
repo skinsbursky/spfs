@@ -83,7 +83,6 @@ static int copy_private_content(struct parasite_ctl *ctl, unsigned long to,
 	ssize_t copied = 0, count;
 	int src, dst, ret = -1;
 	char buf[PAGE_SIZE];
-	off_t off;
 
 	sprintf(path, "/proc/%d/mem", ctl->pid);
 	src = open(path, O_RDONLY);
@@ -93,29 +92,17 @@ static int copy_private_content(struct parasite_ctl *ctl, unsigned long to,
 		goto out;
 	}
 
-	off = lseek(dst, to, SEEK_SET);
-	if (off == (off_t) -1) {
-		pr_perror("Can't lseek in %s on %lx", path, to);
-		goto out;
-	}
-
-	off = lseek(src, from, SEEK_SET);
-	if (off == (off_t) -1) {
-		pr_perror("Can't lseek in %s on %lx", path, from);
-		goto out;
-	}
-
 	do {
 		count = size - copied;
 		if (count > PAGE_SIZE)
 			count = PAGE_SIZE;
 
-		count = read(src, buf, count);
+		count = pread(src, buf, count, from + copied);
 		if (count < 0) {
 			pr_perror("Can't read from tracee's memory");
 			goto out;
 		}
-		if (count != write(dst, buf, count)) {
+		if (count != pwrite(dst, buf, count, to + copied)) {
 			pr_perror("Can't write to tracee's memory");
 			goto out;
 		}
