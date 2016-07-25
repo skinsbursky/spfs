@@ -1,7 +1,8 @@
 #include <search.h>
 #include <stdlib.h>
-#include "include/log.h"
 #include <limits.h>
+
+#include "include/log.h"
 
 #include "link_remap.h"
 #include "processes.h"
