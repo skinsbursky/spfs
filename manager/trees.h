@@ -10,6 +10,8 @@ int collect_open_path(const char *path, unsigned flags, void *file_obj, void **r
 int collect_fifo(const char *path);
 pid_t mm_exists(pid_t pid);
 int collect_mm(pid_t pid);
+int find_unix_socket(ino_t ino, void **data);
+int collect_unix_socket(ino_t ino, void *data);
 
 void destroy_obj_trees(void);
 

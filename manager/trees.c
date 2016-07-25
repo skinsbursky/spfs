@@ -48,12 +48,18 @@ struct mm_struct_s {
 	pid_t pid;
 };
 
+struct sock_struct_s {
+	ino_t ino;
+	void *data;
+};
+
 static void *fd_tree_root = NULL;
 static void *fd_table_tree_root = NULL;
 static void *fs_struct_tree_root = NULL;
 static void *map_fd_tree_root = NULL;
 static void *fifo_tree_root = NULL;
 static void *mm_tree_root = NULL;
+static void *sk_tree_root = NULL;
 
 static void free_fd_node(void *nodep)
 {
@@ -400,4 +406,61 @@ int collect_mm(pid_t pid)
 free_new_mm:
 	free(new_mm);
 	return err;
+}
+
+static int compare_sock_ino(const void *a, const void *b)
+{
+	const struct sock_struct_s *f = a, *s = b;
+
+	if (f->ino < s->ino)
+		return -1;
+	else if (f->ino > s->ino)
+		return 1;
+	return 0;
+}
+
+int collect_unix_socket(ino_t ino, void *data)
+{
+	struct sock_struct_s *new_sk, **found_sk;
+	int err = -ENOMEM;
+
+	new_sk = malloc(sizeof(*new_sk));
+	if (!new_sk) {
+		pr_err("failed to allocate\n");
+		return -ENOMEM;
+	}
+	new_sk->ino = ino;
+	new_sk->data = data;
+
+	found_sk = tsearch(new_sk, &sk_tree_root, compare_sock_ino);
+	if (!found_sk) {
+		pr_err("failed to add new socket object to the tree\n");
+		goto free_new_sk;
+	}
+
+	if (*found_sk == new_sk)
+		return 0;
+
+	pr_err("socket with inode %d already exists\n", ino);
+
+	err = -EEXIST;
+
+free_new_sk:
+	free(new_sk);
+	return err;
+
+}
+
+int find_unix_socket(ino_t ino, void **data)
+{
+	struct sock_struct_s cookie = {
+		.ino = ino,
+	}, **found_sk;
+
+	found_sk = tfind(&cookie, &sk_tree_root, compare_sock_ino);
+	if (!found_sk) {
+		return -ENOENT;
+	}
+	*data = (*found_sk)->data;
+	return 0;
 }
