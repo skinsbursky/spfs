@@ -135,11 +135,12 @@ static void do_something(int *pipe_fd, int fd)
 	}
 	printf("Setting address %lx\n", (unsigned long)addr);
 
-	addr = mmap(0, PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, 0);
+	addr = mmap(0, 2 * PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, 0);
 	if (addr == MAP_FAILED) {
 		perror("Can't mmap");
 		return;
 	}
+	*(char *)addr = 0;
 	printf("Setting address %lx\n", (unsigned long)addr);
 
 	if (write(pipe_fd[1], &addr, sizeof(addr)) != sizeof(addr)) {
@@ -260,11 +261,17 @@ int main()
 	if (swapfd_tracee(ctl, &se) == 0)
 		ret = 0;
 #endif
-	if (swap_fd(ctl, src[0], dst[0], 0, 0) == 0) {
-		pr_debug("Success\n");
-		ret = 0;
-	}
+	ret = -1;
+	if (swap_fd(ctl, src[0], dst[0], 0, 0) != 0)
+		goto out_destroy;
 
+	if (swap_map(ctl, src[0], addr, addr + 2 * PAGE_SIZE,
+		     PROT_READ|PROT_WRITE, MAP_PRIVATE, 0) != 0)
+		goto out_destroy;
+	pr_debug("Success\n");
+
+	ret = 0;
+out_destroy:
 	destroy_parasite_ctl(se.pid, ctl);
 out_detach:
 	detach_from_task(child, st);
