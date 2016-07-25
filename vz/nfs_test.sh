@@ -37,6 +37,7 @@ TESTS_LIST="	\
 		static/unlink_fstat03		\
 		static/unlink_mmap00		\
 		static/unlink_mmap01		\
+		static/unlink_mmap02		\
 		static/link10			\
 		static/unlink_fifo		\
 		static/unlink_fifo_wronly	\
@@ -77,10 +78,6 @@ NOT_DUMPABLE_STALE_TEST_LIST="			\
 		static/cwd01			\
 		static/fanotify00		\
 		static/unlink_fstat00		\
-		"
-
-NOT_DUMPABLE_UNLINKED_TEST_LIST="		\
-		static/unlink_mmap02		\
 		"
 
 NOT_RESTORABLE_DEVICE_LIST="			\
