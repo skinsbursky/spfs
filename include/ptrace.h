@@ -23,6 +23,8 @@ typedef uint32_t u32;
 	(void) (&_min1 == &_min2);	\
 	_min1 < _min2 ? _min1 : _min2; })
 
+#define PAGE_PFN(addr)  ((addr) / PAGE_SIZE)
+
 #define BUILTIN_SYSCALL_SIZE	8
 
 #ifndef  __NR_memfd_create
@@ -45,6 +47,10 @@ typedef uint32_t u32;
 #define X86_EFLAGS_IF	0x00000200 /* Interrupt Flag */
 #define X86_EFLAGS_DF	0x00000400 /* Direction Flag */
 #define TASK_SIZE	((1UL << 47) - PAGE_SIZE)
+
+#define PAGEMAP_LEN(addr)	(PAGE_PFN(addr) * sizeof(uint64_t))
+#define PAGEMAP_PFN_OFF(addr)	(PAGE_PFN(addr) * sizeof(uint64_t))
+#define PME_PRESENT		(1ULL << 63)
 
 #define _KNSIG		64
 # define _NSIG_BPW	64
