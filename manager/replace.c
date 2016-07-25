@@ -12,6 +12,7 @@
 #include "swap.h"
 #include "processes.h"
 #include "context.h"
+#include "unix-sockets.h"
 
 static int do_replace_resources(struct freeze_cgroup_s *fg,
 				struct replace_info_s *ri,
@@ -55,6 +56,10 @@ static int do_replace_resources(struct freeze_cgroup_s *fg,
 		goto release_processes;
 
 	err = seize_processes(&processes);
+	if (err)
+		goto release_processes;
+
+	err = collect_unix_sockets(ri);
 	if (err)
 		goto release_processes;
 
