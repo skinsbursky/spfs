@@ -583,20 +583,22 @@ static int collect_process_fd(struct process_info *p,
 	};
 	void *fobj;
 	int err;
+	const char *path;
 
-	err = get_file_obj(fdi->path, fdi->flags, fdi->st.st_mode,
+	if (!S_ISSOCK(fdi->st.st_mode))
+		path = fdi->path;
+	else
+		path = fdi->cwd;
+
+	err = get_file_obj(path, fdi->flags, fdi->st.st_mode,
 			   fdi->local_fd, ri,
 			   &fdc, collect_process_fd_cb,
 			   &fobj);
 	if (err)
 		return err;
 
-	if (!S_ISSOCK(fdi->st.st_mode))
-		pr_debug("    /proc/%d/fd/%d ---> %s (flags: 0%o)\n",
-				p->pid, fdi->process_fd, fdi->path, fdi->flags);
-	else
-		pr_debug("    /proc/%d/fd/%d ---> socket (fd: %d, flags: 0%o)\n",
-				p->pid, fdi->process_fd, fdi->flags);
+	pr_debug("    /proc/%d/fd/%d ---> %s (flags: 0%o)\n",
+			p->pid, fdi->process_fd, fdi->path, fdi->flags);
 
 	return process_add_fd(p, fdi, fobj);
 }
