@@ -575,6 +575,18 @@ static int collect_process_fd(struct process_info *p,
 	return process_add_fd(p, fdi, fobj);
 }
 
+static bool fd_skip_fast(const struct process_info *p, int dir,
+			 const char *process_fd,
+			 const struct replace_info_s *ri)
+{
+	struct stat st;
+
+	if (fstatat(dir, process_fd, &st, 0))
+		return false;
+
+	return st.st_dev != ri->src_dev;
+}
+
 static int examine_process_fd(struct process_info *p, int dir,
 			      const char *process_fd, const void *data)
 {
@@ -587,10 +599,8 @@ static int examine_process_fd(struct process_info *p, int dir,
 	 * Let's quickly check, whether it is so, and skip the fd copy and
 	 * other checks.
 	 */
-	if (fstatat(dir, process_fd, &fdi.st, 0) == 0) {
-		if (fdi.st.st_dev != ri->src_dev)
-			return 0;
-	}
+	if (fd_skip_fast(p, dir, process_fd, ri))
+		return 0;
 
 	err = get_fd_info(p, dir, process_fd, ri, &fdi);
 	if (err)
