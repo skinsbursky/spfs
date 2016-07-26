@@ -31,6 +31,7 @@ struct swapfd_exchange {
 struct proc_status_creds {
 	char                    state;
 	int                     ppid;
+	int			seccomp_mode;
 	unsigned long long      sigpnd;
 	unsigned long long      shdpnd;
 };
