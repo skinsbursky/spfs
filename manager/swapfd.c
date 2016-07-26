@@ -1056,6 +1056,9 @@ try_again:
 		goto try_again;
 	}
 
+	if (cr.seccomp_mode != SECCOMP_MODE_DISABLED && suspend_seccomp(pid) < 0)
+		goto err;
+
 	nr_sigstop = 0;
 	if (cr.sigpnd & (1 << (SIGSTOP - 1)))
 		nr_sigstop++;

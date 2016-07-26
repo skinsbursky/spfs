@@ -190,4 +190,13 @@ ssize_t recvmsg_seized(struct parasite_ctl *ctl, int sockfd,
 
 int close_seized(struct parasite_ctl *ctl, int fd);
 int fchdir_seized(struct parasite_ctl *ctl, int fd);
+
+#ifndef SECCOMP_MODE_DISABLED
+#define SECCOMP_MODE_DISABLED 0
+#endif
+#ifndef PTRACE_O_SUSPEND_SECCOMP
+# define PTRACE_O_SUSPEND_SECCOMP (1 << 21)
+#endif
+int suspend_seccomp(pid_t pid);
+
 #endif
