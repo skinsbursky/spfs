@@ -54,6 +54,7 @@ TESTS_LIST="	\
 		static/socket_queues		\
 		static/socket-ext		\
 		static/deleted_unix_sock	\
+		static/seccomp_strict		\
 						\
 		transition/unix_sock		\
 		transition/fifo_loop		\
