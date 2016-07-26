@@ -869,6 +869,7 @@ int detach_from_task(pid_t pid, int orig_st)
 
 static int parse_pid_status(pid_t pid, struct proc_status_creds *cr)
 {
+	bool parsed_seccomp = false;
 	char path[PATH_MAX];
 	FILE *fp;
 	int done = 0;
@@ -887,9 +888,19 @@ static int parse_pid_status(pid_t pid, struct proc_status_creds *cr)
 	cr->sigpnd = 0;
 	cr->shdpnd = 0;
 
-	while (done < 3 && getline(&str, &len, fp) > 0) {
+	while (done < 4 && getline(&str, &len, fp) > 0) {
 		if (!strncmp(str, "State:", 6)) {
 			cr->state = str[7];
+			done++;
+			continue;
+		}
+
+		if (!strncmp(str, "Seccomp:", 8)) {
+			if (sscanf(str + 9, "%d", &cr->seccomp_mode) != 1) {
+				goto err_parse;
+			}
+
+			parsed_seccomp = true;
 			done++;
 			continue;
 		}
@@ -916,12 +927,12 @@ static int parse_pid_status(pid_t pid, struct proc_status_creds *cr)
 		}
 	}
 
-	if (done == 3)
+	if (done == 4 || (done == 3 && !parsed_seccomp))
 		ret = 0;
 
 err_parse:
 	if (ret)
-		pr_err("Error parsing proc status file\n");
+		pr_err("Error parsing proc status file: pid=%d\n", pid);
 	free(str);
 	fclose(fp);
 	return ret;
