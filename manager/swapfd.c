@@ -32,7 +32,7 @@
 #define MMAP_SIZE (PATH_MAX + BUILTIN_SYSCALL_SIZE)
 #define MAX_BIND_ATTEMPTS	1000
 
-static void *find_mapping(pid_t pid, struct parasite_ctl *ctl)
+static void *find_mapping(pid_t pid)
 {
 	char path[PATH_MAX];
 	void *result = MAP_FAILED;
@@ -310,26 +310,113 @@ destroy:
 	return -1;
 }
 
+static int parasite_inject_memfd(struct parasite_ctl *ctl, void *where)
+{
+	uint8_t orig_code[] = "SWAPMFD";
+	unsigned long sret = -ENOSYS;
+	int ret, fd;
+
+	if (ptrace_swap_area(ctl->pid, where, (void *)orig_code, sizeof(orig_code))) {
+		pr_err("Can't inject memfd args (pid: %d)\n", ctl->pid);
+		return -1;
+	}
+
+	ret = syscall_seized(ctl, __NR_memfd_create, &sret,
+			     (unsigned long)where, 0, 0, 0, 0, 0);
+
+	fd = sret;
+	if (ptrace_poke_area(ctl->pid, orig_code, where, sizeof(orig_code))) {
+		if (fd >= 0)
+			close_seized(ctl, fd);
+		pr_err("Can't restore memfd args (pid: %d)\n", ctl->pid);
+		return -1;
+	}
+
+	if (ret < 0 || fd < 0) {
+		pr_err("Can't create memfd: %d %d\n", ret, fd);
+		return -1;
+	}
+
+	return fd;
+}
+
+static int parasite_set_map(struct parasite_ctl *ctl, int fd)
+{
+	char path[] = "/proc/XXXXXXXXXX/fd/XXXXXXXXXX";
+	int lfd, err = -EPERM, ret;
+	unsigned long sret;
+
+	sprintf(path, "/proc/%d/fd/%d", ctl->pid, fd);
+	lfd = open(path, O_RDWR);
+	if (lfd < 0) {
+		pr_perror("Can't open %s", path);
+		return -errno;
+	}
+
+	if (ftruncate(lfd, ctl->map_length) < 0) {
+		pr_perror("Fail to truncate memfd for parasite");
+		err = -errno;
+		goto close_lfd;
+	}
+
+	ctl->remote_map = mmap_seized(ctl, NULL, MMAP_SIZE,
+				      PROT_READ | PROT_WRITE | PROT_EXEC,
+				      MAP_FILE | MAP_SHARED, fd, 0);
+	if (!ctl->remote_map) {
+		pr_err("Can't rmap memfd for parasite blob\n");
+		goto close_lfd;
+	}
+
+	ctl->local_map = mmap(NULL, MMAP_SIZE, PROT_READ | PROT_WRITE,
+			      MAP_SHARED | MAP_FILE, lfd, 0);
+	if (ctl->local_map == MAP_FAILED) {
+		pr_perror("Can't lmap memfd for parasite blob");
+		goto munmap_remote_map;
+	}
+
+	err = 0;
+
+close_lfd:
+	close(lfd);
+	return err;
+
+munmap_remote_map:
+	ctl->syscall_ip = ctl->syscall_ip_saved;
+	ret = syscall_seized(ctl, __NR_munmap, &sret, (unsigned long)ctl->remote_map, ctl->map_length, 0, 0, 0, 0);
+	if (ret || ((int)(long)sret) < 0)
+		pr_err("Can't munmap remote file\n");
+	goto close_lfd;
+}
+
+static int inject_parasite(struct parasite_ctl *ctl, void *addr)
+{
+	int fd, err;
+
+	fd = parasite_inject_memfd(ctl, addr + BUILTIN_SYSCALL_SIZE);
+	if (fd < 0)
+		return fd;
+
+	err = parasite_set_map(ctl, fd);
+
+	close_seized(ctl, fd);
+	return err;
+}
+
 int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl)
 {
 	char path[] = "/proc/XXXXXXXXXX/fd/XXXXXXXXXX";
-	void *addr, *where;
-	uint8_t orig_code[] = "SWAPMFD";
-	unsigned long sret = -ENOSYS;
+	void *addr;
 	struct parasite_ctl *ctl;
-	int ret, fd, lfd;
+
+	addr = find_mapping(pid);
+	if (addr == MAP_FAILED) {
+		pr_err("Can't find a useful mapping, pid=%d\n", pid);
+		return -ENOMEM;
+	}
 
 	ctl = malloc(sizeof(*ctl));
 	if (!ctl) {
 		pr_err("Can't alloc ctl\n");
-		return -ENOMEM;
-	}
-
-	addr = find_mapping(pid, ctl);
-	where = addr + BUILTIN_SYSCALL_SIZE;
-
-	if (addr == MAP_FAILED) {
-		pr_err("Can't find a useful mapping, pid=%d\n", pid);
 		return -ENOMEM;
 	}
 
@@ -338,88 +425,41 @@ int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl)
 	ctl->syscall_ip_saved = (unsigned long)addr;
 	ctl->remote_sockfd = -1;
 	ctl->local_sockfd = -1;
+	ctl->map_length = MMAP_SIZE;
 
 	sprintf(path, "/proc/%d/pagemap", pid);
 	ctl->pagemap_fd = open(path, O_RDONLY);
 	if (ctl->pagemap_fd < 0) {
 		pr_perror("Can't open pagemap for %d\n", pid);
-		return -ENOMEM;
+		goto err_free;
 	}
 
         if (get_thread_ctx(pid, &ctl->orig))
-		goto err_free;
+		goto close_pagemap_fd;
 
-	if (ptrace_swap_area(pid, where, (void *)orig_code, sizeof(orig_code))) {
-		pr_err("Can't inject memfd args (pid: %d)\n", pid);
-		goto err_free;
-	}
+	if (inject_parasite(ctl, addr))
+		goto close_pagemap_fd;
 
-	ret = syscall_seized(ctl, __NR_memfd_create, &sret,
-			     (unsigned long)where, 0, 0, 0, 0, 0);
-
-	fd = (int)(long)sret;
-	if (ptrace_poke_area(pid, orig_code, where, sizeof(orig_code))) {
-		if (fd >= 0)
-			close_seized(ctl, fd);
-		pr_err("Can't restore memfd args (pid: %d)\n", pid);
-		goto err_free;
-	}
-
-	if (ret < 0 || fd < 0) {
-		pr_err("Can't create memfd: %d %d\n", ret, fd);
-		goto err_free;
-	}
-
-	ctl->map_length = MMAP_SIZE;
-	sprintf(path, "/proc/%d/fd/%d", pid, fd);
-	lfd = open(path, O_RDWR);
-	if (lfd < 0) {
-		pr_perror("Can't open %s", path);
-		goto err_cure;
-	}
-
-	if (ftruncate(lfd, ctl->map_length) < 0) {
-		pr_perror("Fail to truncate memfd for parasite");
-		goto err_cure;
-	}
-
-	ctl->remote_map = mmap_seized(ctl, NULL, MMAP_SIZE,
-				      PROT_READ | PROT_WRITE | PROT_EXEC,
-				      MAP_FILE | MAP_SHARED, fd, 0);
-	if (!ctl->remote_map) {
-		pr_err("Can't rmap memfd for parasite blob\n");
-		goto err_curef;
-	}
-
-	ctl->local_map = mmap(NULL, MMAP_SIZE, PROT_READ | PROT_WRITE,
-			      MAP_SHARED | MAP_FILE, lfd, 0);
-	if (ctl->local_map == MAP_FAILED) {
-		pr_perror("Can't lmap memfd for parasite blob");
-		goto err_curef;
-	}
-
-	close_seized(ctl, fd);
-	close(lfd);
 	/*
 	 * Use allocated memory for syscall number, because task's mappings
 	 * are unstable over our moving of them.
 	 */
 	ctl->syscall_ip = (unsigned long)ctl->remote_map + PATH_MAX;
 
-	if (set_dgram_socket(ctl) < 0) {
-		destroy_parasite_ctl(pid, ctl);
-		goto err_free;
-	}
+	if (set_dgram_socket(ctl) < 0)
+		goto destroy_parasite;
 
 	*ret_ctl = ctl;
 	return 0;
 
-err_curef:
-	close(lfd);
-err_cure:
-	close_seized(ctl, fd);
+close_pagemap_fd:
+	close(ctl->pagemap_fd);
 err_free:
 	free(ctl);
+	return -1;
+
+destroy_parasite:
+	destroy_parasite_ctl(pid, ctl);
 	return -1;
 }
 
@@ -436,9 +476,11 @@ void destroy_parasite_ctl(pid_t pid, struct parasite_ctl *ctl)
 	if (ret || ((int)(long)sret) < 0)
 		pr_err("Can't munmap remote file\n");
 
-	ret = munmap(ctl->local_map, ctl->map_length);
-	if (ret)
-		pr_perror("Can't munmap local map");
+	if (ctl->local_map != MAP_FAILED) {
+		ret = munmap(ctl->local_map, ctl->map_length);
+		if (ret)
+			pr_perror("Can't munmap local map");
+	}
 	free(ctl);
 }
 
