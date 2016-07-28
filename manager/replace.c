@@ -80,7 +80,7 @@ int __replace_resources(struct freeze_cgroup_s *fg, int *ns_fds,
 		      const char *source_mnt, dev_t src_dev, int src_mnt_ref,
 		      const char *target_mnt)
 {
-	int err, status, pid;
+	int err, status = 0, pid;
 	struct replace_info_s ri = {
 		.src_dev = src_dev,
 		.src_mnt_ref = src_mnt_ref,
@@ -118,7 +118,7 @@ int replace_resources(struct freeze_cgroup_s *fg,
 		      const char *target_mnt,
 		      pid_t ns_pid)
 {
-	int res, err, src_mnt_ref = -1;
+	int res = 0, err, src_mnt_ref = -1;
 	int ct_ns_fds[NS_MAX], *ns_fds = NULL;
 
 	if (ns_pid) {
@@ -133,18 +133,18 @@ int replace_resources(struct freeze_cgroup_s *fg,
 	if (source_mnt) {
 		src_mnt_ref = open(source_mnt, O_PATH);
 		if (src_mnt_ref < 0) {
-			res = -errno;
+			err = -errno;
 			pr_perror("failed to open %s", source_mnt);
 			goto close_ns_fds;
 		}
 	}
 
-	res = lock_cgroup(fg);
-	if (res)
+	err = lock_cgroup(fg);
+	if (err)
 		goto close_mnt_ref;
 
-	res = freeze_cgroup(fg);
-	if (res)
+	err = freeze_cgroup(fg);
+	if (err)
 		goto unlock_cgroup;
 
 	err = __replace_resources(fg, ns_fds, source_mnt, src_dev, src_mnt_ref,
