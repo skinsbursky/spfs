@@ -140,21 +140,20 @@ int replace_resources(struct freeze_cgroup_s *fg,
 	}
 
 	res = lock_cgroup(fg);
-	if (!res) {
-		res = freeze_cgroup(fg);
-		if (res)
-			(void) unlock_cgroup(fg);
-	}
 	if (res)
 		goto close_mnt_ref;
+
+	res = freeze_cgroup(fg);
+	if (res)
+		goto unlock_cgroup;
 
 	err = __replace_resources(fg, ns_fds, source_mnt, src_dev, src_mnt_ref,
 				  target_mnt);
 
 	res = thaw_cgroup(fg);
-	if (!res)
-		(void) unlock_cgroup(fg);
 
+unlock_cgroup:
+	(void) unlock_cgroup(fg);
 close_mnt_ref:
 	if (src_mnt_ref != -1)
 		close(src_mnt_ref);
