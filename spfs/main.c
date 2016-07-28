@@ -160,7 +160,7 @@ int parse_options(int *orig_argc, char ***orig_argv,
 		goto inval_args;
 
 	if (ready_fd_str) {
-		if (xatol(ready_fd_str, (long *)ready_fd) < 0) {
+		if (xatoi(ready_fd_str, ready_fd) < 0) {
 			pr_err("failed to convert --ready-fd\n");
 			goto inval_args;
 		}

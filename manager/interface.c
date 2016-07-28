@@ -188,7 +188,7 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 	const char *opt_mode, *opt_proxy_dir, *opt_mountpoint;
 	struct spfs_info_s *info;
 	int err;
-	long ns_pid = -1;
+	int ns_pid = -1;
 
 	err = parse_cmd_options(opt_array, options);
 	if (err) {
@@ -224,7 +224,7 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 	}
 
 	if (opt_ns_pid) {
-		err = xatol(opt_ns_pid, &ns_pid);
+		err = xatoi(opt_ns_pid, &ns_pid);
 		if (err) {
 			pr_err("failed to convert pid: %s\n", opt_ns_pid);
 			return err;
@@ -502,7 +502,7 @@ static int process_switch_cmd(int sock, struct spfs_manager_context_s *ctx,
 	};
 	int err;
 	struct freeze_cgroup_s *fg;
-	long ns_pid = 0, src_dev = 0;
+	int ns_pid = 0, src_dev = 0;
 	char *source_mnt, *target_mnt;
 	char *freeze_cgroup, *device, *ns_process_id;
 
@@ -535,7 +535,7 @@ static int process_switch_cmd(int sock, struct spfs_manager_context_s *ctx,
 	}
 
 	if (device) {
-		err = xatol(device, &src_dev);
+		err = xatoi(device, &src_dev);
 		if (err) {
 			pr_err("failed to convert device id: %s\n", device);
 			return err;
@@ -543,7 +543,7 @@ static int process_switch_cmd(int sock, struct spfs_manager_context_s *ctx,
 	}
 
 	if (ns_process_id) {
-		err = xatol(ns_process_id, &ns_pid);
+		err = xatoi(ns_process_id, &ns_pid);
 		if (err) {
 			pr_err("failed to convert pid: %s\n", ns_process_id);
 			return err;
