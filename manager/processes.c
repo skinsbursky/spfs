@@ -243,12 +243,12 @@ int iterate_pids_list_name(const char *pids_list, void *data,
 	}
 
 	while ((pid = strsep(&l, "\n")) != NULL) {
-		long p;
+		int p;
 
 		if (!strlen(pid))
 			continue;
 
-		err = xatol(pid, &p);
+		err = xatoi(pid, &p);
 		if (err) {
 			pr_err("failed to convert pid %s to number\n", pid);
 			break;
@@ -474,7 +474,7 @@ static int get_fd_info(struct process_info *p, int dir,
 	int err;
 	ssize_t bytes;
 
-	err = xatol(process_fd, (long *)&fdi->process_fd);
+	err = xatoi(process_fd, &fdi->process_fd);
 	if (err) {
 		pr_err("failed to convert fd %s to number\n", process_fd);
 		return err;
