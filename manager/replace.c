@@ -103,12 +103,12 @@ int __replace_resources(struct freeze_cgroup_s *fg, int *ns_fds,
 		case -1:
 			pr_perror("failed to fork");
 			err = -errno;
+			break;
 		case 0:
 			_exit(do_replace_resources(fg, &ri, ns_fds));
+		default:
+			err = collect_child(pid, &status, 0);
 	}
-
-	if (pid > 0)
-		err = collect_child(pid, &status, 0);
 
 	return err ? err : status;
 }
