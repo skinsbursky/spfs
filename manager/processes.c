@@ -459,6 +459,7 @@ static int parse_fdinfo(pid_t pid, int fd, unsigned *flags, long long *pos)
 	}
 	if (err < 0)
 		pr_err("failed to parse %s: %d\n", path, err);
+	fclose(fdinfo);
 	return err;
 }
 
