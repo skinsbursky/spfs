@@ -888,7 +888,7 @@ static int collect_process_env(struct process_info *p,
 			       const char *dentry, mode_t mode,
 			       void **fobj)
 {
-	char path[PATH_MAX];
+	char path[PATH_MAX] = { };
 	struct open_path_collect_s opath = {
 		.path = path,
 		.flags = O_RDONLY,
@@ -898,6 +898,11 @@ static int collect_process_env(struct process_info *p,
 	err = get_process_env(p, ri, dentry, path, sizeof(path));
 	if (err)
 		return err;
+
+	if (!strlen(path)) {
+		pr_err("empty link /proc/%d/%s\n", p->pid, dentry);
+		return -EINVAL;
+	}
 
 	err = get_file_obj(path, O_RDONLY, mode, -1, ri,
 			   &opath, collect_open_path_cb,
