@@ -41,9 +41,9 @@ int shm_init_pool(void)
 		return -errno;
 	}
 
-	pool->data = pool + sizeof(*pool);
+	pool->data = pool + 1;
 	pool->alloc_size = size;
-	pool->used_size = shm_align(sizeof(*pool));
+	pool->used_size = shm_align((unsigned long)pool->data - (unsigned long)pool);
 
 	return 0;
 }
