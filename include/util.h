@@ -9,7 +9,6 @@ char *xvstrcat(char *str, const char *fmt, va_list args);
 extern char *xstrcat(char *str, const char *fmt, ...);
 extern char *xsprintf(const char *fmt, ...);
 
-int xatol_base(const char *string, long *number, int base);
 extern int xatol(const char *string, long *number);
 
 int save_fd(int fd, unsigned flags);

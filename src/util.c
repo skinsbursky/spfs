@@ -139,7 +139,7 @@ int execvp_print(const char *file, char *const argv[])
 	return -errno;
 }
 
-int xatol_base(const char *string, long *number, int base)
+static int xatol_base(const char *string, long *number, int base)
 {
 	char *endptr;
 	long nr;
