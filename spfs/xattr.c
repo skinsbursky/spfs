@@ -382,8 +382,8 @@ int spfs_removexattr(const char *path, const char *name)
 
 	if (empty_xattr_tree(fxt->tree)) {
 		remove_file_xattr_tree(fxt);
-		destroy_file_xattr_tree(fxt);
 		pr_debug("destroyed xattr tree for %s\n", fxt->path);
+		destroy_file_xattr_tree(fxt);
 	}
 
 unlock:
