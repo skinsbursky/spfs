@@ -497,7 +497,6 @@ static int unix_listen_socket(struct unix_socket_info *sk, int sock)
 
 	if (listen(sock, sk->wq_len)) {
 		pr_err("failed to listen socket %d\n", sock);
-		close(sock);
 		return -errno;
 	}
 
