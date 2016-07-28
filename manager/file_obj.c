@@ -142,10 +142,9 @@ static int fifo_file_open(const char *path, unsigned flags, int source_fd)
 		case 0:
 			err = fifo_file_fill(source_fd, fd);
 			break;
-		default:
-			close(fd);
 	}
-
+	if (err)
+		close(fd);
 	return err ? err : fd;
 }
 
