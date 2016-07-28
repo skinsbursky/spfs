@@ -455,7 +455,7 @@ static int unix_bind_socket(struct unix_socket_info *sk, int sock)
 	struct stat st;
 
 	if (stat(sk->path, &st)) {
-		pr_perror("fialed to stat %s", sk->path);
+		pr_perror("failed to stat %s", sk->path);
 		return -errno;
 	}
 
