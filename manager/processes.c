@@ -1004,7 +1004,7 @@ static int collect_process_cwd_root(struct process_info *p,
 	}
 
 	if (mnt_root) {
-		char path[PATH_MAX];
+		char path[PATH_MAX] = { };
 
 		err = get_process_env(p, ri, "root", path, sizeof(path));
 		if (err)
