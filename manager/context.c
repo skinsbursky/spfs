@@ -44,7 +44,9 @@ static void cleanup_spfs_mount(struct spfs_manager_context_s *ctx,
 	info->dead = true;
 	del_spfs_info(ctx->spfs_mounts, info);
 
-	unlink(info->socket_path);
+	if (unlink(info->socket_path))
+		pr_perror("failed to unlink %s", info->socket_path);
+
 	spfs_cleanup_env(info);
 
 	close_namespaces(info->ns_fds);
