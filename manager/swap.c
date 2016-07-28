@@ -195,7 +195,7 @@ static int process_do_swap_handler(struct process_info *p, swap_resource_t type)
 	swap_handler_t handler;
 
 	handler = get_swap_handler(type);
-	if (handler < 0)
+	if (!handler)
 		return -EINVAL;
 
 	return handler(p);
