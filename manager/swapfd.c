@@ -99,15 +99,20 @@ static int copy_private_content(struct parasite_ctl *ctl, unsigned long to,
 	}
 	if (pread(ctl->pagemap_fd, map, size_map, PAGEMAP_PFN_OFF(from)) != size_map) {
 		pr_perror("Can't read %d's pagemap file", ctl->pid);
-		goto out;
+		goto free_map;
 	}
 
 	sprintf(path, "/proc/%d/mem", ctl->pid);
 	src = open(path, O_RDONLY);
+	if (src < 0) {
+		pr_perror("Can't open %s for read", path);
+		goto free_map;
+	}
+
 	dst = open(path, O_WRONLY);
-	if (src < 0 || dst < 0) {
-		pr_perror("Can't open %s: %d %d\n", path, src, dst);
-		goto out;
+	if (dst < 0) {
+		pr_perror("Can't open %s for write", path);
+		goto close_src;
 	}
 
 	do {
@@ -128,9 +133,12 @@ static int copy_private_content(struct parasite_ctl *ctl, unsigned long to,
 	} while (copied != size);
 
 	ret = 0;
+
 out:
-	close(src);
 	close(dst);
+close_src:
+	close(src);
+free_map:
 	free(map);
 	return ret;
 }
