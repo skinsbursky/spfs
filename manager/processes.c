@@ -662,7 +662,7 @@ static int iterate_dir_name(const char *dpath, struct process_info *p,
 	struct dirent *dt;
 	DIR *fdir;
 	int dir;
-	int err;
+	int err = 0;
 
 	fdir = opendir(dpath);
 	if (!fdir) {
