@@ -156,15 +156,16 @@ int collect_fd(pid_t pid, int fd, void *file_obj, void **real_file_obj)
 		goto free_new_fd;
 	}
 
-	if (*found_fd != new_fd)
+	if (*found_fd != new_fd) {
 		(*found_fd)->shared = true;
+		free(new_fd);
+	}
 
 	*real_file_obj = (*found_fd)->file_obj;
-	err = 0;
+	return 0;
 
 free_new_fd:
-	if (*found_fd != new_fd)
-		free(new_fd);
+	free(new_fd);
 	return err;
 }
 
