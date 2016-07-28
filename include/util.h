@@ -10,6 +10,7 @@ extern char *xstrcat(char *str, const char *fmt, ...);
 extern char *xsprintf(const char *fmt, ...);
 
 extern int xatol(const char *string, long *number);
+extern int xatoi(const char *string, int *number);
 
 int save_fd(int fd, unsigned flags);
 

@@ -165,6 +165,18 @@ int xatol(const char *string, long *number)
 	return xatol_base(string, number, 10);
 }
 
+
+int xatoi(const char *string, int *number)
+{
+	long tmp;
+	int err;
+
+	err = xatol(string, &tmp);
+	if (!err)
+		*number = (int)tmp;
+	return err;
+}
+
 int create_dir(const char *fmt, ...)
 {
 	int err = -1;
