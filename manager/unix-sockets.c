@@ -449,6 +449,13 @@ static bool unix_sk_is_supported(const struct unix_socket_info *sk)
 	return true;
 }
 
+static void unix_construct_addr(struct unix_socket_info *sk, struct sockaddr_un *addr)
+{
+	memset(addr, 0, sizeof(*addr));
+	addr->sun_family = AF_UNIX;
+	strncpy(addr->sun_path, sk->path, sizeof(addr->sun_path) - 1);
+}
+
 static int unix_bind_socket(struct unix_socket_info *sk, int sock)
 {
 	struct sockaddr_un addr;
@@ -464,9 +471,7 @@ static int unix_bind_socket(struct unix_socket_info *sk, int sock)
 		return -errno;
 	}
 
-	memset(&addr, 0, sizeof(addr));
-	addr.sun_family = AF_UNIX;
-	memcpy(&addr.sun_path, sk->path, strlen(sk->path));
+	unix_construct_addr(sk, &addr);
 
 	if (bind(sock, (struct sockaddr *)&addr,
 		   sizeof(addr.sun_family) + strlen(sk->path))) {
@@ -507,9 +512,7 @@ static int unix_connect_socket(struct unix_socket_info *dest, int sock)
 {
 	struct sockaddr_un addr;
 
-	memset(&addr, 0, sizeof(addr));
-	addr.sun_family = AF_UNIX;
-	memcpy(&addr.sun_path, dest->path, strlen(dest->path));
+	unix_construct_addr(dest, &addr);
 
 	if (connect(sock, (struct sockaddr *)&addr,
 		   sizeof(addr.sun_family) + strlen(dest->path))) {
