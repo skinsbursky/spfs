@@ -346,9 +346,14 @@ static int transform_path(const char *source_path,
 int fixup_source_path(char *source_path, size_t source_size,
 			     const char *source_mnt, const char *target_mnt)
 {
-	char buf[PATH_MAX];
+	char buf[PATH_MAX] = { };
 
-	strcpy(buf, source_path);
+	if (source_size >= sizeof(buf)) {
+		pr_err("source path size is to big: %ld\n", source_size);
+		return -E2BIG;
+	}
+
+	strncpy(buf, source_path, source_size);
 
 	return transform_path(buf, source_mnt, target_mnt,
 			      source_path, source_size);
