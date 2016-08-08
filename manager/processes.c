@@ -1097,16 +1097,34 @@ destroy_process_fds:
 	return err;
 }
 
+static bool process_needs_resources_swap(struct process_info *p)
+{
+	if (p->fds_nr)
+		return true;
+	if (p->maps_nr)
+		return true;
+	if (p->fs.cwd.fobj)
+		return true;
+	if (p->fs.root)
+		return true;
+	return false;
+}
+
 int examine_processes(struct list_head *collection,
 		      const struct replace_info_s *ri)
 {
-	struct process_info *p;
+	struct process_info *p, *tmp;
 	int err;
 
-	list_for_each_entry(p, collection, list) {
+	list_for_each_entry_safe(p, tmp, collection, list) {
 		err = examine_one_process(p, ri);
 		if (err)
 			return err;
+
+		if (!process_needs_resources_swap(p)) {
+			pr_info("Process %d doesn't need resources swap\n", p->pid);
+			detach_one_process(p);
+		}
 	}
 	return 0;
 }

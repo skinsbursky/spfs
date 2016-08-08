@@ -229,19 +229,6 @@ static int do_swap_exe_resources(struct process_info *p)
 	return process_do_swap_handler(p, SWAP_RESOURCE_EXE);
 }
 
-static bool process_needs_resources_swap(struct process_info *p)
-{
-	if (p->fds_nr)
-		return true;
-	if (p->maps_nr)
-		return true;
-	if (p->fs.cwd.fobj)
-		return true;
-	if (p->fs.root)
-		return true;
-	return false;
-}
-
 int do_swap_resources(const struct list_head *processes)
 {
 	struct process_info *p;
@@ -249,8 +236,6 @@ int do_swap_resources(const struct list_head *processes)
 	pr_debug("Swapping resources:\n");
 
 	list_for_each_entry(p, processes, list) {
-		if (!process_needs_resources_swap(p))
-			continue;
 		if (do_swap_process_resources(p))
 			pr_err("failed to swap resources for process %d\n", p->pid);
 	}
