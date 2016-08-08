@@ -1066,6 +1066,20 @@ static int collect_process_fds(struct process_info *p,
 	return err;
 }
 
+int del_parasite(struct process_info *p)
+{
+	struct parasite_ctl *pctl = p->pctl;
+
+	p->pctl = NULL;
+
+	return destroy_parasite_ctl(p->pid, pctl);
+}
+
+int add_parasite(struct process_info *p)
+{
+	return set_parasite_ctl(p->pid, &p->pctl);
+}
+
 static int examine_one_process(struct process_info *p, const struct replace_info_s *ri)
 {
 	int err;
