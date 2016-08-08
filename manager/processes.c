@@ -39,8 +39,7 @@ static int seize_one_process(struct process_info *p)
 		return -EPERM;
 	}
 	pr_info("    %d seized\n", p->pid);
-
-	return set_parasite_ctl(p->pid, &p->pctl);
+	return 0;
 }
 
 int seize_processes(struct list_head *processes)
@@ -1072,6 +1071,10 @@ static int examine_one_process(struct process_info *p, const struct replace_info
 	int err;
 
 	pr_debug("Process %d: examining...\n", p->pid);
+
+	err = set_parasite_ctl(p->pid, &p->pctl);
+	if (err)
+		return err;
 
 	err = collect_process_fs(p, ri);
 	if (err)
