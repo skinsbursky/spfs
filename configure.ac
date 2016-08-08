@@ -1,4 +1,4 @@
-AC_INIT([spfs], [0.08.05], [skinsbursky@virtuozzo.org])
+AC_INIT([spfs], [0.08.06], [skinsbursky@virtuozzo.org])
 
 m4_ifdef([AM_SILENT_RULES],
 	 [AM_SILENT_RULES([yes])],
