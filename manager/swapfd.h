@@ -42,7 +42,7 @@ pid_t attach_to_task(pid_t pid);
 int detach_from_task(pid_t pid, int orig_st);
 int wait_task_seized(pid_t pid);
 int set_parasite_ctl(pid_t pid, struct parasite_ctl **ret_ctl);
-void destroy_parasite_ctl(pid_t pid, struct parasite_ctl *ctl);
+int destroy_parasite_ctl(pid_t pid, struct parasite_ctl *ctl);
 
 int swap_exe(struct parasite_ctl *ctl, int exe_fd);
 int swap_root(struct parasite_ctl *ctl, int cwd_fd, const char *root,

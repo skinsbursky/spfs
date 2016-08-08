@@ -459,11 +459,11 @@ err_free:
 	return -1;
 
 destroy_parasite:
-	destroy_parasite_ctl(pid, ctl);
+	(void) destroy_parasite_ctl(pid, ctl);
 	return -1;
 }
 
-void destroy_parasite_ctl(pid_t pid, struct parasite_ctl *ctl)
+int destroy_parasite_ctl(pid_t pid, struct parasite_ctl *ctl)
 {
 	unsigned long sret;
 	int ret;
@@ -473,15 +473,20 @@ void destroy_parasite_ctl(pid_t pid, struct parasite_ctl *ctl)
 
 	ctl->syscall_ip = ctl->syscall_ip_saved;
 	ret = syscall_seized(ctl, __NR_munmap, &sret, (unsigned long)ctl->remote_map, ctl->map_length, 0, 0, 0, 0);
-	if (ret || ((int)(long)sret) < 0)
+	if (ret || ((int)(long)sret) < 0) {
 		pr_err("Can't munmap remote file\n");
+		return ret ? ret : sret;
+	}
 
 	if (ctl->local_map != MAP_FAILED) {
 		ret = munmap(ctl->local_map, ctl->map_length);
-		if (ret)
+		if (ret) {
 			pr_perror("Can't munmap local map");
+			return -errno;
+		}
 	}
 	free(ctl);
+	return 0;
 }
 
 static int change_exe(struct parasite_ctl *ctl, int exe_fd)
