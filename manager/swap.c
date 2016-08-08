@@ -221,12 +221,7 @@ static int do_swap_process_resources(struct process_info *p)
 {
 	pr_info("Swapping process %d resources:\n", p->pid);
 
-	return process_do_swap_handlers(p, SWAP_RESOURCE_FDS, SWAP_RESOURCE_EXE);
-}
-
-static int do_swap_exe_resources(struct process_info *p)
-{
-	return process_do_swap_handler(p, SWAP_RESOURCE_EXE);
+	return process_do_swap_handlers(p, SWAP_RESOURCE_FDS, SWAP_RESOURCE_MAX);
 }
 
 int do_swap_resources(const struct list_head *processes)
@@ -239,13 +234,5 @@ int do_swap_resources(const struct list_head *processes)
 		if (do_swap_process_resources(p))
 			pr_err("failed to swap resources for process %d\n", p->pid);
 	}
-
-	pr_info("Swapping exe links:\n");
-
-	list_for_each_entry(p, processes, list) {
-		if (p->exe.fobj && do_swap_exe_resources(p))
-			pr_err("failed to swap exe for process %d\n", p->pid);
-	}
-
 	return 0;
 }
