@@ -1086,7 +1086,7 @@ static int examine_one_process(struct process_info *p, const struct replace_info
 
 	pr_debug("Process %d: examining...\n", p->pid);
 
-	err = add_parasite(p);
+	err = set_parasite_ctl(p->pid, &p->pctl);
 	if (err)
 		return err;
 
@@ -1099,10 +1099,6 @@ static int examine_one_process(struct process_info *p, const struct replace_info
 		goto destroy_process_fds;
 
 	err = collect_process_maps(p, ri);
-	if (err)
-		goto destroy_process_maps;
-
-	err = del_parasite(p);
 	if (err)
 		goto destroy_process_maps;
 
@@ -1141,8 +1137,7 @@ int examine_processes(struct list_head *collection,
 
 		if (!process_needs_resources_swap(p)) {
 			pr_info("Process %d doesn't need resources swap\n", p->pid);
-			list_del(&p->list);
-			free(p);
+			detach_one_process(p);
 		}
 	}
 	return 0;
