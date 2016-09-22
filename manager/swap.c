@@ -219,19 +219,9 @@ static int process_do_swap_handlers(struct process_info *p,
 
 static int do_swap_process_resources(struct process_info *p)
 {
-	int err;
-
 	pr_info("Swapping process %d resources:\n", p->pid);
 
-	err = add_parasite(p);
-	if (err)
-		return err;
-
-	err = process_do_swap_handlers(p, SWAP_RESOURCE_FDS, SWAP_RESOURCE_MAX);
-	if (err)
-		return err;
-
-	return del_parasite(p);
+	return process_do_swap_handlers(p, SWAP_RESOURCE_FDS, SWAP_RESOURCE_MAX);
 }
 
 int do_swap_resources(const struct list_head *processes)
