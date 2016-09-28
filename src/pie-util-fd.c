@@ -187,7 +187,10 @@ int recv_fds(struct parasite_ctl *ctl, bool seized, int *fds, int nr_fds, struct
 			ret = recvmsg(ctl->local_sockfd, &fdset->hdr, 0);
 
 		if (ret < 0) {
-			pr_err("recvmsg: %d%s\n", ret, seized ? "(seized)" : "\0");
+			if (seized)
+				pr_err("recvmsg_seized: %d\n", ret);
+			else
+				pr_perror("recvmsg: %d\n", ret);
 			return -1;
 		}
 
