@@ -34,15 +34,4 @@ static inline int recv_fd(struct parasite_ctl *ctl, bool seized)
 	return fd;
 }
 
-static inline int transfer_local_fd(struct parasite_ctl *ctl, int local_fd)
-{
-	int ret;
-
-	ret = send_fd(ctl, false, local_fd);
-	if (ret < 0)
-		return -1;
-
-	return recv_fd(ctl, true);
-}
-
 #endif

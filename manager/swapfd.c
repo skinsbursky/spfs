@@ -184,6 +184,24 @@ static int move_map(struct parasite_ctl *ctl,
 	return 0;
 }
 
+static int transfer_local_fd(struct parasite_ctl *ctl, int local_fd)
+{
+	int ret;
+
+	ret = send_fd(ctl, false, local_fd);
+	if (ret < 0) {
+		pr_err("failed to send local fd %d to process %d\n",
+				local_fd, ctl->pid);
+		return -1;
+	}
+
+	ret = recv_fd(ctl, true);
+	if (ret)
+		pr_err("failed to receive fd %d from process %d\n", ctl->pid);
+
+	return ret;
+}
+
 int swap_map(struct parasite_ctl *ctl, int map_fd,
 	     unsigned long start, unsigned long end,
 	     int prot, int flags, unsigned long long pgoff)
