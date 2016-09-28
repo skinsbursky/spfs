@@ -151,7 +151,10 @@ int send_fds(struct parasite_ctl *ctl, bool seized, int *fds, int nr_fds, bool w
 		else
 			ret = sendmsg(sock, &fdset->hdr, 0);
 		if (ret <= 0) {
-			pr_err("sendmsg: %d%s\n", ret, seized ? "(seized)" : "\0");
+			if (seized)
+				pr_err("sendmsg_seized: %d\n", ret);
+			else
+				pr_perror("sendmsg: %d\n", ret);
 			return ret ? : -1;
 		}
 	}
