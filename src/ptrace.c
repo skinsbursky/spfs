@@ -18,6 +18,11 @@
 #include "include/ptrace.h"
 #include "include/log.h"
 
+#define ERESTARTSYS		512
+#define ERESTARTNOINTR		513
+#define ERESTARTNOHAND		514
+#define ERESTART_RESTARTBLOCK	516
+
 /*
  * Injected syscall instruction
  */
@@ -120,6 +125,35 @@ static int ptrace_set_regs(pid_t pid, user_regs_struct_t *regs)
 	return ptrace(PTRACE_SETREGSET, pid, NT_PRSTATUS, &iov);
 }
 
+static int get_task_regs(pid_t pid, user_regs_struct_t *regs)
+{
+	if (ptrace_get_regs(pid, regs)) {
+		pr_perror("Can't obtain registers (pid: %d)", pid);
+		return -1;
+	}
+
+	if (user_regs_native(regs)) {
+		/* Did we come from a system call? */
+		if ((int)regs->native.orig_ax >= 0) {
+			/* Restart the system call */
+			switch ((long)(int)regs->native.ax) {
+				case -ERESTARTNOHAND:
+				case -ERESTARTSYS:
+				case -ERESTARTNOINTR:
+					pr_warn("Process %d will restart system call\n", pid);
+					regs->native.ax = regs->native.orig_ax;
+					regs->native.ip -= 2;
+					break;
+				case -ERESTART_RESTARTBLOCK:
+					pr_warn("Will restore %d with interrupted system call\n", pid);
+					regs->native.ax = -EINTR;
+					break;
+			}
+		}
+	}
+	return 0;
+}
+
 int get_thread_ctx(int pid, struct thread_ctx *ctx)
 {
 	if (ptrace(PTRACE_GETSIGMASK, pid, sizeof(k_rtsigset_t), &ctx->sigmask)) {
@@ -127,7 +161,7 @@ int get_thread_ctx(int pid, struct thread_ctx *ctx)
 		return -1;
 	}
 
-	if (ptrace_get_regs(pid, &ctx->regs)) {
+	if (get_task_regs(pid, &ctx->regs)) {
 		pr_perror("Can't obtain registers (pid: %d)", pid);
 		return -1;
 	}
