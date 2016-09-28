@@ -62,6 +62,7 @@ TESTS_LIST="	\
 		transition/epoll		\
 		transition/file_aio		\
 		transition/file_read		\
+		transition/thread-bomb		\
 		"
 
 NOT_STARTING_TEST_LIST="			\
@@ -281,7 +282,7 @@ function get_spfs_processes_list {
 
 function wait_spfs_exited {
 	local list=$(get_spfs_processes_list)
-	local attempts=25
+	local attempts=200
 
 	echo -n "Waiting until SPFS is exited... "
 
@@ -291,7 +292,7 @@ function wait_spfs_exited {
 			echo "timed out"
 			return 1
 		fi
-		sleep 0.2
+		sleep 0.1
 		list=$(get_spfs_processes_list)
 	done
 	echo "done"
