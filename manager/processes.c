@@ -969,6 +969,7 @@ static int collect_process_maps(struct process_info *p,
 	if (pid) {
 		pr_info("    /proc/%d/map_files ---> ignoring (shared with process %d)\n",
 				p->pid, pid);
+		p->share_resources = true;
 		return 0;
 	}
 
@@ -980,8 +981,11 @@ static int collect_process_maps(struct process_info *p,
 	if (err)
 		return err;
 
-	if (p->maps_nr)
+	if (p->maps_nr) {
+		p->swap_resources = true;
+
 		err = collect_mm(p->pid);
+	}
 
 	return err;
 }
@@ -1040,6 +1044,7 @@ static int collect_process_fs(struct process_info *p,
 	if (pid) {
 		pr_info("    /proc/%d/<root,cwd> ---> ignoring (shared with process %d)\n",
 				p->pid, pid);
+		p->share_resources = true;
 		return 0;
 	}
 
@@ -1048,6 +1053,8 @@ static int collect_process_fs(struct process_info *p,
 		return err;
 
 	if (fs->cwd.fobj || fs->root) {
+		p->swap_resources = true;
+
 		err = collect_fs_struct(p->pid);
 		if (err)
 			pr_err("failed to collect process %d fs\n", p->pid);
@@ -1066,6 +1073,7 @@ static int collect_process_fds(struct process_info *p,
 	if (pid) {
 		pr_info("    /proc/%d/fd ---> ignoring (shared with process %d)\n",
 				p->pid, pid);
+		p->share_resources = true;
 		return 0;
 	}
 
@@ -1073,8 +1081,11 @@ static int collect_process_fds(struct process_info *p,
 	if (err)
 		return err;
 
-	if (p->fds_nr)
+	if (p->fds_nr) {
+		p->swap_resources = true;
+
 		err = collect_fd_table(p->pid);
+	}
 
 	return err;
 }
@@ -1110,19 +1121,6 @@ destroy_process_fds:
 	return err;
 }
 
-static bool process_needs_resources_swap(struct process_info *p)
-{
-	if (p->fds_nr)
-		return true;
-	if (p->maps_nr)
-		return true;
-	if (p->fs.cwd.fobj)
-		return true;
-	if (p->fs.root)
-		return true;
-	return false;
-}
-
 int examine_processes(struct list_head *collection,
 		      const struct replace_info_s *ri)
 {
@@ -1134,7 +1132,27 @@ int examine_processes(struct list_head *collection,
 		if (err)
 			return err;
 
-		if (!process_needs_resources_swap(p)) {
+		if (!p->swap_resources) {
+			if (p->share_resources) {
+				/* We don't need parasite in this case, but we
+				 * can't simply detach from this task,
+				 * because it uses resources to be replaced in
+				 * other task.
+				 * Moreover, we _need_ to remove parasite here,
+				 * because it uses a file descriptor.
+				 * In case a multi-thread application, there
+				 * might be not enough of them to keep parasite
+				 * socket in each thread.
+				 */
+				err = del_parasite(p);
+				if (err) {
+					pr_err("failed to remove parasite "
+						"from process %d\n", p->pid);
+					return err;
+				}
+				continue;
+			}
+
 			pr_info("Process %d doesn't need resources swap\n", p->pid);
 			detach_one_process(p);
 		}
@@ -1157,6 +1175,7 @@ static struct process_info *create_process_info(pid_t pid)
 	p->orig_st = TASK_UNDEF;
 	INIT_LIST_HEAD(&p->fds);
 	INIT_LIST_HEAD(&p->maps);
+	p->share_resources = false;
 
 	return p;
 }
