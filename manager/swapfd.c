@@ -66,7 +66,7 @@ static void *find_mapping(pid_t pid)
 			continue;
 
 		result = (void *)start;
-		pr_debug("Using mapping: %s\n", line);
+		pr_debug("    Using mapping: %s", line);
 		break;
 	}
 
