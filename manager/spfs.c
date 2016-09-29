@@ -20,11 +20,11 @@
 #include "freeze.h"
 #include "replace.h"
 #include "cgroup.h"
+#include "context.h"
 
 int create_spfs_info(const char *id, const char *mountpoint,
 		     pid_t ns_pid, const char *root,
-		     int *mgr_ns_fds, const char *ovz_id,
-		     struct spfs_info_s **i)
+		     const char *ovz_id, struct spfs_info_s **i)
 {
 	struct spfs_info_s *info;
 	int err;
@@ -102,7 +102,6 @@ int create_spfs_info(const char *id, const char *mountpoint,
 	INIT_LIST_HEAD(&info->processes);
 
 	info->ovz_id = ovz_id;
-	info->mgr_ns_fds = mgr_ns_fds;
 
 	info->mode = SPFS_REPLACE_MODE_HOLD;
 
@@ -207,7 +206,7 @@ static int join_spfs_context(const struct spfs_info_s *info, int ns_mask)
 	err = spfs_chroot(info);
 
 	if (err && info->ns_pid)
-		(void) set_namespaces(info->mgr_ns_fds, ns_mask);
+		(void) set_namespaces(mgr_ns_fds(), ns_mask);
 	return err;
 }
 
@@ -381,7 +380,7 @@ int spfs_prepare_env(struct spfs_info_s *info, const char *proxy_dir)
 
 	err = __spfs_prepare_env(info, proxy_dir);
 
-	res = set_namespaces(info->mgr_ns_fds, NS_MNT_MASK);
+	res = set_namespaces(mgr_ns_fds(), NS_MNT_MASK);
 
 	return err ? err : res;
 }
@@ -410,7 +409,7 @@ int spfs_cleanup_env(struct spfs_info_s *info)
 
 	err = __spfs_cleanup_env(info);
 
-	res = set_namespaces(info->mgr_ns_fds, NS_MNT_MASK);
+	res = set_namespaces(mgr_ns_fds(), NS_MNT_MASK);
 
 	return err ? err : res;
 }
@@ -487,7 +486,7 @@ static int do_replace_spfs_mounts(struct spfs_info_s *info, const char *source)
 
 	err = __do_replace_spfs_mounts(info, source);
 
-	res = set_namespaces(info->mgr_ns_fds, NS_MNT_MASK);
+	res = set_namespaces(mgr_ns_fds(), NS_MNT_MASK);
 
 	return err ? err : res;
 }
@@ -768,7 +767,7 @@ int update_spfs_info(struct spfs_info_s *info)
 	}
 
 set_orig_ns:
-	res = set_namespaces(info->mgr_ns_fds, NS_MNT_MASK);
+	res = set_namespaces(mgr_ns_fds(), NS_MNT_MASK);
 
 	return err ? err : res;
 }
@@ -797,7 +796,7 @@ int umount_spfs(struct spfs_info_s *info)
 	if (!err)
 		err = __spfs_cleanup_env(info);
 
-	res = set_namespaces(info->mgr_ns_fds, NS_MNT_MASK);
+	res = set_namespaces(mgr_ns_fds(), NS_MNT_MASK);
 
 	return err ? err : res;
 }
