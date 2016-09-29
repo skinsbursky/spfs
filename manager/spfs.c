@@ -193,6 +193,11 @@ int spfs_chroot(const struct spfs_info_s *info)
 	return secure_chroot(info->root);
 }
 
+static int leave_spfs_context(const struct spfs_info_s *info, int ns_mask)
+{
+	return set_namespaces(mgr_ns_fds(), NS_MNT_MASK);
+}
+
 static int join_spfs_context(const struct spfs_info_s *info, int ns_mask)
 {
 	int err;
@@ -206,7 +211,7 @@ static int join_spfs_context(const struct spfs_info_s *info, int ns_mask)
 	err = spfs_chroot(info);
 
 	if (err && info->ns_pid)
-		(void) set_namespaces(mgr_ns_fds(), ns_mask);
+		(void) leave_spfs_context(info, ns_mask);
 	return err;
 }
 
@@ -380,7 +385,7 @@ int spfs_prepare_env(struct spfs_info_s *info, const char *proxy_dir)
 
 	err = __spfs_prepare_env(info, proxy_dir);
 
-	res = set_namespaces(mgr_ns_fds(), NS_MNT_MASK);
+	res = leave_spfs_context(info, NS_MNT_MASK);
 
 	return err ? err : res;
 }
@@ -409,7 +414,7 @@ int spfs_cleanup_env(struct spfs_info_s *info)
 
 	err = __spfs_cleanup_env(info);
 
-	res = set_namespaces(mgr_ns_fds(), NS_MNT_MASK);
+	res = leave_spfs_context(info, NS_MNT_MASK);
 
 	return err ? err : res;
 }
@@ -486,7 +491,7 @@ static int do_replace_spfs_mounts(struct spfs_info_s *info, const char *source)
 
 	err = __do_replace_spfs_mounts(info, source);
 
-	res = set_namespaces(mgr_ns_fds(), NS_MNT_MASK);
+	res = leave_spfs_context(info, NS_MNT_MASK);
 
 	return err ? err : res;
 }
@@ -767,7 +772,7 @@ int update_spfs_info(struct spfs_info_s *info)
 	}
 
 set_orig_ns:
-	res = set_namespaces(mgr_ns_fds(), NS_MNT_MASK);
+	res = leave_spfs_context(info, NS_MNT_MASK);
 
 	return err ? err : res;
 }
@@ -796,7 +801,7 @@ int umount_spfs(struct spfs_info_s *info)
 	if (!err)
 		err = __spfs_cleanup_env(info);
 
-	res = set_namespaces(mgr_ns_fds(), NS_MNT_MASK);
+	res = leave_spfs_context(info, NS_MNT_MASK);
 
 	return err ? err : res;
 }
