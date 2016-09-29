@@ -32,6 +32,11 @@ const int *mgr_ns_fds(void)
 	return spfs_manager_context.ns_fds;
 }
 
+const char *mgr_work_dir(void)
+{
+	return spfs_manager_context.work_dir;
+}
+
 static void cleanup_spfs_mount(struct spfs_manager_context_s *ctx,
 			       struct spfs_info_s *info, int status)
 {
