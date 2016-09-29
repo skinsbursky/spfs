@@ -231,8 +231,7 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 		}
 	}
 
-	err = create_spfs_info(opt_id, opt_mountpoint, ns_pid, opt_root,
-			       ctx->ovz_id, &info);
+	err = create_spfs_info(opt_id, opt_mountpoint, ns_pid, opt_root, &info);
 	if (err)
 		return err;
 
