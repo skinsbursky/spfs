@@ -81,6 +81,9 @@ struct process_info {
 	struct list_head	maps;
 	struct parasite_ctl	*pctl;
 	int			orig_st;
+
+	bool			share_resources;
+	bool			swap_resources;
 };
 
 int fixup_source_path(char *source_path, size_t source_size,
