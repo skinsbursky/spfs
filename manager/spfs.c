@@ -195,7 +195,19 @@ int spfs_chroot(const struct spfs_info_s *info)
 
 static int leave_spfs_context(const struct spfs_info_s *info, int ns_mask)
 {
-	return set_namespaces(mgr_ns_fds(), NS_MNT_MASK);
+	int err;
+
+	err = set_namespaces(mgr_ns_fds(), NS_MNT_MASK);
+	if (err)
+		return err;
+
+	err = chdir(mgr_work_dir());
+	if (err) {
+		pr_perror("failed to chdir to %s\n", mgr_work_dir());
+		return -errno;
+	}
+
+	return 0;
 }
 
 static int join_spfs_context(const struct spfs_info_s *info, int ns_mask)
