@@ -86,7 +86,4 @@ struct process_info {
 int fixup_source_path(char *source_path, size_t source_size,
 		      const char *source_mnt, const char *target_mnt);
 
-int del_parasite(struct process_info *p);
-int add_parasite(struct process_info *p);
-
 #endif

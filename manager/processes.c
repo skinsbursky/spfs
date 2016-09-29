@@ -135,10 +135,24 @@ static void release_process_resources(struct process_info *p)
 	release_process_fs(p);
 }
 
+static int del_parasite(struct process_info *p)
+{
+	struct parasite_ctl *pctl = p->pctl;
+
+	p->pctl = NULL;
+
+	return destroy_parasite_ctl(p->pid, pctl);
+}
+
+static int add_parasite(struct process_info *p)
+{
+	return set_parasite_ctl(p->pid, &p->pctl);
+}
+
 static void detach_one_process(struct process_info *p)
 {
 	if (p->pctl)
-		(void) destroy_parasite_ctl(p->pid, p->pctl);
+		(void) del_parasite(p);
 	(void) detach_from_process(p);
 	list_del(&p->list);
 	free(p);
@@ -1065,27 +1079,13 @@ static int collect_process_fds(struct process_info *p,
 	return err;
 }
 
-int del_parasite(struct process_info *p)
-{
-	struct parasite_ctl *pctl = p->pctl;
-
-	p->pctl = NULL;
-
-	return destroy_parasite_ctl(p->pid, pctl);
-}
-
-int add_parasite(struct process_info *p)
-{
-	return set_parasite_ctl(p->pid, &p->pctl);
-}
-
 static int examine_one_process(struct process_info *p, const struct replace_info_s *ri)
 {
 	int err;
 
 	pr_debug("Process %d: examining...\n", p->pid);
 
-	err = set_parasite_ctl(p->pid, &p->pctl);
+	err = add_parasite(p);
 	if (err)
 		return err;
 
