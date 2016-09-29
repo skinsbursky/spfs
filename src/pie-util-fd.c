@@ -154,7 +154,7 @@ int send_fds(struct parasite_ctl *ctl, bool seized, int *fds, int nr_fds, bool w
 			if (seized)
 				pr_err("sendmsg_seized: %d\n", ret);
 			else
-				pr_perror("sendmsg: %d\n", ret);
+				pr_perror("sendmsg: %d", ret);
 			return ret ? : -1;
 		}
 	}
@@ -190,7 +190,7 @@ int recv_fds(struct parasite_ctl *ctl, bool seized, int *fds, int nr_fds, struct
 			if (seized)
 				pr_err("recvmsg_seized: %d\n", ret);
 			else
-				pr_perror("recvmsg: %d\n", ret);
+				pr_perror("recvmsg: %d", ret);
 			return -1;
 		}
 
