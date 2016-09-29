@@ -139,12 +139,12 @@ static int get_task_regs(pid_t pid, user_regs_struct_t *regs)
 			case -ERESTARTNOHAND:
 			case -ERESTARTSYS:
 			case -ERESTARTNOINTR:
-				pr_warn("Process %d will restart system call\n", pid);
+				pr_warn("    Process %d will restart system call\n", pid);
 				regs->native.ax = regs->native.orig_ax;
 				regs->native.ip -= 2;
 				break;
 			case -ERESTART_RESTARTBLOCK:
-				pr_warn("Will restore %d with interrupted system call\n", pid);
+				pr_warn("    Will restore %d with interrupted system call\n", pid);
 				regs->native.ax = -EINTR;
 				break;
 		}

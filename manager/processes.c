@@ -1153,7 +1153,7 @@ int examine_processes(struct list_head *collection,
 				continue;
 			}
 
-			pr_info("Process %d doesn't need resources swap\n", p->pid);
+			pr_info("    Process %d doesn't need resources swap\n", p->pid);
 			detach_one_process(p);
 		}
 	}
