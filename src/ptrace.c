@@ -132,23 +132,21 @@ static int get_task_regs(pid_t pid, user_regs_struct_t *regs)
 		return -1;
 	}
 
-	if (user_regs_native(regs)) {
-		/* Did we come from a system call? */
-		if ((int)regs->native.orig_ax >= 0) {
-			/* Restart the system call */
-			switch ((long)(int)regs->native.ax) {
-				case -ERESTARTNOHAND:
-				case -ERESTARTSYS:
-				case -ERESTARTNOINTR:
-					pr_warn("Process %d will restart system call\n", pid);
-					regs->native.ax = regs->native.orig_ax;
-					regs->native.ip -= 2;
-					break;
-				case -ERESTART_RESTARTBLOCK:
-					pr_warn("Will restore %d with interrupted system call\n", pid);
-					regs->native.ax = -EINTR;
-					break;
-			}
+	/* Did we come from a system call? */
+	if (get_user_reg(regs, orig_ax) >= 0) {
+		/* Restart the system call */
+		switch ((long)(int)regs->native.ax) {
+			case -ERESTARTNOHAND:
+			case -ERESTARTSYS:
+			case -ERESTARTNOINTR:
+				pr_warn("Process %d will restart system call\n", pid);
+				regs->native.ax = regs->native.orig_ax;
+				regs->native.ip -= 2;
+				break;
+			case -ERESTART_RESTARTBLOCK:
+				pr_warn("Will restore %d with interrupted system call\n", pid);
+				regs->native.ax = -EINTR;
+				break;
 		}
 	}
 	return 0;
