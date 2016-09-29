@@ -37,6 +37,11 @@ const char *mgr_work_dir(void)
 	return spfs_manager_context.work_dir;
 }
 
+const char *mgr_ovz_id(void)
+{
+	return spfs_manager_context.ovz_id;
+}
+
 static void cleanup_spfs_mount(struct spfs_manager_context_s *ctx,
 			       struct spfs_info_s *info, int status)
 {

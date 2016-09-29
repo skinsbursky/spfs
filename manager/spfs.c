@@ -23,8 +23,7 @@
 #include "context.h"
 
 int create_spfs_info(const char *id, const char *mountpoint,
-		     pid_t ns_pid, const char *root,
-		     const char *ovz_id, struct spfs_info_s **i)
+		     pid_t ns_pid, const char *root, struct spfs_info_s **i)
 {
 	struct spfs_info_s *info;
 	int err;
@@ -100,8 +99,6 @@ int create_spfs_info(const char *id, const char *mountpoint,
 
 	INIT_LIST_HEAD(&info->mnt.list);
 	INIT_LIST_HEAD(&info->processes);
-
-	info->ovz_id = ovz_id;
 
 	info->mode = SPFS_REPLACE_MODE_HOLD;
 
@@ -521,7 +518,7 @@ static int do_replace_spfs(struct spfs_info_s *info, const char *source)
 {
 	int err, res;
 
-	if (info->ovz_id) {
+	if (mgr_ovz_id()) {
 		err = move_to_cgroup("ve", "/");
 		if (err)
 			return err;

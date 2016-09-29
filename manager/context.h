@@ -30,5 +30,6 @@ extern int spfs_manager_packet_handler(int sock, void *data, void *package, size
 
 const int *mgr_ns_fds(void);
 const char *mgr_work_dir(void);
+const char *mgr_ovz_id(void);
 
 #endif
