@@ -231,6 +231,9 @@ int do_swap_resources(const struct list_head *processes)
 	pr_debug("Swapping resources:\n");
 
 	list_for_each_entry(p, processes, list) {
+		if (!p->swap_resources)
+			continue;
+
 		if (do_swap_process_resources(p))
 			pr_err("failed to swap resources for process %d\n", p->pid);
 	}
