@@ -82,7 +82,6 @@ struct process_info {
 	struct parasite_ctl	*pctl;
 	int			orig_st;
 
-	bool			share_resources;
 	bool			swap_resources;
 };
 
