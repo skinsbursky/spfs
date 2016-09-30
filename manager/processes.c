@@ -969,7 +969,6 @@ static int collect_process_maps(struct process_info *p,
 	if (pid) {
 		pr_info("    /proc/%d/map_files ---> ignoring (shared with process %d)\n",
 				p->pid, pid);
-		p->share_resources = true;
 		return 0;
 	}
 
@@ -1044,7 +1043,6 @@ static int collect_process_fs(struct process_info *p,
 	if (pid) {
 		pr_info("    /proc/%d/<root,cwd> ---> ignoring (shared with process %d)\n",
 				p->pid, pid);
-		p->share_resources = true;
 		return 0;
 	}
 
@@ -1073,7 +1071,6 @@ static int collect_process_fds(struct process_info *p,
 	if (pid) {
 		pr_info("    /proc/%d/fd ---> ignoring (shared with process %d)\n",
 				p->pid, pid);
-		p->share_resources = true;
 		return 0;
 	}
 
@@ -1175,7 +1172,6 @@ static struct process_info *create_process_info(pid_t pid)
 	p->orig_st = TASK_UNDEF;
 	INIT_LIST_HEAD(&p->fds);
 	INIT_LIST_HEAD(&p->maps);
-	p->share_resources = false;
 
 	return p;
 }
