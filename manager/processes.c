@@ -1133,28 +1133,28 @@ int examine_processes(struct list_head *collection,
 			return err;
 
 		if (!p->swap_resources) {
-			if (p->share_resources) {
-				/* We don't need parasite in this case, but we
-				 * can't simply detach from this task,
-				 * because it uses resources to be replaced in
-				 * other task.
-				 * Moreover, we _need_ to remove parasite here,
-				 * because it uses a file descriptor.
-				 * In case a multi-thread application, there
-				 * might be not enough of them to keep parasite
-				 * socket in each thread.
-				 */
-				err = del_parasite(p);
-				if (err) {
-					pr_err("failed to remove parasite "
+			/* We don't need parasite in this case.
+			 * Moreover, we _need_ to remove parasite here,
+			 * because it uses a file descriptor.
+			 * In case a multi-thread application, there
+			 * might be not enough of them to keep parasite
+			 * socket in each thread.
+			 * But we can't simply detach from this task,
+			 * because it can use resources to be replaced in
+			 * other task.
+			 * But, frankly, even is this process doesn't use any
+			 * of resources to be replaced, it can't be garanteed,
+			 * that it won't try to use them immideatly after
+			 * release.
+			 * IOW, there can be races with other processes, which
+			 * are using them or even locked them.
+			 */
+			err = del_parasite(p);
+			if (err) {
+				pr_err("failed to remove parasite "
 						"from process %d\n", p->pid);
-					return err;
-				}
-				continue;
+				return err;
 			}
-
-			pr_info("    Process %d doesn't need resources swap\n", p->pid);
-			detach_one_process(p);
 		}
 	}
 	return 0;
