@@ -870,6 +870,51 @@ int swap_cwd(struct parasite_ctl *ctl, int cwd_fd)
 	return change_cwd(ctl, remote_fd);
 }
 
+static int expose_process_state(pid_t pid)
+{
+	char buf[PATH_MAX];
+	FILE *status;
+
+	sprintf(buf, "/proc/%d", pid);
+
+	if (access(buf, F_OK)) {
+		pr_perror("failed to access %s", buf);
+		return -errno;
+	}
+
+	snprintf(buf, PATH_MAX, "/proc/%d/status", pid);
+
+	status = fopen(buf, "r");
+	if (!status) {
+		pr_perror("failed to open %s", buf);
+		return -errno;
+	}
+
+	pr_debug("/proc/%d/status:\n", pid);
+
+	while (fgets(buf, PATH_MAX, status) != NULL)
+		pr_debug("    %s", buf);
+
+	fclose(status);
+
+	snprintf(buf, PATH_MAX, "/proc/%d/maps", pid);
+
+	status = fopen(buf, "r");
+	if (!status) {
+		pr_perror("failed to open %s", buf);
+		return -errno;
+	}
+
+	pr_debug("/proc/%d/maps:\n", pid);
+
+	while (fgets(buf, PATH_MAX, status) != NULL)
+		pr_debug("    %s", buf);
+
+	fclose(status);
+
+	return 0;
+}
+
 static int do_detach(pid_t pid)
 {
 	int ret;
@@ -877,6 +922,7 @@ static int do_detach(pid_t pid)
 	ret = ptrace(PTRACE_DETACH, pid, NULL, NULL);
 	if (ret) {
 		pr_perror("Can't detach from %d", pid);
+		expose_process_state(pid);
 	}
 	return ret;
 }
