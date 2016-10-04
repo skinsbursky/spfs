@@ -935,6 +935,7 @@ static int seize_catch_task(pid_t pid)
 	if (ret) {
 		/* Error or task is exiting */
 		pr_perror("Can't seize task %d", pid);
+		expose_process_state(pid);
 		return -1;
 	}
 
