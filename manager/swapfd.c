@@ -870,6 +870,17 @@ int swap_cwd(struct parasite_ctl *ctl, int cwd_fd)
 	return change_cwd(ctl, remote_fd);
 }
 
+static int do_detach(pid_t pid)
+{
+	int ret;
+
+	ret = ptrace(PTRACE_DETACH, pid, NULL, NULL);
+	if (ret) {
+		pr_perror("Can't detach from %d", pid);
+	}
+	return ret;
+}
+
 static int seize_catch_task(pid_t pid)
 {
 	int ret;
@@ -886,8 +897,7 @@ static int seize_catch_task(pid_t pid)
 		/* Currently this happens only if task is exiting */
 		pr_perror("Can't interrupt task %d", pid);
 
-		if (ptrace(PTRACE_DETACH, pid, NULL, NULL))
-			pr_perror("Can't detach");
+		(void) do_detach(pid);
 	}
 
 	return ret;
@@ -927,9 +937,8 @@ int detach_from_task(pid_t pid, int orig_st)
 	if (orig_st == TASK_STOPPED)
 		kill(pid, SIGSTOP);
 
-	ret = ptrace(PTRACE_DETACH, pid, NULL, NULL);
+	ret = do_detach(pid);
 	if (ret) {
-		pr_perror("Can't detach from %d", pid);
 		/* A process may be killed by SIGKILL */
 		if (wait4(pid, &status, __WALL, NULL) == pid)
 			ret = 0;
@@ -1158,8 +1167,7 @@ try_again:
 err_stop:
 	kill(pid, SIGSTOP);
 err:
-	if (ptrace(PTRACE_DETACH, pid, NULL, NULL))
-		pr_perror("Unable to detach from %d", pid);
+	(void) do_detach(pid);
 	return -1;
 }
 
