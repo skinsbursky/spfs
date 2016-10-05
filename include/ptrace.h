@@ -50,7 +50,9 @@ typedef uint32_t u32;
 
 #define PAGEMAP_LEN(addr)	(PAGE_PFN(addr) * sizeof(uint64_t))
 #define PAGEMAP_PFN_OFF(addr)	(PAGE_PFN(addr) * sizeof(uint64_t))
+
 #define PME_PRESENT		(1ULL << 63)
+#define PME_SWAP		(1ULL << 62)
 
 #define _KNSIG		64
 # define _NSIG_BPW	64
