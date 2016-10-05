@@ -118,7 +118,7 @@ static int copy_private_content(struct parasite_ctl *ctl, unsigned long to,
 	do {
 		count = PAGE_SIZE;
 
-		if (map[copied/PAGE_SIZE] & PME_PRESENT) {
+		if (map[copied/PAGE_SIZE] & (PME_PRESENT|PME_SWAP)) {
 			count = pread(src, buf, count, from + copied);
 			if (count < 0) {
 				pr_perror("Can't read from tracee's memory");
