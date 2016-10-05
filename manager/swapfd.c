@@ -119,6 +119,11 @@ static int copy_private_content(struct parasite_ctl *ctl, unsigned long to,
 		count = PAGE_SIZE;
 
 		if (map[copied/PAGE_SIZE] & (PME_PRESENT|PME_SWAP)) {
+			pr_debug("            copy %lx-%lx (%s)\n", from + copied,
+					from + copied + count,
+					(map[copied/PAGE_SIZE] & PME_PRESENT) ?
+					"PME_PRESENT" : "PME_SWAP");
+
 			count = pread(src, buf, count, from + copied);
 			if (count < 0) {
 				pr_perror("Can't read from tracee's memory");
@@ -141,6 +146,17 @@ close_src:
 free_map:
 	free(map);
 	return ret;
+}
+
+static bool sync_map_content(unsigned flags, int prot)
+{
+	if (flags & MAP_SHARED)
+		return false;
+
+	if ((prot & PROT_WRITE) == 0)
+		return false;
+
+	return true;
 }
 
 static int move_map(struct parasite_ctl *ctl,
@@ -167,7 +183,7 @@ static int move_map(struct parasite_ctl *ctl,
 		return -1;
 	}
 
-	if (flags & MAP_PRIVATE) {
+	if (sync_map_content(flags, prot)) {
 		ret = copy_private_content(ctl, addr, start, length);
 		if (ret)
 			return -1;
