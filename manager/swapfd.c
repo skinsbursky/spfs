@@ -122,11 +122,24 @@ static bool pages_equal(int fd1, unsigned long addr1, int fd2, unsigned long add
 	return false;
 }
 
+static int open_pid_mem(pid_t pid, unsigned flags)
+{
+	int fd;
+	char path[] = "/proc/XXXXXXXXXX/mem";
+
+	sprintf(path, "/proc/%d/mem", pid);
+	fd = open(path, flags);
+	if (fd < 0) {
+		pr_perror("Can't open %s for (flags: %x)", path, flags);
+		return -errno;
+	}
+	return fd;
+}
+
 static bool equal_mappings(pid_t pid, unsigned long addr1, unsigned long addr2,
 			   size_t size)
 {
 	int fd;
-	char path[PATH_MAX];
 	bool ret = false;
 	size_t count = 0;
 
@@ -135,12 +148,9 @@ static bool equal_mappings(pid_t pid, unsigned long addr1, unsigned long addr2,
 		return -EFAULT;
 	}
 
-	sprintf(path, "/proc/%d/mem", pid);
-	fd = open(path, O_RDONLY);
-	if (fd < 0) {
-		pr_perror("Can't open %s for read", path);
-		return false;
-	}
+	fd = open_pid_mem(pid, O_RDONLY);
+	if (fd < 0)
+		return fd;
 
 	while (count != size) {
 		if (!pages_equal(fd, addr1 + count, fd, addr2 + count)) {
@@ -162,7 +172,6 @@ out:
 static int copy_private_content(struct parasite_ctl *ctl, unsigned long to,
 				unsigned long from, unsigned long size)
 {
-	char path[] = "/proc/XXXXXXXXXX/mem";
 	int src = -1, dst = -1, ret = -1;
 	ssize_t copied = 0, count;
 	unsigned int size_map;
@@ -185,18 +194,13 @@ static int copy_private_content(struct parasite_ctl *ctl, unsigned long to,
 		goto free_map;
 	}
 
-	sprintf(path, "/proc/%d/mem", ctl->pid);
-	src = open(path, O_RDONLY);
-	if (src < 0) {
-		pr_perror("Can't open %s for read", path);
+	src = open_pid_mem(ctl->pid, O_RDONLY);
+	if (src < 0)
 		goto free_map;
-	}
 
-	dst = open(path, O_WRONLY);
-	if (dst < 0) {
-		pr_perror("Can't open %s for write", path);
+	dst = open_pid_mem(ctl->pid, O_WRONLY);
+	if (dst < 0)
 		goto close_src;
-	}
 
 	do {
 		count = PAGE_SIZE;
