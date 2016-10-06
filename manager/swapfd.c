@@ -140,6 +140,32 @@ static int open_pid_mem(pid_t pid, unsigned flags)
 	return fd;
 }
 
+static bool mapping_accessible(pid_t pid, unsigned long addr, size_t size)
+{
+	int fd;
+	char buf[PAGE_SIZE];
+	size_t count = 0;
+	bool ret;
+
+	fd = open_pid_mem(pid, O_RDONLY);
+	if (fd < 0)
+		return false;
+
+	while (count != PAGE_SIZE) {
+		ret = mem_read(fd, addr + count, buf, PAGE_SIZE);
+		if (ret)
+			goto out;
+
+		count += PAGE_SIZE;
+	}
+
+	ret = true;
+
+out:
+	close(fd);
+	return ret;
+}
+
 static bool equal_mappings(pid_t pid, unsigned long addr1, unsigned long addr2,
 			   size_t size)
 {
@@ -292,6 +318,12 @@ static int move_map(struct parasite_ctl *ctl,
 	if (ret || IS_ERR_VALUE(sret)) {
 		pr_err("Can't remap: ret=%d, sret=%d\n", ret, (int)(long)sret);
 		return -1;
+	}
+
+	if (!mapping_accessible(ctl->pid, start, length)) {
+		pr_err("Mapping %#lx-%#lx is not accessible after replace\n",
+				start, start + length);
+		return -EFAULT;
 	}
 
 	return 0;
