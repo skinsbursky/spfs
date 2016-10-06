@@ -22,6 +22,7 @@
 #include <syscall.h>
 #include <stdint.h>
 #include <linux/prctl.h>
+#include <string.h>
 
 #include "include/ptrace.h"
 #include "include/pie-util-fd.h"
@@ -74,6 +75,88 @@ static void *find_mapping(pid_t pid)
 	fclose(fp);
 
 	return result;
+}
+
+static bool pages_equal(int fd1, unsigned long addr1, int fd2, unsigned long addr2)
+{
+	char buf1[PAGE_SIZE];
+	char buf2[PAGE_SIZE];
+	ssize_t count;
+
+	count = pread(fd1, buf1, PAGE_SIZE, addr1);
+	if (count < 0) {
+		pr_perror("Can't read from tracee's memory");
+		return false;
+	}
+	if (count != PAGE_SIZE) {
+		pr_perror("Read less memory, that expected: %ld != %ld\n",
+				count, PAGE_SIZE);
+		return false;
+	}
+
+	count = pread(fd2, buf2, PAGE_SIZE, addr2);
+	if (count < 0) {
+		pr_perror("Can't read from tracee's memory");
+		return false;
+	}
+	if (count != PAGE_SIZE) {
+		pr_perror("Read less memory, that expected: %ld != %ld\n",
+				count, PAGE_SIZE);
+		return false;
+	}
+
+	if (!memcmp((const void *)buf1, (const void *)buf2, PAGE_SIZE))
+		return true;
+
+	count = 0;
+
+	while (count != PAGE_SIZE) {
+		unsigned long *ptr1 = (unsigned long *)(buf1 + count);
+		unsigned long *ptr2 = (unsigned long *)(buf2 + count);
+
+		if (*ptr1 != *ptr2)
+			pr_err("Values with offset %x do not match: %016lx != %016lx\n", count, *ptr1, *ptr2);
+
+		count += sizeof(unsigned long);
+	}
+	return false;
+}
+
+static bool equal_mappings(pid_t pid, unsigned long addr1, unsigned long addr2,
+			   size_t size)
+{
+	int fd;
+	char path[PATH_MAX];
+	bool ret = false;
+	size_t count = 0;
+
+	if (size & (PAGE_SIZE - 1)) {
+		pr_err("Not aligned size: %lu\n", size);
+		return -EFAULT;
+	}
+
+	sprintf(path, "/proc/%d/mem", pid);
+	fd = open(path, O_RDONLY);
+	if (fd < 0) {
+		pr_perror("Can't open %s for read", path);
+		return false;
+	}
+
+	while (count != size) {
+		if (!pages_equal(fd, addr1 + count, fd, addr2 + count)) {
+			pr_err("Regions %#lx-%lx and %lx-%lx are different\n",
+					addr1 + count, addr1 + count + PAGE_SIZE,
+					addr2 + count, addr2 + count + PAGE_SIZE);
+			goto out;
+		}
+		count += PAGE_SIZE;
+	}
+
+	ret = true;
+
+out:
+	close(fd);
+	return ret;
 }
 
 static int copy_private_content(struct parasite_ctl *ctl, unsigned long to,
@@ -187,6 +270,12 @@ static int move_map(struct parasite_ctl *ctl,
 		ret = copy_private_content(ctl, addr, start, length);
 		if (ret)
 			return -1;
+	}
+
+	if (!equal_mappings(ctl->pid, addr, start, length)) {
+		pr_err("Mappings %#lx-%#lx and %#lx-%#lx are different\n",
+				addr, addr + length, start, start + length);
+//		return -1;
 	}
 
 	flags = MREMAP_FIXED | MREMAP_MAYMOVE;
