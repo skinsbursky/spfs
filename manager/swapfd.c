@@ -77,33 +77,37 @@ static void *find_mapping(pid_t pid)
 	return result;
 }
 
+static int mem_read(int fd, unsigned long addr, char *buf, size_t size)
+{
+	ssize_t count;
+
+	count = pread(fd, buf, size, addr);
+	if (count < 0) {
+		pr_perror("Can't read process memory %#lx-%#lx", addr, addr + size);
+		return -errno;
+	}
+	if (count != size) {
+		pr_err("Read less process memory, that requested: %ld != %ld\n", 
+				count, size);
+		return -errno;
+	}
+	return 0;
+}
+
 static bool pages_equal(int fd1, unsigned long addr1, int fd2, unsigned long addr2)
 {
 	char buf1[PAGE_SIZE];
 	char buf2[PAGE_SIZE];
-	ssize_t count;
+	size_t count;
+	int ret;
 
-	count = pread(fd1, buf1, PAGE_SIZE, addr1);
-	if (count < 0) {
-		pr_perror("Can't read from tracee's memory");
+	ret = mem_read(fd1, addr1, buf1, PAGE_SIZE);
+	if (ret)
 		return false;
-	}
-	if (count != PAGE_SIZE) {
-		pr_perror("Read less memory, that expected: %ld != %ld\n",
-				count, PAGE_SIZE);
-		return false;
-	}
 
-	count = pread(fd2, buf2, PAGE_SIZE, addr2);
-	if (count < 0) {
-		pr_perror("Can't read from tracee's memory");
+	ret = mem_read(fd2, addr2, buf2, PAGE_SIZE);
+	if (ret)
 		return false;
-	}
-	if (count != PAGE_SIZE) {
-		pr_perror("Read less memory, that expected: %ld != %ld\n",
-				count, PAGE_SIZE);
-		return false;
-	}
 
 	if (!memcmp((const void *)buf1, (const void *)buf2, PAGE_SIZE))
 		return true;
