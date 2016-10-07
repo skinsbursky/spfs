@@ -1,7 +1,6 @@
 ## Process this file with automake to produce Makefile.in
 CLEANFILES = `find . -name "*~"`
 
-AM_CPPFLAGS = -I/usr/include/libnl3
 AM_CFLAGS = -Wall -Werror -ggdb -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64
 AM_MAKEFLAGS = --no-print-directory
 
