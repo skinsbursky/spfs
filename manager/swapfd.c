@@ -267,13 +267,7 @@ free_map:
 
 static bool sync_map_content(unsigned flags, int prot)
 {
-	if (flags & MAP_SHARED)
-		return false;
-
-	if ((prot & PROT_WRITE) == 0)
-		return false;
-
-	return true;
+	return flags & MAP_PRIVATE;
 }
 
 static int move_map(struct parasite_ctl *ctl,
