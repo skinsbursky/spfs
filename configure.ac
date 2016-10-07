@@ -22,6 +22,12 @@ AC_CHECK_HEADER(
 		[AC_MSG_ERROR([*** install libcap-dev(el)])],
 		[])
 
+AC_CHECK_HEADER(
+		[libnl3/netlink/msg.h],
+		[],
+		[AC_MSG_ERROR([*** install libnl3-devel (libnl-3-dev)])],
+		[])
+
 AC_CHECK_LIB(
 	     [fuse],
 	     [fuse_mount],
