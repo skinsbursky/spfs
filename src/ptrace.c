@@ -125,6 +125,10 @@ static int ptrace_set_regs(pid_t pid, user_regs_struct_t *regs)
 	return ptrace(PTRACE_SETREGSET, pid, NT_PRSTATUS, &iov);
 }
 
+#define get_signed_user_reg(pregs, name)                                \
+	        ((user_regs_native(pregs)) ? (int64_t)((pregs)->native.name) :  \
+		                                 (int32_t)((pregs)->compat.name))
+
 static int get_task_regs(pid_t pid, user_regs_struct_t *regs)
 {
 	if (ptrace_get_regs(pid, regs)) {
@@ -133,9 +137,9 @@ static int get_task_regs(pid_t pid, user_regs_struct_t *regs)
 	}
 
 	/* Did we come from a system call? */
-	if (get_user_reg(regs, orig_ax) >= 0) {
+	if (get_signed_user_reg(regs, orig_ax) >= 0) {
 		/* Restart the system call */
-		switch ((long)(int)regs->native.ax) {
+		switch (get_signed_user_reg(regs, ax)) {
 			case -ERESTARTNOHAND:
 			case -ERESTARTSYS:
 			case -ERESTARTNOINTR:
