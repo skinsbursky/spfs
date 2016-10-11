@@ -27,6 +27,8 @@
 #include "include/util.h"
 #include "include/log.h"
 
+#define EINTR_TRIES	3
+
 static int proxy_getattr(const char *path, struct stat *stbuf)
 {
 	int res;
@@ -261,26 +263,46 @@ static int proxy_chown(const char *path, uid_t uid, gid_t gid)
 static int proxy_truncate(const char *path, off_t size)
 {
 	int res;
+	int tries = 0;
 
-	res = truncate(path, size);
-	if (res == -1)
-		return -errno;
+	while (tries++ < EINTR_TRIES) {
+		res = truncate(path, size);
+		if (res == -1) {
+			if (errno == EINTR) {
+				pr_err("%s: truncate returned -EINTR; retrying\n", __func__);
+				continue;
+			}
+			return -errno;
+		}
 
-	return 0;
+		return 0;
+	}
+	pr_err("%s: failed; returning -EINTR\n", __func__);
+	return -EINTR;
 }
 
 static int proxy_ftruncate(const char *path, off_t size,
 			 struct fuse_file_info *fi)
 {
 	int res;
+	int tries = 0;
 
 	(void) path;
 
-	res = ftruncate(fi->fh, size);
-	if (res == -1)
-		return -errno;
+	while (tries++ < EINTR_TRIES) {
+		res = ftruncate(fi->fh, size);
+		if (res == -1) {
+			if (errno == EINTR) {
+				pr_err("%s: ftruncate returned -EINTR; retrying\n", __func__);
+				continue;
+			}
+			return -errno;
+		}
 
-	return 0;
+		return 0;
+	}
+	pr_err("%s: failed; returning -EINTR\n", __func__);
+	return -EINTR;
 }
 
 #ifdef HAVE_UTIMENSAT
@@ -300,43 +322,66 @@ static int proxy_utimens(const char *path, const struct timespec ts[2])
 static int proxy_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
 	int fd;
+	int tries = 0;
 
 	pr_debug("%s: fi->flags: %o\n", __func__, fi->flags);
 	pr_debug("%s: mode: %o\n", __func__, mode);
-	fd = open(path, fi->flags, mode);
-	if (fd == -1)
-		return -errno;
 
-	pr_debug("%s: success\n", __func__);
+	while (tries++ < EINTR_TRIES) {
+		fd = open(path, fi->flags, mode);
+		if (fd == -1) {
+			if (errno == EINTR) {
+				pr_err("%s: %s returned -EINTR; retrying\n",
+						__func__,
+						mode ? "create" : "open");
+				continue;
+			}
+			return -errno;
+		}
 
-	fi->fh = fd;
-	return 0;
+		pr_debug("%s: success\n", __func__);
+
+		fi->fh = fd;
+		return 0;
+	}
+	pr_err("%s: failed; returning -EINTR\n", __func__);
+	return -EINTR;
 }
 
 static int proxy_open(const char *path, struct fuse_file_info *fi)
 {
-	int fd;
-
-	fd = open(path, fi->flags);
-	if (fd == -1)
-		return -errno;
-
-	fi->fh = fd;
-	pr_debug("%s: opened %s as fd %d\n", __func__, path, fd);
-	return 0;
+	return proxy_create(path, 0, fi);
 }
 
 static int proxy_read(const char *path, char *buf, size_t size, off_t offset,
 		    struct fuse_file_info *fi)
 {
-	int res;
+	ssize_t res;
+	int tries = 0;
 
 	(void) path;
-	res = pread(fi->fh, buf, size, offset);
-	if (res == -1)
-		res = -errno;
 
-	return res;
+	while (tries++ < EINTR_TRIES) {
+		errno = 0;
+		res = pread(fi->fh, buf, size, offset);
+		if (res == -1) {
+			if (errno == EINTR) {
+				pr_err("%s: read returned -EINTR; retrying\n",
+						__func__);
+				continue;
+			}
+			res = -errno;
+		}
+		if ((res != size) && (errno == EINTR)) {
+			pr_err("%s: read interrupted: %ld < %ld; retrying\n",
+					__func__, res, size);
+			continue;
+		}
+
+		return res;
+	}
+	pr_err("%s: failed; returning -EINTR\n", __func__);
+	return -EINTR;
 }
 
 static int proxy_read_buf(const char *path, struct fuse_bufvec **bufp,
@@ -364,14 +409,32 @@ static int proxy_read_buf(const char *path, struct fuse_bufvec **bufp,
 static int proxy_write(const char *path, const char *buf, size_t size,
 		     off_t offset, struct fuse_file_info *fi)
 {
-	int res;
+	ssize_t res;
+	int tries = 0;
 
 	(void) path;
-	res = pwrite(fi->fh, buf, size, offset);
-	if (res == -1)
-		res = -errno;
 
-	return res;
+	while (tries++ < EINTR_TRIES) {
+		errno = 0;
+		res = pwrite(fi->fh, buf, size, offset);
+		if (res == -1) {
+			if (errno == EINTR) {
+				pr_err("%s: write returned -EINTR; retrying\n",
+						__func__);
+				continue;
+			}
+			res = -errno;
+		}
+		if ((res != size) && (errno == EINTR)) {
+			pr_err("%s: wrote interrupted: %ld < %ld; retrying\n",
+					__func__, res, size);
+			continue;
+		}
+
+		return res;
+	}
+	pr_err("%s: failed; returning -EINTR\n", __func__);
+	return -EINTR;
 }
 
 static int proxy_write_buf(const char *path, struct fuse_bufvec *buf,
