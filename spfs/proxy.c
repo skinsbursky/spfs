@@ -269,7 +269,7 @@ static int proxy_truncate(const char *path, off_t size)
 		res = truncate(path, size);
 		if (res == -1) {
 			if (errno == EINTR) {
-				pr_err("%s: truncate returned -EINTR; retrying\n", __func__);
+				pr_warn("%s: truncate returned -EINTR; retrying\n", __func__);
 				continue;
 			}
 			return -errno;
@@ -277,7 +277,7 @@ static int proxy_truncate(const char *path, off_t size)
 
 		return 0;
 	}
-	pr_err("%s: failed; returning -EINTR\n", __func__);
+	pr_warn("%s: failed; returning -EINTR\n", __func__);
 	return -EINTR;
 }
 
@@ -293,7 +293,7 @@ static int proxy_ftruncate(const char *path, off_t size,
 		res = ftruncate(fi->fh, size);
 		if (res == -1) {
 			if (errno == EINTR) {
-				pr_err("%s: ftruncate returned -EINTR; retrying\n", __func__);
+				pr_warn("%s: ftruncate returned -EINTR; retrying\n", __func__);
 				continue;
 			}
 			return -errno;
@@ -301,7 +301,7 @@ static int proxy_ftruncate(const char *path, off_t size,
 
 		return 0;
 	}
-	pr_err("%s: failed; returning -EINTR\n", __func__);
+	pr_warn("%s: failed; returning -EINTR\n", __func__);
 	return -EINTR;
 }
 
@@ -331,7 +331,7 @@ static int proxy_create(const char *path, mode_t mode, struct fuse_file_info *fi
 		fd = open(path, fi->flags, mode);
 		if (fd == -1) {
 			if (errno == EINTR) {
-				pr_err("%s: %s returned -EINTR; retrying\n",
+				pr_warn("%s: %s returned -EINTR; retrying\n",
 						__func__,
 						mode ? "create" : "open");
 				continue;
@@ -344,7 +344,7 @@ static int proxy_create(const char *path, mode_t mode, struct fuse_file_info *fi
 		fi->fh = fd;
 		return 0;
 	}
-	pr_err("%s: failed; returning -EINTR\n", __func__);
+	pr_warn("%s: failed; returning -EINTR\n", __func__);
 	return -EINTR;
 }
 
@@ -366,21 +366,21 @@ static int proxy_read(const char *path, char *buf, size_t size, off_t offset,
 		res = pread(fi->fh, buf, size, offset);
 		if (res == -1) {
 			if (errno == EINTR) {
-				pr_err("%s: read returned -EINTR; retrying\n",
+				pr_warn("%s: read returned -EINTR; retrying\n",
 						__func__);
 				continue;
 			}
 			res = -errno;
 		}
 		if ((res != size) && (errno == EINTR)) {
-			pr_err("%s: read interrupted: %ld < %ld; retrying\n",
+			pr_warn("%s: read interrupted: %ld < %ld; retrying\n",
 					__func__, res, size);
 			continue;
 		}
 
 		return res;
 	}
-	pr_err("%s: failed; returning -EINTR\n", __func__);
+	pr_warn("%s: failed; returning -EINTR\n", __func__);
 	return -EINTR;
 }
 
@@ -419,21 +419,21 @@ static int proxy_write(const char *path, const char *buf, size_t size,
 		res = pwrite(fi->fh, buf, size, offset);
 		if (res == -1) {
 			if (errno == EINTR) {
-				pr_err("%s: write returned -EINTR; retrying\n",
+				pr_warn("%s: write returned -EINTR; retrying\n",
 						__func__);
 				continue;
 			}
 			res = -errno;
 		}
 		if ((res != size) && (errno == EINTR)) {
-			pr_err("%s: wrote interrupted: %ld < %ld; retrying\n",
+			pr_warn("%s: wrote interrupted: %ld < %ld; retrying\n",
 					__func__, res, size);
 			continue;
 		}
 
 		return res;
 	}
-	pr_err("%s: failed; returning -EINTR\n", __func__);
+	pr_warn("%s: failed; returning -EINTR\n", __func__);
 	return -EINTR;
 }
 
