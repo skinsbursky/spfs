@@ -273,7 +273,7 @@ int main(int argc, char *argv[])
 
 		if (access("/sys/module/fuse", F_OK)) {
 			pr_perror("failed to access /sys/module/fuse");
-			pr_err("FUSE module not loaded?");
+			pr_err("FUSE module not loaded?\n");
 		}
 		return -1;
 	}
