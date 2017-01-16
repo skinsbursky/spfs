@@ -204,12 +204,24 @@ static int leave_spfs_context(const struct spfs_info_s *info, int ns_mask)
 		return -errno;
 	}
 
+	if (mgr_ovz_id()) {
+		err = move_to_cgroup("ve", "/");
+		if (err)
+			return err;
+	}
+
 	return 0;
 }
 
 static int join_spfs_context(const struct spfs_info_s *info, int ns_mask)
 {
 	int err;
+
+	if (mgr_ovz_id()) {
+		err = move_to_cgroup("ve/", mgr_ovz_id());
+		if (err)
+			return err;
+	}
 
 	if (info->ns_pid) {
 		err = set_namespaces(info->ns_fds, ns_mask);
@@ -518,12 +530,6 @@ static int do_replace_spfs(struct spfs_info_s *info, const char *source)
 {
 	int err, res;
 
-	if (mgr_ovz_id()) {
-		err = move_to_cgroup("ve", "/");
-		if (err)
-			return err;
-	}
-
 	res = spfs_freeze_and_lock(info);
 	if (res)
 		return res;
@@ -680,6 +686,13 @@ static int exec_spfs(int pipe, const struct spfs_info_s *info, const char *mode,
 
 	if (!options)
 		return -ENOMEM;
+
+	if (mgr_ovz_id()) {
+		pr_debug("Move SPFS master to VE#%s\n", mgr_ovz_id());
+		err = move_to_cgroup("ve/", mgr_ovz_id());
+		if (err)
+			goto free_options;
+	}
 
 	if (info->ns_pid) {
 		err = set_namespaces(info->ns_fds, NS_MNT_MASK | NS_NET_MASK |
