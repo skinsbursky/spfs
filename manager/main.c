@@ -19,8 +19,11 @@ int main(int argc, char *argv[])
 	if (!ctx)
 		return -1;
 
-	if (move_to_cgroup("freezer", "/"))
-		return -1;
+	if (mgr_ovz_id()) {
+		pr_info("Move itself to VE#%s\n", mgr_ovz_id());
+		if (move_to_cgroup("ve/", mgr_ovz_id()))
+			return -1;
+	}
 
 	if (ctx->daemonize) {
 		if (daemon(1, 1)) {
