@@ -112,7 +112,8 @@ static int mount_spfs(struct spfs_manager_context_s *ctx,
 			goto close_pipe;
 		case 0:
 			close(initpipe[0]);
-			_exit(do_mount_spfs(info, mode, proxy_dir, initpipe[1]));
+			_exit(do_mount_spfs(info, ctx->log_dir,
+					    mode, proxy_dir, initpipe[1]));
 	}
 
 	/* First, close write end of the pipe */

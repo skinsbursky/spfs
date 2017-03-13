@@ -696,7 +696,7 @@ free_options:
 	return err;
 }
 
-int do_mount_spfs(struct spfs_info_s *info,
+int do_mount_spfs(struct spfs_info_s *info, const char *log_dir,
 		  const char *mode, const char *proxy_dir,
 		  int pipe_fd)
 {
@@ -717,7 +717,7 @@ int do_mount_spfs(struct spfs_info_s *info,
 	if (!socket_path)
 		goto free_mountpoint;
 
-	log_path = xsprintf("%s/spfs-%s.log", cwd, info->mnt.id);
+	log_path = xsprintf("%s/spfs-%s.log", log_dir ? log_dir : cwd, info->mnt.id);
 	if (!log_path)
 		goto free_socket_path;
 

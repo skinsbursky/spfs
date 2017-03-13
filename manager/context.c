@@ -169,7 +169,15 @@ static int configure(struct spfs_manager_context_s *ctx)
 	}
 
 	if (!ctx->log_file) {
-		ctx->log_file = xsprintf("%s.log", ctx->progname);
+		const char *log_dir = ".";
+
+		if (ctx->log_dir) {
+			log_dir = ctx->log_dir;
+			if (create_dir(log_dir))
+				return -1;
+		}
+
+		ctx->log_file = xsprintf("%s/%s.log", log_dir, ctx->progname);
 		if (!ctx->log_file) {
 			pr_err("failed to allocate\n");
 			return -ENOMEM;
