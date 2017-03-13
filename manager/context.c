@@ -224,11 +224,12 @@ static void help(const char *program)
 }
 
 static int parse_options(int argc, char **argv, char **work_dir, char **log,
-			 char **socket_path, int *verbosity, bool *daemonize,
-			 bool *exit_with_spfs)
+			 char **log_dir, char **socket_path, int *verbosity,
+			 bool *daemonize, bool *exit_with_spfs)
 {
 	static struct option opts[] = {
 		{"work-dir",		required_argument,      0, 'w'},
+		{"log-dir",		required_argument,      0, 'L'},
 		{"log",			required_argument,      0, 'l'},
 		{"socket-path",		required_argument,      0, 's'},
 		{"daemon",		required_argument,      0, 'd'},
@@ -247,6 +248,9 @@ static int parse_options(int argc, char **argv, char **work_dir, char **log,
 		switch (c) {
 			case 'w':
 				*work_dir = optarg;
+				break;
+			case 'L':
+				*log_dir = optarg;
 				break;
 			case 'l':
 				*log = optarg;
@@ -307,8 +311,9 @@ struct spfs_manager_context_s *create_context(int argc, char **argv)
 	(void) close_inherited_fds();
 
 	if (parse_options(argc, argv, &ctx->work_dir, &ctx->log_file,
-			  &ctx->socket_path, &ctx->verbosity, &ctx->daemonize,
-			  &ctx->exit_with_spfs)) {
+				&ctx->log_dir, &ctx->socket_path,
+				&ctx->verbosity, &ctx->daemonize,
+				&ctx->exit_with_spfs)) {
 		pr_err("failed to parse options\n");
 		return NULL;
 	}

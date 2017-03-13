@@ -9,6 +9,7 @@ struct spfs_manager_context_s {
 	const char	*progname;
 
 	char	*work_dir;
+	char	*log_dir;
 	char	*log_file;
 	char	*socket_path;
 	int	verbosity;
