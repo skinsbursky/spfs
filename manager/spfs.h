@@ -70,7 +70,7 @@ int spfs_cleanup_env(struct spfs_info_s *info);
 
 int spfs_apply_replace_mode(struct spfs_info_s *info, spfs_replace_mode_t mode);
 
-int do_mount_spfs(struct spfs_info_s *info,
+int do_mount_spfs(struct spfs_info_s *info, const char *log_dir,
 		  const char *mode, const char *proxy_dir,
 		  int pipe_fd);
 
