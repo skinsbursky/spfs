@@ -461,14 +461,19 @@ static int unix_bind_socket(struct unix_socket_info *sk, int sock)
 	struct sockaddr_un addr;
 	struct stat st;
 
-	if (stat(sk->path, &st)) {
-		pr_perror("failed to stat %s", sk->path);
-		return -errno;
-	}
+	/* Socket file can be deleted. It's not preserved on file systems like
+	 * NFS.
+	 */
+	if (!access(sk->path, F_OK)) {
+		if (stat(sk->path, &st)) {
+			pr_perror("failed to stat %s", sk->path);
+			return -errno;
+		}
 
-	if (unlink(sk->path)) {
-		pr_perror("failed to unlink %s", sk->path);
-		return -errno;
+		if (unlink(sk->path)) {
+			pr_perror("failed to unlink %s", sk->path);
+			return -errno;
+		}
 	}
 
 	unix_construct_addr(sk, &addr);
