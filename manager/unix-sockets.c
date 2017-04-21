@@ -127,16 +127,28 @@ static int unix_socket_collect(struct unix_socket_info *sk)
 	return collect_unix_socket(sk->ino, sk);
 }
 
-static int unix_collect_connecting(unsigned int ino, unsigned type, struct unix_socket_info *lsk)
+static struct unix_socket_info *alloc_unix_sk(void)
 {
 	struct unix_socket_info *sk;
 
 	sk = malloc(sizeof(*sk));
 	if (!sk) {
 		pr_err("failed to allocated\n");
-		return -ENOMEM;
+		return NULL;
 	}
 	memset(sk, 0, sizeof(*sk));
+	sk->fd = -1;
+
+	return sk;
+}
+
+static int unix_collect_connecting(unsigned int ino, unsigned type, struct unix_socket_info *lsk)
+{
+	struct unix_socket_info *sk;
+
+	sk = alloc_unix_sk();
+	if (!sk)
+		return -ENOMEM;
 
 	sk->ino = ino;
 	sk->type  = type;
@@ -161,13 +173,9 @@ static int unix_create_one(const struct unix_diag_msg *m, struct nlattr **tb,
 	struct unix_socket_info *sk;
 	int err;
 
-	sk = malloc(sizeof(*sk));
-	if (!sk) {
-		pr_err("failed to allocated\n");
+	sk = alloc_unix_sk();
+	if (!sk)
 		return -ENOMEM;
-	}
-	memset(sk, 0, sizeof(*sk));
-	sk->fd = -1;
 
 	sk->ino = m->udiag_ino;
 	sk->type  = m->udiag_type;
