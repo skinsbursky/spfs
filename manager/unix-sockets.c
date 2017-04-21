@@ -786,6 +786,13 @@ int unix_sk_file_open(const char *cwd, unsigned flags, int source_fd)
 		return err;
 	}
 
+	if (sk->fd != -1) {
+		err = fcntl(sk->fd, F_SETFL, flags & O_NONBLOCK);
+		if (err)
+			return err;
+		return sk->fd;
+	}
+
 	if (!unix_sk_is_supported(sk))
 		return -ENOTSUP;
 
