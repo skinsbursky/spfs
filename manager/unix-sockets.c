@@ -505,20 +505,31 @@ static int unix_bind_socket(struct unix_socket_info *sk, int sock)
 	return 0;
 }
 
-static int unix_listen_socket(struct unix_socket_info *sk, int sock)
+static int unix_listen_socket(struct unix_socket_info *sk, unsigned flags)
 {
-	int err;
+	int sock, err;
 
-	err = unix_bind_socket(sk, sock);
-	if (err < 0)
-		return err;
-
-	if (listen(sock, sk->wq_len)) {
-		pr_err("failed to listen socket %d\n", sock);
+	sock = socket(AF_UNIX, sk->type | (flags & O_NONBLOCK), 0);
+	if (sock < 0) {
+		pr_perror("failed to create socket");
 		return -errno;
 	}
 
-	return 0;
+	err = unix_bind_socket(sk, sock);
+	if (err < 0)
+		goto close_sock;
+
+	if (listen(sock, sk->wq_len)) {
+		pr_err("failed to listen socket %d\n", sock);
+		err = -errno;
+		goto close_sock;
+	}
+
+	return sock;
+
+close_sock:
+	close(sock);
+	return err;
 }
 
 static int unix_connect_socket(struct unix_socket_info *dest, int sock)
@@ -535,9 +546,9 @@ static int unix_connect_socket(struct unix_socket_info *dest, int sock)
 	return 0;
 }
 
-static int unix_unconn_socket(struct unix_socket_info *sk, int sock)
+static int unix_unconn_socket(struct unix_socket_info *sk, unsigned flags)
 {
-	int err;
+	int sock, err;
 	struct unix_socket_info *dest;
 
 	if (sk->type != SOCK_DGRAM) {
@@ -545,25 +556,40 @@ static int unix_unconn_socket(struct unix_socket_info *sk, int sock)
 		return -EINVAL;
 	}
 
+	sock = socket(AF_UNIX, sk->type | (flags & O_NONBLOCK), 0);
+	if (sock < 0) {
+		pr_perror("failed to create socket");
+		return -errno;
+	}
+
 	if (sk->path) {
 		err = unix_bind_socket(sk, sock);
 		if (err)
-			return err;
+			goto close_sock;
 	}
 
 	if (!sk->peer_ino)
-		return 0;
+		return sock;
 
 	if (sk->ino == sk->peer_ino)
 		dest = sk;
 	else {
 		if (find_unix_socket(sk->peer_ino, (void **)&dest)) {
 			pr_err("failed to find peer with inode %d\n", sk->peer_ino);
-			return -EINVAL;
+			err = -EINVAL;
+			goto close_sock;
 		}
 	}
 
-	return unix_connect_socket(dest, sock);
+	err = unix_connect_socket(dest, sock);
+	if (err)
+		goto close_sock;
+
+	return sock;
+
+close_sock:
+	close(sock);
+	return err;
 }
 
 static int unix_create_connected_socket(struct unix_socket_info *dest)
@@ -583,14 +609,30 @@ static int unix_create_connected_socket(struct unix_socket_info *dest)
 	return err ? err :sock;
 }
 
-static int unix_create_connecting_socket(struct unix_socket_info *sk, int sock)
+static int unix_create_connecting_socket(struct unix_socket_info *sk, unsigned flags)
 {
+	int sock, err;
+
 	if (!sk->peer) {
 		pr_err("connecting socket without peer?\n");
 		return -EINVAL;
 	}
 
-	return unix_connect_socket(sk->peer, sock);
+	sock = socket(AF_UNIX, sk->type | (flags & O_NONBLOCK), 0);
+	if (sock < 0) {
+		pr_perror("failed to create socket");
+		return -errno;
+	}
+
+	err = unix_connect_socket(sk->peer, sock);
+	if (err)
+		goto close_sock;
+
+	return sock;
+
+close_sock:
+	close(sock);
+	return err;
 }
 
 static bool path_is_relative(const char *path)
@@ -807,37 +849,31 @@ int unix_sk_file_open(const char *cwd, unsigned flags, int source_fd)
 			return err;
 	}
 
-	sock = socket(AF_UNIX, sk->type | (flags & O_NONBLOCK), 0);
-	if (sock < 0) {
-		pr_perror("failed to create socket");
-		return -errno;
-	}
-
 	if (sk->state == TCP_LISTEN)
-		err = unix_listen_socket(sk, sock);
+		sock = unix_listen_socket(sk, flags);
 	else if (sk->state == TCP_ESTABLISHED)
-		err = unix_create_connecting_socket(sk, sock);
+		sock = unix_create_connecting_socket(sk, flags);
 	else
-		err = unix_unconn_socket(sk, sock);
+		sock = unix_unconn_socket(sk, flags);
 
-	if (path_is_relative(sk->path)) {
-		int err2;
+	if (path_is_relative(sk->path))
+		err = set_cwd(cwd, NULL, 0);
 
-		err2 = set_cwd(cwd, NULL, 0);
-		if (err2) {
-			err = err2;
-			goto close_sock;
-		}
-	}
+	if (sock < 0)
+		return sock;
+
 	if (err)
 		goto close_sock;
 
 	err = unix_restore_rqueue(sk, sock, source_fd);
+	if (err)
+		goto close_sock;
+
+	return sock;
 
 close_sock:
-	if (err)
-		close(sock);
-	return err ? err : sock;
+	close(sock);
+	return err;
 }
 
 bool unix_sk_early_open(const char *cwd, unsigned flags, int source_fd)
