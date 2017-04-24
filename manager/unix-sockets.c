@@ -567,6 +567,33 @@ static int unix_dgram_peer(struct unix_socket_info *sk,
 	return 0;
 }
 
+static int unix_create_dgram_socket(struct unix_socket_info *sk,
+				    unsigned flags);
+
+static int unix_dgram_connect(struct unix_socket_info *sk,
+			      struct unix_socket_info *peer,
+			      unsigned flags)
+{
+	if (!peer)
+		return 0;
+
+	if (peer->fd == -1) {
+		/* Why peer restore has to be done here?
+		 * Because we want to connect to it.
+		 * Thus it has to be bound to the address first.
+		 * But it also can be connected to some other (third) socket.
+		 * And this other socket can be unbound. Thus, peer has to be
+		 * restored as a part of socket pair.
+		 */
+
+		peer->fd = unix_create_dgram_socket(peer, flags);
+		if (peer->fd < 0)
+			return peer->fd;
+	}
+
+	return unix_connect_socket(peer, sk->fd);
+}
+
 static int unix_dgram_socket(struct unix_socket_info *sk,
 			     struct unix_socket_info *peer,
 			     unsigned flags)
@@ -585,7 +612,7 @@ static int unix_dgram_socket(struct unix_socket_info *sk,
 			goto close_sock;
 	}
 
-	err = unix_connect_socket(peer, sk->fd);
+	err = unix_dgram_connect(sk, peer, flags);
 	if (err)
 		goto close_sock;
 
@@ -596,6 +623,88 @@ close_sock:
 	return err;
 }
 
+/* Why dgram sockets have to restored as socketpair?
+ * Because, there might be a situation, when one the interconnected sockets is
+ * bound to some path on SPFS. But another one is not. In this case
+ * interconnection can't be restored.
+ */
+static int unix_dgram_socketpair(struct unix_socket_info *sk,
+				 struct unix_socket_info *peer,
+				 unsigned flags)
+{
+	int socks[2], err;
+
+	pr_debug("        Creating socket pair: %s %s---%s %s\n",
+			sk->path ? sk->path : "None",
+			(peer && (peer->peer_ino == sk->ino)) ? "<" : "",
+			(peer && (sk->peer_ino == peer->ino)) ? ">" : "",
+			(peer && peer->path) ? peer->path : "");
+
+	err = socketpair(AF_UNIX, sk->type | (flags & O_NONBLOCK), 0, socks);
+	if (err)
+		return err;
+
+	sk->fd = socks[0];
+	peer->fd = socks[1];
+
+	if (sk->path) {
+		err = unix_bind_socket(sk, sk->fd);
+		if (err)
+			goto close_socks;
+	}
+
+	if (peer->path) {
+		err = unix_bind_socket(peer, peer->fd);
+		if (err)
+			goto close_socks;
+	}
+
+	/* Here is solved the situation, described in is_socketpair() helper */
+	if (sk->peer_ino != peer->ino) {
+		err = unix_dgram_connect(sk, peer, flags);
+		if (err)
+			goto close_socks;
+	}
+
+	if (peer->peer_ino != sk->ino) {
+		err = unix_dgram_connect(peer, sk, flags);
+		if (err)
+			goto close_socks;
+	}
+
+	return sk->fd;
+
+close_socks:
+	close(sk->fd);
+	close(peer->fd);
+	return err;
+}
+
+static bool is_socketpair(struct unix_socket_info *sk,
+			  struct unix_socket_info *peer)
+{
+	if (!peer)
+		return false;
+
+	if (sk == peer)
+		return false;
+
+	if (peer->path == NULL)
+		/* This are a couple of special case with DGRAM sockets:
+		 * 1) sock --> peer (bound) --> sock2
+		 * 2) sock --> peer --> sock2 (bound)
+		 * If peer is not bound to some address, there won't be a way to
+		 * connect to it expect creating a socket pair from the begging.
+		 * Real peer connection will be fixed in unix_dgram_socketpair().
+		 */
+		return true;
+
+	if (peer->peer_ino != sk->ino)
+		return false;
+
+	return true;
+}
+
 static int unix_create_dgram_socket(struct unix_socket_info *sk, unsigned flags)
 {
 	int err;
@@ -604,6 +713,9 @@ static int unix_create_dgram_socket(struct unix_socket_info *sk, unsigned flags)
 	err = unix_dgram_peer(sk, &peer);
 	if (err)
 		return err;
+
+	if (is_socketpair(sk, peer))
+		return unix_dgram_socketpair(sk, peer, flags);
 
 	return unix_dgram_socket(sk, peer, flags);
 }
