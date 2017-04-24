@@ -948,38 +948,11 @@ static int unix_restore_rqueue(struct unix_socket_info *sk, int sock, int source
 	return err;
 }
 
-int unix_sk_file_open(const char *cwd, unsigned flags, int source_fd)
+static int do_unix_sk_create(const char *cwd, unsigned flags,
+			     struct unix_socket_info *sk)
 {
-	struct unix_socket_info *sk;
-	struct stat st;
 	int err, sock;
 	char cur_cwd[PATH_MAX];
-
-	if (fstat(source_fd, &st)) {
-		pr_perror("failed to stat fd %d", source_fd);
-		return -errno;
-	}
-
-	err = find_unix_socket(st.st_ino, (void **)&sk);
-	if (err) {
-		pr_err("failed to find socket by inode %d: %d\n", st.st_ino, err);
-		return err;
-	}
-
-	if (sk->fd != -1) {
-		err = fcntl(sk->fd, F_SETFL, flags & O_NONBLOCK);
-		if (err)
-			return err;
-		return sk->fd;
-	}
-
-	if (!unix_sk_is_supported(sk))
-		return -ENOTSUP;
-
-	if (sk->shutdown) {
-		pr_err("sockets with shutdown state are not supported yet\n");
-		return -ENOTSUP;
-	}
 
 	if (path_is_relative(sk->path)) {
 		err = set_cwd(cwd, cur_cwd, PATH_MAX);
@@ -1002,6 +975,52 @@ int unix_sk_file_open(const char *cwd, unsigned flags, int source_fd)
 
 	if (err)
 		goto close_sock;
+
+	return sock;
+
+close_sock:
+	close(sock);
+	return err;
+}
+
+int unix_sk_file_open(const char *cwd, unsigned flags, int source_fd)
+{
+	struct unix_socket_info *sk;
+	struct stat st;
+	int err, sock;
+
+	if (fstat(source_fd, &st)) {
+		pr_perror("failed to stat fd %d", source_fd);
+		return -errno;
+	}
+
+	err = find_unix_socket(st.st_ino, (void **)&sk);
+	if (err) {
+		pr_err("failed to find socket by inode %d: %d\n", st.st_ino, err);
+		return err;
+	}
+
+	if (!unix_sk_is_supported(sk))
+		return -ENOTSUP;
+
+	if (sk->shutdown) {
+		pr_err("sockets with shutdown state are not supported yet\n");
+		return -ENOTSUP;
+	}
+
+	sock = sk->fd;
+
+	if (sock == -1) {
+		sock = do_unix_sk_create(cwd, flags, sk);
+		if (sock < 0)
+			return sock;
+	} else {
+		/* Restore sock flags, as they were unavailable on peer
+		 * creation */
+		err = fcntl(sk->fd, F_SETFL, flags & O_NONBLOCK);
+		if (err)
+			return err;
+	}
 
 	err = unix_restore_rqueue(sk, sock, source_fd);
 	if (err)
