@@ -546,6 +546,27 @@ static int unix_connect_socket(struct unix_socket_info *dest, int sock)
 	return 0;
 }
 
+static int unix_dgram_peer(struct unix_socket_info *sk,
+			   struct unix_socket_info **peer)
+{
+	*peer = NULL;
+
+	if (!sk->peer_ino)
+		return 0;
+
+	if (sk->ino == sk->peer_ino) {
+		*peer = sk;
+		return 0;
+	}
+
+	if (find_unix_socket(sk->peer_ino, (void **)peer)) {
+		pr_err("failed to find peer with inode %d\n", sk->peer_ino);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static int unix_dgram_socket(struct unix_socket_info *sk,
 			     struct unix_socket_info *peer,
 			     unsigned flags)
@@ -577,18 +598,13 @@ close_sock:
 
 static int unix_create_dgram_socket(struct unix_socket_info *sk, unsigned flags)
 {
+	int err;
 	struct unix_socket_info *peer;
 
-	if (sk->peer_ino) {
-		if (sk->ino == sk->peer_ino)
-			peer = sk;
-		else {
-			if (find_unix_socket(sk->peer_ino, (void **)&peer)) {
-				pr_err("failed to find peer with inode %d\n", sk->peer_ino);
-				return -EINVAL;
-			}
-		}
-	}
+	err = unix_dgram_peer(sk, &peer);
+	if (err)
+		return err;
+
 	return unix_dgram_socket(sk, peer, flags);
 }
 
