@@ -45,6 +45,7 @@ TESTS_LIST="	\
 		static/file_attr		\
 		static/fifo-ghost		\
 						\
+		static/sk-unix01		\
 		static/sockets00		\
 		static/sk-unix-rel		\
 		static/socket_close_data01	\
