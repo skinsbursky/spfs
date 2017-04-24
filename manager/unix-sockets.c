@@ -546,50 +546,60 @@ static int unix_connect_socket(struct unix_socket_info *dest, int sock)
 	return 0;
 }
 
-static int unix_unconn_socket(struct unix_socket_info *sk, unsigned flags)
+static int unix_dgram_socket(struct unix_socket_info *sk,
+			     struct unix_socket_info *peer,
+			     unsigned flags)
 {
-	int sock, err;
-	struct unix_socket_info *dest;
+	int err;
 
-	if (sk->type != SOCK_DGRAM) {
-		pr_err("trying to create non-DGRAM unconnected socket %d\n", sk->ino);
-		return -EINVAL;
-	}
-
-	sock = socket(AF_UNIX, sk->type | (flags & O_NONBLOCK), 0);
-	if (sock < 0) {
+	sk->fd = socket(AF_UNIX, sk->type | (flags & O_NONBLOCK), 0);
+	if (sk->fd < 0) {
 		pr_perror("failed to create socket");
 		return -errno;
 	}
 
 	if (sk->path) {
-		err = unix_bind_socket(sk, sock);
+		err = unix_bind_socket(sk, sk->fd);
 		if (err)
 			goto close_sock;
 	}
 
-	if (!sk->peer_ino)
-		return sock;
-
-	if (sk->ino == sk->peer_ino)
-		dest = sk;
-	else {
-		if (find_unix_socket(sk->peer_ino, (void **)&dest)) {
-			pr_err("failed to find peer with inode %d\n", sk->peer_ino);
-			err = -EINVAL;
-			goto close_sock;
-		}
-	}
-
-	err = unix_connect_socket(dest, sock);
+	err = unix_connect_socket(peer, sk->fd);
 	if (err)
 		goto close_sock;
 
-	return sock;
+	return sk->fd;
 
 close_sock:
-	close(sock);
+	close(sk->fd);
 	return err;
+}
+
+static int unix_create_dgram_socket(struct unix_socket_info *sk, unsigned flags)
+{
+	struct unix_socket_info *peer;
+
+	if (sk->peer_ino) {
+		if (sk->ino == sk->peer_ino)
+			peer = sk;
+		else {
+			if (find_unix_socket(sk->peer_ino, (void **)&peer)) {
+				pr_err("failed to find peer with inode %d\n", sk->peer_ino);
+				return -EINVAL;
+			}
+		}
+	}
+	return unix_dgram_socket(sk, peer, flags);
+}
+
+static int unix_unconn_socket(struct unix_socket_info *sk, unsigned flags)
+{
+	if (sk->type != SOCK_DGRAM) {
+		pr_err("trying to create non-DGRAM unconnected socket %d\n", sk->ino);
+		return -EINVAL;
+	}
+
+	return unix_create_dgram_socket(sk, flags);
 }
 
 static int unix_create_connected_socket(struct unix_socket_info *dest)
