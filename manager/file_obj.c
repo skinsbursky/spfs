@@ -371,7 +371,7 @@ static void destroy_file_obj(void *file_obj)
 
 	if (fobj->source_fd != -1)
 		close(fobj->source_fd);
-	if (fobj->fd != -1)
+	if (fobj->fd >= 0)
 		fobj->ops->close(fobj);
 	free(fobj->path);
 	free(fobj);
