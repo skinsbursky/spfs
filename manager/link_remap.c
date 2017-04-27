@@ -1,8 +1,10 @@
 #include <search.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <libgen.h>
 
 #include "include/log.h"
+#include "include/util.h"
 
 #include "link_remap.h"
 #include "processes.h"
@@ -78,7 +80,6 @@ static int get_link_remap(const char *path, struct link_remap_s **link_remap)
 		return err;
 
 	lr->users++;
-	pr_debug("%s: %s: %d\n", __func__, path, lr->users);
 	*link_remap = lr;
 	return 0;
 }
@@ -109,10 +110,45 @@ static int rename_link_to_path(const char *path, const char *link_remap)
 	return 0;
 }
 
+static char *generate_path_from_remap(const char *path, const char *link_remap)
+{
+	char *bname, *new;
+
+	bname = strdup(link_remap);
+	if (!bname) {
+		pr_err("failed to duplicate string\n");
+		return NULL;
+	}
+
+	new = xsprintf("%s_%s", path, basename(bname));
+
+	free(bname);
+	return new;
+}
+
+static int are_hardlinks(const char *path1, const char *path2)
+{
+	struct stat st1, st2;
+
+	if (lstat(path1, &st1)) {
+		pr_perror("failed to stat %s", path1);
+		return -errno;
+	}
+
+	if (lstat(path2, &st2)) {
+		pr_perror("failed to stat %s", path2);
+		return -errno;
+	}
+
+	return !memcmp(&st1, &st2, sizeof(st1));
+}
+
 int handle_sillyrenamed(const char *path, const struct replace_info_s *ri,
-			struct link_remap_s **link_remap)
+			struct link_remap_s **link_remap,
+			char **renamed_path)
 {
 	char remap[PATH_MAX];
+	const char *real_path;
 	int err;
 
 	err = spfs_link_remap(ri->src_mnt_ref,
@@ -129,7 +165,23 @@ int handle_sillyrenamed(const char *path, const struct replace_info_s *ri,
 	if (err)
 		return err;
 
-	err = rename_link_to_path(path, remap);
+	real_path = path;
+
+	if (!access(path, F_OK)) {
+		int ret;
+
+		ret = are_hardlinks(path, remap);
+		if (ret < 0)
+			return ret;
+
+		pr_warn("        (%s exists - %s)\n", path, ret ? "hardlink" : "other");
+
+		real_path = *renamed_path = generate_path_from_remap(path, remap);
+		if (!real_path)
+			return -ENOMEM;
+	}
+
+	err = rename_link_to_path(real_path, remap);
 	if (err)
 		return err;
 
@@ -142,7 +194,7 @@ int handle_sillyrenamed(const char *path, const struct replace_info_s *ri,
 	return 0;
 
 unlink_path:
-	if (unlink(path))
+	if (unlink(real_path))
 		pr_perror("failed to unlink %s", path);
 	return err;
 }

@@ -280,9 +280,17 @@ static int open_file_obj(file_obj_t *fobj)
 	bool sillyrenamed = sillyrenamed_path(fobj->path);
 
 	if (sillyrenamed) {
-		err = handle_sillyrenamed(fobj->path, fobj->ri, &fobj->link_remap);
+		char *renamed_path = NULL;
+
+		err = handle_sillyrenamed(fobj->path, fobj->ri,
+					  &fobj->link_remap, &renamed_path);
 		if (err)
 			return err;
+
+		if (renamed_path) {
+			free(fobj->path);
+			fobj->path = renamed_path;
+		}
 	}
 
 	/* TODO it makes sense to create file objects (open files) only
