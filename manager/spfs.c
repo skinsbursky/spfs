@@ -22,11 +22,15 @@
 #include "cgroup.h"
 #include "context.h"
 
-int create_spfs_info(const char *id, const char *mountpoint,
+int create_spfs_info(const char *id,
+		     const char *mountpoint, const char *ns_mountpoint,
 		     pid_t ns_pid, const char *root, struct spfs_info_s **i)
 {
 	struct spfs_info_s *info;
 	int err;
+
+	if (!ns_mountpoint)
+		ns_mountpoint = mountpoint;
 
 	info = shm_alloc(sizeof(*info));
 	if (!info) {
@@ -34,7 +38,7 @@ int create_spfs_info(const char *id, const char *mountpoint,
 		return -ENOMEM;
 	}
 
-	err = init_mount_info(&info->mnt, id, mountpoint);
+	err = init_mount_info(&info->mnt, id, mountpoint, ns_mountpoint);
 	if (err)
 		return err;
 
@@ -93,7 +97,7 @@ int create_spfs_info(const char *id, const char *mountpoint,
 	if (err)
 		return err;
 
-	err = spfs_add_mount_paths(info, info->mnt.mountpoint);
+	err = spfs_add_mount_paths(info, ns_mountpoint);
 	if (err)
 		return err;
 

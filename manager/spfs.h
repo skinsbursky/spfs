@@ -44,7 +44,8 @@ struct spfs_info_s {
 	int			mnt_ref;
 };
 
-int create_spfs_info(const char *id, const char *mountpoint,
+int create_spfs_info(const char *id,
+		     const char *mountpoint, const char *ns_mountpoint,
 		     pid_t ns_pid, const char *root, struct spfs_info_s **i);
 int update_spfs_info(struct spfs_info_s *info);
 int release_spfs_info(struct spfs_info_s *info);

@@ -183,10 +183,12 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 		[3] = { "mode=", NULL },
 		[4] = { "proxy_dir=", NULL },	// optional
 		[5] = { "mountpoint=", NULL },
+		[6] = { "ns_mountpoint=", NULL }, // optional
 		{ NULL, NULL },
 	};
 	const char *opt_id, *opt_ns_pid, *opt_root;
-	const char *opt_mode, *opt_proxy_dir, *opt_mountpoint;
+	const char *opt_mode, *opt_proxy_dir;
+	const char *opt_mountpoint, *opt_ns_mountpoint;
 	struct spfs_info_s *info;
 	int err;
 	int ns_pid = -1;
@@ -203,6 +205,7 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 	opt_mode = opt_array[3].value;
 	opt_proxy_dir = opt_array[4].value;
 	opt_mountpoint = opt_array[5].value;
+	opt_ns_mountpoint = opt_array[6].value;
 
 	if (opt_id == NULL) {
 		pr_err("mount id wasn't provided\n");
@@ -232,7 +235,8 @@ static int process_mount_cmd(int sock, struct spfs_manager_context_s *ctx,
 		}
 	}
 
-	err = create_spfs_info(opt_id, opt_mountpoint, ns_pid, opt_root, &info);
+	err = create_spfs_info(opt_id, opt_mountpoint, opt_ns_mountpoint,
+			       ns_pid, opt_root, &info);
 	if (err)
 		return err;
 
