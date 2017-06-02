@@ -9,6 +9,7 @@ struct mount_info_s {
 	struct list_head	list;
 	char			*id;
 	char			*mountpoint;
+	char			*ns_mountpoint;
 	struct stat		st;
 };
 
@@ -20,7 +21,7 @@ int add_mount_info(struct shared_list *mounts, struct mount_info_s *info);
 void del_mount_info(struct shared_list *mounts, struct mount_info_s *info);
 
 int init_mount_info(struct mount_info_s *mnt, const char *id,
-		    const char *mountpoint);
+		    const char *mountpoint, const char *ns_mountpoint);
 
 int mount_loop(const char *source, const char *mnt,
 	       const char *fstype, unsigned long mountflags,

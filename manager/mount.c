@@ -80,9 +80,10 @@ void del_mount_info(struct shared_list *mounts, struct mount_info_s *info)
 }
 
 int init_mount_info(struct mount_info_s *mnt, const char *id,
-		    const char *mountpoint)
+		    const char *mountpoint, const char *ns_mountpoint)
 {
 	mnt->mountpoint = shm_xsprintf(mountpoint);
+	mnt->ns_mountpoint = shm_xsprintf(ns_mountpoint);
 	mnt->id = shm_xsprintf(id);
 	if (!mnt->mountpoint || !mnt->id) {
 		pr_err("failed to allocate shared memory\n");
