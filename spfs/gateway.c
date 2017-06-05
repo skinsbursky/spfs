@@ -104,6 +104,10 @@ static char *gateway_full_path(const char *path, const struct work_mode_s *wm)
 
 	if (wm->mode != SPFS_PROXY_MODE)
 		return strdup(path);
+
+	if (access(wm->proxy_dir, F_OK))
+		pr_err("failed to access proxy directory %s\n", wm->proxy_dir);
+
 	return xsprintf("%s%s", wm->proxy_dir,
 				gateway_real_path(path, real, PATH_MAX));
 }
