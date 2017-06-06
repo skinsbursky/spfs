@@ -171,6 +171,19 @@ inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 	}
 	return err;
 }
+
+int update_work_mode(struct gateway_fh_s *gw_fh)
+{
+	/* Quick check, that work mode hasn't changed */
+	if (gw_fh->wm == get_context()->wm)
+		return 0;
+
+	put_work_mode(gw_fh->wm);
+	gw_fh->wm = get_work_mode();
+
+	return gw_fh->wm ? 0 : -EFAULT;
+}
+
 /* This macro is used for _any_operation, which means that context was set
  * already */
 #define GATEWAY_METHOD(__func, __path, __fh, ...)				\
@@ -240,11 +253,9 @@ inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 	int _err;								\
 										\
 	do {									\
-		put_work_mode(_gw_fh->wm);					\
-		_gw_fh->wm = get_work_mode();					\
-		if (_gw_fh->wm)							\
-			_err = GATEWAY_METHOD(_func, _path, _gw_fh,		\
-					      ##__VA_ARGS__);			\
+		if (update_work_mode(_gw_fh))					\
+			 break;							\
+		_err = GATEWAY_METHOD(_func, _path, _gw_fh, ##__VA_ARGS__);	\
 	} while(_err == -ERESTARTSYS);						\
 	_err;									\
 })
