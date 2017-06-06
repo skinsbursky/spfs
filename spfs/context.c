@@ -88,6 +88,7 @@ static int create_work_mode(spfs_mode_t mode, const char *path, struct work_mode
 	}
 
 	new->mode = mode;
+	new->cnt = 1;
 	new->proxy_root_fd = -1;
 	new->proxy_dir = NULL;
 
@@ -124,53 +125,55 @@ free_new:
 	return err;
 }
 
-int copy_work_mode(struct work_mode_s **wm)
+static void destroy_work_mode(struct work_mode_s *wm)
 {
-	struct spfs_context_s *ctx = get_context();
-	const struct work_mode_s *ctx_wm;
-	struct work_mode_s *copy;
-	int err;
-
-	copy = malloc(sizeof(*copy));
-	if (!copy)
-		return -ENOMEM;
-
-	err = pthread_mutex_lock(&ctx->wm_lock);
-	if (err) {
-		pr_err("%s: failed to lock wm: %d\n", __func__, err);
-		return -err;
-	}
-
-	ctx_wm = ctx->wm;
-
-	if (ctx_wm->proxy_dir) {
-		copy->proxy_dir = strdup(ctx_wm->proxy_dir);
-		if (!copy->proxy_dir)
-			goto free_copy;
-	}
-	copy->mode = ctx_wm->mode;
-	copy->proxy_root_fd = -1;
-
-        pthread_mutex_unlock(&ctx->wm_lock);
-
-	*wm = copy;
-	return 0;
-
-free_copy:
-        pthread_mutex_unlock(&ctx->wm_lock);
-	free(copy);
-	return -ENOMEM;
-}
-
-void destroy_work_mode(struct work_mode_s *wm)
-{
-	if (!wm)
-		return;
 	if (wm->proxy_root_fd != -1)
 		close(wm->proxy_root_fd);
 	if (wm->proxy_dir)
 		free(wm->proxy_dir);
 	free(wm);
+}
+
+/* Well... Get and put methods below are worng in generic case.
+ * They work properly, because:
+ * 1) Current work mode is being hold by context. And in *get* method we
+ * protect agains its change.
+ * 2) Any arch word operation is atomic on x86 arch.
+ * These two assumtions are enough to make this work properly on x86{_64}
+ * architecture.
+ * For others we either need to protec these operations by lock, or introduced
+ * atomic operations.
+ */
+
+void put_work_mode(struct work_mode_s *wm)
+{
+	if (!wm)
+		return;
+
+	if (--wm->cnt)
+		return;
+
+	destroy_work_mode(wm);
+}
+
+struct work_mode_s *get_work_mode(void)
+{
+	struct spfs_context_s *ctx = get_context();
+	struct work_mode_s *wm;
+	int err;
+
+	/* Protect against work mode change */
+	err = pthread_mutex_lock(&ctx->wm_lock);
+	if (err) {
+		pr_err("%s: failed to lock wm_lock: %d\n", __func__, err);
+		return NULL;
+	}
+
+	wm = ctx->wm;
+	wm->cnt++;
+
+        pthread_mutex_unlock(&ctx->wm_lock);
+	return wm;
 }
 
 int stale_work_mode(spfs_mode_t mode, const char *proxy_dir)
@@ -207,7 +210,7 @@ int set_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode, const char *path
 
 			if (cur_wm) {
 				wake_mode_waiters(cur_wm);
-				destroy_work_mode(cur_wm);
+				put_work_mode(cur_wm);
 			}
 			break;
 		default:
