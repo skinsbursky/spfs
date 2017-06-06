@@ -300,7 +300,7 @@ int main(int argc, char *argv[])
 		 * If parent process would like to catch this moment, it has to
 		 * poll for POLLHUP the passed fd, and once it's closed, check
 		 * whether process is still alive wia waitpid with ECHILD. */
-		pr_debug("closing fd %d\n");
+		pr_debug("closing fd %d\n", ready_fd);
 		close(ready_fd);
 	}
 
