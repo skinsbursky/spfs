@@ -50,7 +50,7 @@ static void gateway_set_fh(struct gateway_fh_s *gw_fh, struct fuse_file_info *fi
 
 static void gateway_release_fh(struct gateway_fh_s *gw_fh)
 {
-	destroy_work_mode(gw_fh->wm);
+	put_work_mode(gw_fh->wm);
 	free(gw_fh);
 }
 
@@ -240,9 +240,9 @@ inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 	int _err;								\
 										\
 	do {									\
-		destroy_work_mode(_gw_fh->wm);					\
-		_err = copy_work_mode(&_gw_fh->wm);				\
-		if (!_err)							\
+		put_work_mode(_gw_fh->wm);					\
+		_gw_fh->wm = get_work_mode();					\
+		if (_gw_fh->wm)							\
 			_err = GATEWAY_METHOD(_func, _path, _gw_fh,		\
 					      ##__VA_ARGS__);			\
 	} while(_err == -ERESTARTSYS);						\
