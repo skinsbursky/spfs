@@ -89,7 +89,7 @@ static int create_work_mode(spfs_mode_t mode, const char *path, struct work_mode
 
 	new->mode = mode;
 	new->cnt = 1;
-	new->proxy_root_fd = -1;
+	new->proxy_dir_fd = -1;
 	new->proxy_dir = NULL;
 
 	if (path ) {
@@ -98,28 +98,21 @@ static int create_work_mode(spfs_mode_t mode, const char *path, struct work_mode
 			pr_err("%s: failed to allocate proxy_dir for work mode structure\n", __func__);
 			goto free_new;
 		}
-		/* TODO: don't hold the reference, because on case of chroot
-		 * ("root" option) this path won't be accessible.
-		 * This have to be fixed later. Maybe it's not required at all.
-		 * Say, one first starts spfs and only then mounts actual proxy.
-		 */
-#if 0
-		/* Take a reference to underlying fs to make sure, that
+
+		/* Take a reference to proxy directory to make sure, that
 		 * it won't be removed from underneath of us. */
-		new->proxy_root_fd = open(new->proxy_dir, O_PATH);
-		if (new->proxy_root_fd == -1) {
+		new->proxy_dir_fd = open(new->proxy_dir, O_PATH);
+		if (new->proxy_dir_fd == -1) {
 			pr_perror("failed to open %s", new->proxy_dir);
 			err = -errno;
 			goto free_proxy_dir;
 		}
-#endif
 	}
 	*wm = new;
 	return 0;
-#if 0
+
 free_proxy_dir:
 	free(new->proxy_dir);
-#endif
 free_new:
 	free(new);
 	return err;
@@ -127,8 +120,8 @@ free_new:
 
 static void destroy_work_mode(struct work_mode_s *wm)
 {
-	if (wm->proxy_root_fd != -1)
-		close(wm->proxy_root_fd);
+	if (wm->proxy_dir_fd != -1)
+		close(wm->proxy_dir_fd);
 	if (wm->proxy_dir)
 		free(wm->proxy_dir);
 	free(wm);

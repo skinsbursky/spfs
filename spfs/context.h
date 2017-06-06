@@ -24,7 +24,7 @@ struct work_mode_s {
 	int			cnt;
 	spfs_mode_t		mode;
 	char                    *proxy_dir;
-	int			proxy_root_fd;
+	int			proxy_dir_fd;
 };
 
 struct spfs_context_s {
