@@ -77,6 +77,39 @@ static int wake_mode_waiters(struct work_mode_s *wm)
 	return futex_wake(&wm->mode);
 }
 
+static int open_proxy_directory(const char *path, int ns_pid)
+{
+	int err, mnt_ns_fd, dfd;
+        struct spfs_context_s *ctx = get_context();
+
+	mnt_ns_fd = open_ns(ns_pid, NS_MNT);
+	if (mnt_ns_fd < 0)
+		return mnt_ns_fd;
+
+	err = set_ns(mnt_ns_fd);
+	if (err)
+		goto close_ns_fd;
+
+	dfd = open(path, O_PATH);
+	if (dfd == -1) {
+		pr_perror("failed to open %s", path);
+		err = -errno;
+		goto close_ns_fd;
+	}
+
+	err = set_ns(ctx->mnt_ns_fd);
+	if (err)
+		goto close_fd;
+
+close_ns_fd:
+        close(mnt_ns_fd);
+	return err ? err : dfd;
+
+close_fd:
+	close(dfd);
+	goto close_ns_fd;
+}
+
 static int create_work_mode(spfs_mode_t mode,
 			    const char *path, int mnt_ns_pid,
 			    struct work_mode_s **wm)
@@ -104,10 +137,9 @@ static int create_work_mode(spfs_mode_t mode,
 
 		/* Take a reference to proxy directory to make sure, that
 		 * it won't be removed from underneath of us. */
-		new->proxy_dir_fd = open(new->proxy_dir, O_PATH);
-		if (new->proxy_dir_fd == -1) {
-			pr_perror("failed to open %s", new->proxy_dir);
-			err = -errno;
+		new->proxy_dir_fd = open_proxy_directory(new->proxy_dir, mnt_ns_pid);
+		if (new->proxy_dir_fd < 0) {
+			err = new->proxy_dir_fd;
 			goto free_proxy_dir;
 		}
 	}
