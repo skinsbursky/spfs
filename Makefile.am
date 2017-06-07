@@ -119,7 +119,3 @@ bin_swapfd_SOURCES =		main.c				\
 				include/ptrace.h
 
 bin_spfs_manager_LDFLAGS = -Wl,--wrap=nla_parse,--wrap=nlmsg_parse
-
-tags: ctags
-
-.PHONY: tags
