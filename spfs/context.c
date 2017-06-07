@@ -77,7 +77,9 @@ static int wake_mode_waiters(struct work_mode_s *wm)
 	return futex_wake(&wm->mode);
 }
 
-static int create_work_mode(spfs_mode_t mode, const char *path, struct work_mode_s **wm)
+static int create_work_mode(spfs_mode_t mode,
+			    const char *path, int mnt_ns_pid,
+			    struct work_mode_s **wm)
 {
 	struct work_mode_s *new;
 	int err = -ENOMEM;
@@ -180,7 +182,8 @@ static bool stale_work_mode(spfs_mode_t mode, const char *proxy_dir)
 	return mode != ctx->wm->mode;
 }
 
-int set_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode, const char *path)
+int set_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode,
+		  const char *path, int mnt_ns_pid)
 {
 	struct work_mode_s *cur_wm = get_context()->wm;
 	struct work_mode_s *new_wm = NULL;
@@ -189,7 +192,7 @@ int set_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode, const char *path
 	switch (mode) {
 		case SPFS_PROXY_MODE:
 		case SPFS_STUB_MODE:
-			err = create_work_mode(mode, path, &new_wm);
+			err = create_work_mode(mode, path, mnt_ns_pid, &new_wm);
 			if (err)
 				return err;
 
@@ -221,16 +224,17 @@ int change_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode, const char *p
 		pr_info("%s: the mode is already %d\n", __func__, ctx->wm->mode);
 		return 0;
 	}
-	return set_work_mode(ctx, mode, path);
+	return set_work_mode(ctx, mode, path, 0);
 }
 
 
-static int setup_context(struct spfs_context_s *ctx, const char *proxy_dir,
+static int setup_context(struct spfs_context_s *ctx,
+			 const char *proxy_dir, int proxy_mnt_ns_pid,
 			 spfs_mode_t mode, bool single_user)
 {
 	int err;
 
-	err = set_work_mode(ctx, mode, proxy_dir);
+	err = set_work_mode(ctx, mode, proxy_dir, proxy_mnt_ns_pid);
 	if (err) {
 		pr_err("Set work mode %d failed\n", mode);
 		return err;
@@ -288,7 +292,8 @@ int start_socket_thread(void)
 	return 0;
 }
 
-int context_init(const char *proxy_dir, spfs_mode_t mode, const char *log_file,
+int context_init(const char *proxy_dir, int proxy_mnt_ns_pid,
+		 spfs_mode_t mode, const char *log_file,
 		 const char *socket_path, int verbosity, bool single_user)
 {
 	struct spfs_context_s *ctx = get_context();
@@ -306,7 +311,7 @@ int context_init(const char *proxy_dir, spfs_mode_t mode, const char *log_file,
 	if (ctx->mnt_ns_fd < 0)
 		return ctx->mnt_ns_fd;
 
-	err = setup_context(ctx, proxy_dir, mode, single_user);
+	err = setup_context(ctx, proxy_dir, proxy_mnt_ns_pid, mode, single_user);
 	if (err) {
 		pr_crit("failed to setup context: %d\n", err);
 		return err;
