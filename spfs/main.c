@@ -33,16 +33,17 @@ static void help(int argc, char **argv, int help_level)
 	printf("usage: %s mountpoint [options]\n", argv[0]);
 	printf("\n");
 	printf("general options:\n");
-	printf("\t-m   --mode            work mode (\"stub\" or \"proxy\")\n");
-	printf("\t-p   --proxy-dir       path for proxy mode\n");
-	printf("\t-r   --root            directory to chroot to\n");
-	printf("\t-l   --log             log file\n");
-	printf("\t-s   --socket-path     control socket bind path\n");
-	printf("\t-h   --help            print help (for double option will print fuse help)\n");
-	printf("\t     --ready-fd        fd number to report ready status\n");
-	printf("\t     --single-user     spfs won't close socket connection\n");
-	printf("\t     --mntns-pid       pid with mount namespace for mountpoint\n");
-	printf("\t-v                     increase verbosity (can be used multiple times)\n");
+	printf("\t-m   --mode                  work mode (\"stub\" or \"proxy\")\n");
+	printf("\t-p   --proxy-dir             path for proxy mode\n");
+	printf("\t     --proxy-mntns-pid       pid with mount namespace for proxy directory\n");
+	printf("\t-r   --root                  directory to chroot to\n");
+	printf("\t-l   --log                   log file\n");
+	printf("\t-s   --socket-path           control socket bind path\n");
+	printf("\t-h   --help                  print help (for double option will print fuse help)\n");
+	printf("\t     --ready-fd              fd number to report ready status\n");
+	printf("\t     --single-user           spfs won't close socket connection\n");
+	printf("\t     --mntns-pid             pid with mount namespace for mountpoint\n");
+	printf("\t-v                           increase verbosity (can be used multiple times)\n");
 	printf("\n");
 
 	if (help_level > 1) {
@@ -56,7 +57,7 @@ static void help(int argc, char **argv, int help_level)
 int parse_options(int *orig_argc, char ***orig_argv,
 		  char **proxy_dir, spfs_mode_t *mode, char **log, char **socket_path,
 		  int *verbosity, char **root, int *ready_fd, bool *single_user,
-		  int *mnt_ns_pid)
+		  int *mnt_ns_pid, int *proxy_mnt_ns_pid)
 {
 	static struct option opts[] = {
 		{"proxy-dir",	required_argument,	0, 'p'},
@@ -68,6 +69,7 @@ int parse_options(int *orig_argc, char ***orig_argv,
 		{"ready-fd",	required_argument,	0, 1000},
 		{"single-user",	no_argument,		0, 1001},
 		{"mntns-pid",	required_argument,	0, 1002},
+		{"proxy-mntns-pid",	required_argument,	0, 1003},
 		{0,		0,			0,  0 }
 	};
 	int oind = 0, nind = 1;
@@ -76,6 +78,7 @@ int parse_options(int *orig_argc, char ***orig_argv,
 	char *mode_str = "stub";
 	char *ready_fd_str = NULL;
 	char *mnt_ns_pid_str = NULL;
+	char *proxy_mnt_ns_pid_str = NULL;
 
 	new_argv = malloc(sizeof(char *) * (argc + 1));
 	if (!new_argv) {
@@ -149,6 +152,10 @@ int parse_options(int *orig_argc, char ***orig_argv,
 				mnt_ns_pid_str = optarg;
 				nind += 2;
 				break;
+			case 1003:
+				proxy_mnt_ns_pid_str = optarg;
+				nind += 2;
+				break;
 			case '?':
 				copy_args(argv, &nind, new_argv, &new_argc);
 				break;
@@ -189,6 +196,21 @@ int parse_options(int *orig_argc, char ***orig_argv,
 		}
 
 		sprintf(path,"/proc/%d/ns/mnt", *mnt_ns_pid);
+		if (access(path, F_OK)) {
+			pr_perror("failed to access %s", path);
+			goto inval_args;
+		}
+	}
+
+	if (proxy_mnt_ns_pid_str) {
+		char path[] = "/proc/XXXXXXXXXX/ns/mnt";
+
+		if (xatoi(proxy_mnt_ns_pid_str, proxy_mnt_ns_pid) < 0) {
+			pr_err("failed to convert --proxy-mntns-pid\n");
+			goto inval_args;
+		}
+
+		sprintf(path,"/proc/%d/ns/mnt", *proxy_mnt_ns_pid);
 		if (access(path, F_OK)) {
 			pr_perror("failed to access %s", path);
 			goto inval_args;
@@ -336,12 +358,13 @@ int main(int argc, char *argv[])
 	char *root = "", *mountpoint;
 	bool single_user = false;
 	int mnt_ns_pid;
+	int proxy_mnt_ns_pid = 0;
 	spfs_mode_t mode = SPFS_STUB_MODE;
 	struct fuse *fuse = NULL;
 
 	if (parse_options(&argc, &argv, &proxy_dir, &mode, &log_file,
 			  &socket_path, &verbosity, &root, &ready_fd,
-			  &single_user, &mnt_ns_pid))
+			  &single_user, &mnt_ns_pid, &proxy_mnt_ns_pid))
 		return -1;
 
 	if (access("/dev/fuse", R_OK | W_OK)) {
