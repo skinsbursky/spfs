@@ -682,20 +682,21 @@ static int exec_spfs(int pipe, const struct spfs_info_s *info, const char *mode,
 		options = add_exec_options(options, "--root", info->root, NULL);
 	if (options && proxy_dir)
 		options = add_exec_options(options, "--proxy-dir", proxy_dir, NULL);
+	if (options && info->ns_pid) {
+		char pid[32];
+
+		sprintf(pid, "%ld", info->ns_pid);
+
+		options = add_exec_options(options, "--mntns-pid", pid, NULL);
+		if (options && proxy_dir)
+			options = add_exec_options(options, "--proxy-mntns-pid", pid, NULL);
+	}
 
 	if (!options)
 		return -ENOMEM;
 
-	if (info->ns_pid) {
-		err = set_namespaces(info->ns_fds, NS_MNT_MASK | NS_NET_MASK |
-				NS_USER_MASK | NS_UTS_MASK);
-		if (err)
-			goto free_options;
-	}
-
 	err = execvp_print(spfs, options);
 
-free_options:
 	free(options);
 	return err;
 }
