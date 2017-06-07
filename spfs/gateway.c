@@ -108,8 +108,8 @@ static char *gateway_full_path(const char *path, const struct work_mode_s *wm)
 	if (access(wm->proxy_dir, F_OK))
 		pr_err("failed to access proxy directory %s\n", wm->proxy_dir);
 
-	return xsprintf("%s%s", wm->proxy_dir,
-				gateway_real_path(path, real, PATH_MAX));
+	return xsprintf("/proc/self/fd/%d%s", wm->proxy_dir_fd,
+			gateway_real_path(path, real, PATH_MAX));
 }
 
 inline static int gateway_stale_fh(struct fuse_file_info *fi)
