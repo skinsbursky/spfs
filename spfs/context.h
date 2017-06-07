@@ -43,7 +43,8 @@ struct spfs_context_s {
 	int			mnt_ns_fd;
 };
 
-int context_init(const char *proxy_dir, spfs_mode_t mode, const char *log_file,
+int context_init(const char *proxy_dir, int proxy_mnt_ns_pid,
+		 spfs_mode_t mode, const char *log_file,
 		 const char *socket_path, int verbosity, bool single_user);
 int start_socket_thread(void);
 
@@ -53,7 +54,8 @@ struct spfs_context_s *get_context(void);
 const struct fuse_operations *get_operations(struct work_mode_s *wm);
 
 int change_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode, const char *path);
-int set_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode, const char *path);
+int set_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode,
+		  const char *path, int mnt_ns_pid);
 int wait_mode_change(int current_mode);
 
 const struct work_mode_s *ctx_work_mode(void);

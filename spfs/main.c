@@ -372,8 +372,8 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	if (context_init(proxy_dir, mode, log_file, socket_path, verbosity,
-			 single_user)) {
+	if (context_init(proxy_dir, proxy_mnt_ns_pid, mode, log_file,
+			 socket_path, verbosity, single_user)) {
 		pr_crit("failed to create gateway ctx\n");
 		return -1;
 	}
