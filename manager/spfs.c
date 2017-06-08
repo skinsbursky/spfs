@@ -292,7 +292,7 @@ free_bm_array:
 }
 
 int spfs_send_mode(const struct spfs_info_s *info,
-		   spfs_mode_t mode, const char *proxy_dir)
+		   spfs_mode_t mode, const char *proxy_dir, int ns_pid)
 {
 	size_t psize;
 	struct external_cmd *package;
@@ -308,15 +308,15 @@ int spfs_send_mode(const struct spfs_info_s *info,
 		pr_err("failed to allocate package\n");
 		return -ENOMEM;
 	}
-	fill_mode_packet(package, mode, proxy_dir, 0);
+	fill_mode_packet(package, mode, proxy_dir, ns_pid);
 
 	err = seqpacket_sock_send(info->sock, package, psize);
 	if (err)
-		pr_err("failed to switch spfs %s to proxy mode to %s: %d\n",
-				info->mnt.id, proxy_dir, err);
+		pr_err("failed to switch spfs %s to %s mode to %s (ns_pid: %d): %d\n",
+				info->mnt.id, mode, proxy_dir, ns_pid, err);
 	else
-		pr_info("spfs %s mode was changed to %d (path: %s)\n",
-				info->mnt.id, mode, proxy_dir);
+		pr_info("spfs %s mode was changed to %d (path: %s, ns_pid: %d)\n",
+				info->mnt.id, mode, proxy_dir, ns_pid);
 
 	free(package);
 	return err;
@@ -485,7 +485,7 @@ static int __do_replace_spfs_mounts(struct spfs_info_s *info, const char *source
 		}
 	}
 
-	err = spfs_send_mode(info, SPFS_PROXY_MODE, mnt->mountpoint);
+	err = spfs_send_mode(info, SPFS_PROXY_MODE, mnt->mountpoint, info->ns_pid);
 	if (!err)
 		(void) umount_target(source);
 
@@ -633,7 +633,7 @@ int replace_spfs(int sock, struct spfs_info_s *info,
 	if (err)
 		goto free_mnt;
 
-	err = spfs_send_mode(info, SPFS_PROXY_MODE, mnt);
+	err = spfs_send_mode(info, SPFS_PROXY_MODE, mnt, info->ns_pid);
 	if (err)
 		/*TODO: should umount the target ? */
 		goto free_mnt;
