@@ -265,13 +265,14 @@ umount_spfs:
 
 static int change_spfs_mode(struct spfs_manager_context_s *ctx,
 			    const struct spfs_info_s *info,
-			    spfs_mode_t mode, const char *proxy_dir)
+			    spfs_mode_t mode,
+			    const char *proxy_dir, int ns_pid)
 {
 	int err;
 	struct mount_info_s *mnt;
 
 	if (info)
-		return spfs_send_mode(info, mode, proxy_dir);
+		return spfs_send_mode(info, mode, proxy_dir, ns_pid);
 
 	err = lock_shared_list(ctx->spfs_mounts);
 	if (err)
@@ -280,7 +281,7 @@ static int change_spfs_mode(struct spfs_manager_context_s *ctx,
 	list_for_each_entry(mnt, &ctx->spfs_mounts->list, list) {
 		info = container_of(mnt, const struct spfs_info_s, mnt);
 
-		err = spfs_send_mode(info, mode, proxy_dir);
+		err = spfs_send_mode(info, mode, proxy_dir, ns_pid);
 		if (err)
 			break;
 	}
@@ -297,13 +298,14 @@ static int process_mode_cmd(int sock, struct spfs_manager_context_s *ctx,
 		[0] = { "id=", NULL },
 		[1] = { "mode=", NULL },
 		[2] = { "proxy_dir=", NULL },
-		[3] = { "all", NULL, true },
+		[3] = { "ns_pid=", NULL },
+		[4] = { "all", NULL, true },
 		{ NULL, NULL },
 	};
-	const char *opt_id, *opt_mode, *opt_proxy_dir, *opt_all;
+	const char *opt_id, *opt_mode, *opt_proxy_dir, *opt_ns_pid, *opt_all;
 	const struct spfs_info_s *info = NULL;
 	spfs_mode_t mode;
-	int err;
+	int err, ns_pid = 0;
 
 	err = parse_cmd_options(opt_array, options);
 	if (err) {
@@ -314,7 +316,8 @@ static int process_mode_cmd(int sock, struct spfs_manager_context_s *ctx,
 	opt_id = opt_array[0].value;
 	opt_mode = opt_array[1].value;
 	opt_proxy_dir = opt_array[2].value;
-	opt_all = opt_array[3].value;
+	opt_ns_pid = opt_array[3].value;
+	opt_all = opt_array[4].value;
 
 	if (!opt_id && !opt_all) {
 		pr_err("mount id wasn't provided\n");
@@ -331,6 +334,11 @@ static int process_mode_cmd(int sock, struct spfs_manager_context_s *ctx,
 		return -EINVAL;
 	}
 
+	if (opt_ns_pid && xatoi(opt_ns_pid, &ns_pid)) {
+		pr_err("failed to convert ns pid  %s\n", opt_ns_pid);
+		return -EINVAL;
+	}
+
 	if (opt_id) {
 		info = find_spfs_by_id(ctx->spfs_mounts, opt_array[0].value);
 		if (!info) {
@@ -343,7 +351,7 @@ static int process_mode_cmd(int sock, struct spfs_manager_context_s *ctx,
 	if (mode < 0)
 		return mode;
 
-	return change_spfs_mode(ctx, info, mode, opt_proxy_dir);
+	return change_spfs_mode(ctx, info, mode, opt_proxy_dir, ns_pid);
 }
 
 static int process_replace_mode_all(int sock, struct spfs_manager_context_s *ctx,

@@ -60,7 +60,7 @@ void del_spfs_info(struct shared_list *mounts, struct spfs_info_s *info);
 int spfs_add_mount_paths(struct spfs_info_s *info, const char *bind_mounts);
 
 int spfs_send_mode(const struct spfs_info_s *info,
-		   spfs_mode_t mode, const char *proxy_dir);
+		   spfs_mode_t mode, const char *proxy_dir, int ns_pid);
 
 int replace_spfs(int sock, struct spfs_info_s *info,
 		  const char *source, const char *fstype,
