@@ -112,11 +112,9 @@ static char *gateway_full_path(const char *path, const struct work_mode_s *wm)
 			gateway_real_path(path, real, PATH_MAX));
 }
 
-inline static int gateway_stale_fh(struct fuse_file_info *fi)
+inline static bool gateway_stale_fh(struct fuse_file_info *fi)
 {
-	struct work_mode_s *wm = gateway_fh_mode(fi->fh);
-
-	return stale_work_mode(wm->mode, wm->proxy_dir);
+	return gateway_fh_mode(fi->fh) != get_context()->wm;
 }
 
 inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
