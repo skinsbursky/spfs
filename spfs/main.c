@@ -307,7 +307,8 @@ static int mount_fuse(int argc, char **argv,
 
 		if (access("/sys/module/fuse", F_OK)) {
 			pr_perror("failed to access /sys/module/fuse");
-			pr_err("FUSE module not loaded?\n");
+			if (errno == ENOENT)
+				pr_err("FUSE module not loaded?\n");
 		}
 		return -1;
 	}
