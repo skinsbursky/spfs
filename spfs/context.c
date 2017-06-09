@@ -115,7 +115,7 @@ static int create_work_mode(spfs_mode_t mode,
 			    struct work_mode_s **wm)
 {
 	struct work_mode_s *new;
-	int err = -ENOMEM;
+	int err;
 
 	new = malloc(sizeof(*new));
 	if (!new) {
@@ -128,10 +128,17 @@ static int create_work_mode(spfs_mode_t mode,
 	new->proxy_dir_fd = -1;
 	new->proxy_dir = NULL;
 
-	if (path ) {
+	if (mode == SPFS_PROXY_MODE) {
+		if (!strlen(path)) {
+			pr_err("%s: proxy directory is empty\n", __func__);
+			err = -EINVAL;
+			goto free_new;
+		}
+
 		new->proxy_dir = strdup(path);
 		if (!new->proxy_dir) {
 			pr_err("%s: failed to allocate proxy_dir for work mode structure\n", __func__);
+			err = -ENOMEM;
 			goto free_new;
 		}
 
