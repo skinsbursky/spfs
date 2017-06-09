@@ -169,14 +169,14 @@ struct work_mode_s *get_work_mode(void)
 	return wm;
 }
 
-static int stale_work_mode(spfs_mode_t mode, const char *proxy_dir)
+static bool stale_work_mode(spfs_mode_t mode, const char *proxy_dir)
 {
 	struct spfs_context_s *ctx = get_context();
 
-	if (mode != ctx->wm->mode)
-		return 1;
+	if (mode == SPFS_PROXY_MODE)
+		return true;
 
-	return !!strcmp(proxy_dir, ctx->wm->proxy_dir);
+	return mode != ctx->wm->mode;
 }
 
 int set_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode, const char *path)
