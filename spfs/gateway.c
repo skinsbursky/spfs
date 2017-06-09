@@ -94,7 +94,7 @@ static const char *gateway_real_path(const char *path, char *buf, size_t rsize)
 		return path;
 
 	real = buf;
-	pr_debug("found real path %s for file %s\n", real, path);
+	pr_debug("found real path '%s' for file '%s'\n", real, path);
 	return real;
 }
 
@@ -106,7 +106,7 @@ static char *gateway_full_path(const char *path, const struct work_mode_s *wm)
 		return strdup(path);
 
 	if (access(wm->proxy_dir, F_OK))
-		pr_err("failed to access proxy directory %s\n", wm->proxy_dir);
+		pr_err("failed to access proxy directory '%s'\n", wm->proxy_dir);
 
 	return xsprintf("/proc/self/fd/%d%s", wm->proxy_dir_fd,
 			gateway_real_path(path, real, PATH_MAX));
@@ -132,7 +132,7 @@ inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 		(fi->flags & O_DIRECTORY) ? gateway_releasedir : gateway_release;
 	int err;
 
-	pr_info("%s: reopening file handle for %s (mode: %d -> %d, proxy_dir: %s -> %s)\n",
+	pr_info("%s: reopening file handle for '%s' (mode: %d -> %d, proxy_dir: '%s' -> '%s')\n",
 			__func__, path,
 			gateway_fh_mode(fi->fh)->mode,
 			ctx_work_mode()->mode,
@@ -142,7 +142,7 @@ inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 	/* Open new fh by using temporary fi */
 	err = open(path, &tmp_fi);
 	if (err) {
-		pr_err("%s: failed to open new file handler for %s\n",
+		pr_err("%s: failed to open new file handler for '%s'\n",
 				__func__, path);
 		return err;
 	}
@@ -163,7 +163,7 @@ inline static int gateway_reopen_fh(const char *path, struct fuse_file_info *fi)
 	 */
 	err = release(path, &tmp_fi);
 	if (err) {
-		pr_err("%s: failed to release old file handler for %s\n",
+		pr_err("%s: failed to release old file handler for '%s'\n",
 				__func__, path);
 		return err;
 	}
@@ -285,7 +285,7 @@ int update_work_mode(struct gateway_fh_s *gw_fh)
 		_err = GATEWAY_METHOD_FH_RESTARTABLE(_func, _path, _gw_fh,	\
 						     ##__VA_ARGS__);		\
 	else									\
-		pr_err("%s: failed to create gateway context for %s\n",		\
+		pr_err("%s: failed to create gateway context for '%s'\n",	\
 			__func__, _path);					\
 	if (_err)								\
 		gateway_release_fh(_gw_fh);					\
