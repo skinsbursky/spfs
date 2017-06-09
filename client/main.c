@@ -49,7 +49,7 @@ static int send_mode(const char *socket_path, spfs_mode_t mode, const char *path
 		fprintf(stderr, "failed to allocate package\n");
 		return -ENOMEM;
 	}
-	fill_mode_packet(package, mode, path_to_send);
+	fill_mode_packet(package, mode, path_to_send, 0);
 
 	err = send_packet(socket_path, package, len);
 

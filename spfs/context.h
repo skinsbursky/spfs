@@ -53,7 +53,8 @@ void context_fini(void);
 struct spfs_context_s *get_context(void);
 const struct fuse_operations *get_operations(struct work_mode_s *wm);
 
-int change_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode, const char *path);
+int change_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode,
+		     const char *path, int ns_pid);
 int set_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode,
 		  const char *path, int mnt_ns_pid);
 int wait_mode_change(int current_mode);
