@@ -6,6 +6,9 @@
 #include <stdlib.h>
 #include <limits.h>
 
+#include <sys/types.h>
+#include <sys/wait.h>
+
 #include "include/util.h"
 #include "include/log.h"
 #include "include/socket.h"
@@ -77,10 +80,22 @@ static int wake_mode_waiters(struct work_mode_s *wm)
 	return futex_wake(&wm->mode);
 }
 
-static int open_proxy_directory(const char *path, int ns_pid)
+static int do_open_proxy_directory(const char *path)
+{
+	int fd;
+
+	fd = open(path, O_PATH);
+	if (fd == -1) {
+		pr_perror("failed to open %s", path);
+		return -errno;
+	}
+	return fd;
+}
+
+static int do_open_proxy_directory_ns(const char *path, int ns_pid)
 {
 	int err, mnt_ns_fd, dfd;
-        struct spfs_context_s *ctx = get_context();
+	struct spfs_context_s *ctx = get_context();
 
 	mnt_ns_fd = open_ns(ns_pid, NS_MNT);
 	if (mnt_ns_fd < 0)
@@ -102,12 +117,97 @@ static int open_proxy_directory(const char *path, int ns_pid)
 		goto close_fd;
 
 close_ns_fd:
-        close(mnt_ns_fd);
+	close(mnt_ns_fd);
 	return err ? err : dfd;
 
 close_fd:
 	close(dfd);
 	goto close_ns_fd;
+}
+
+struct proxy_dir_info {
+	const char      *path;
+	int             ns_pid;
+	int             wpipe;
+};
+
+static int child_open_dir(void *data)
+{
+	struct proxy_dir_info *pdi = data;
+	int fd;
+
+	fd = do_open_proxy_directory_ns(pdi->path, pdi->ns_pid);
+	if (fd < 0)
+		return fd;
+
+	if (write(pdi->wpipe, &fd, sizeof(fd)) != sizeof(fd))
+		return -errno;
+
+	return 0;
+}
+
+static int open_proxy_directory_ns(const char *path, int ns_pid)
+{
+	int err, pfd[2], fd, status;
+	pid_t pid;
+	char buf[4096], *stack = buf + sizeof(buf);
+	struct proxy_dir_info pdi = {
+		.path = path,
+		.ns_pid = ns_pid,
+	};
+
+	err = pipe(pfd);
+	if (err) {
+		pr_perror("failed to create pipe");
+		return -errno;
+	}
+
+	pdi.wpipe = pfd[1];
+
+	pid = clone(child_open_dir, stack, CLONE_FILES | SIGCHLD, &pdi);
+	if (pid == -1) {
+		pr_perror("failed to clone child");
+		fd = -errno;
+		goto close_pipe;
+	}
+
+	if (waitpid(-1, &status, 0) != pid) {
+		pr_perror("failed to wait for child %d", pid);
+		fd = -errno;
+		goto close_pipe;
+	}
+
+	if (WIFSIGNALED(status)) {
+		pr_err("child was killed by signal %d\n", WTERMSIG(status));
+		fd = -EFAULT;
+		goto close_pipe;
+	}
+
+	err = WEXITSTATUS(status);
+	if (err) {
+		fd = (char )err;
+		pr_err("child failed with error %d\n", fd);
+		goto close_pipe;
+	}
+
+	if (read(pfd[0], &fd, sizeof(fd)) != sizeof(fd)) {
+		pr_perror("failed to get ns fd from child");
+		fd = -errno;
+		goto close_pipe;
+	}
+
+close_pipe:
+	close(pfd[1]);
+	close(pfd[0]);
+	return fd;
+}
+
+static int open_proxy_directory(const char *path, int ns_pid)
+{
+	if (ns_pid)
+		return open_proxy_directory_ns(path, ns_pid);
+
+	return do_open_proxy_directory(path);
 }
 
 static int create_work_mode(spfs_mode_t mode,
