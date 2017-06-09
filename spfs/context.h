@@ -59,7 +59,6 @@ int wait_mode_change(int current_mode);
 const struct work_mode_s *ctx_work_mode(void);
 struct work_mode_s *get_work_mode(void);
 void put_work_mode(struct work_mode_s *wm);
-int stale_work_mode(spfs_mode_t mode, const char *proxy_dir);
 
 extern int spfs_execute_cmd(int sock, void *data, void *package, size_t psize);
 
