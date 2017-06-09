@@ -241,23 +241,6 @@ static int setup_context(struct spfs_context_s *ctx, const char *proxy_dir,
 	return 0;
 }
 
-int get_stat(const char *mountpoint, struct stat *st)
-{
-	int err;
-
-	if (!mountpoint) {
-		pr_err("%s: mountpoint wasn't specified\n", __func__);
-		return -EINVAL;
-	}
-
-	err = stat(mountpoint, st);
-	if (err < 0) {
-		pr_perror("%s: failed to stat %s", __func__, mountpoint);
-		return err;
-	}
-	return 0;
-}
-
 #include <sys/types.h>          /* See NOTES */
 #include <sys/socket.h>
 
@@ -306,8 +289,7 @@ int start_socket_thread(void)
 }
 
 int context_init(const char *proxy_dir, spfs_mode_t mode, const char *log_file,
-		 const char *socket_path, int verbosity, const char *mountpoint,
-		 bool single_user)
+		 const char *socket_path, int verbosity, bool single_user)
 {
 	struct spfs_context_s *ctx = get_context();
 	int err;
@@ -329,9 +311,6 @@ int context_init(const char *proxy_dir, spfs_mode_t mode, const char *log_file,
 		pr_crit("failed to setup context: %d\n", err);
 		return err;
 	}
-
-	if (get_stat(mountpoint, &ctx->stub_root_stat))
-		return -1;
 
 	ctx->packet_socket = seqpacket_sock(socket_path, true, true,
 					    &ctx->sock_addr);

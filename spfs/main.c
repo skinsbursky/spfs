@@ -241,6 +241,57 @@ err_unmount:
 	return NULL;
 }
 
+static int mount_fuse(int argc, char **argv,
+		      char **mountpoint,
+		      int *multithreaded, int *foreground,
+		      struct fuse **fuse)
+{
+	int err;
+	struct spfs_context_s *ctx = get_context();
+	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
+
+	args.argc = argc;
+	args.argv = argv;
+	args.allocated = 0;
+
+	err = fuse_parse_cmdline(&args, mountpoint, multithreaded, foreground);
+	if (err)
+		return err;
+
+	if (!*mountpoint) {
+		pr_err("%s: mountpoint wasn't specified\n", __func__);
+		return -EINVAL;
+	}
+
+	pr_debug("%s: mountpoint  : %s\n", __func__, *mountpoint);
+
+	/* Needed to return something, when stat for root in Sbut mode is
+	 * called */
+	err = stat(*mountpoint, &ctx->stub_root_stat);
+	if (err < 0) {
+		pr_perror("%s: failed to stat %s", __func__, *mountpoint);
+		return err;
+	}
+
+	*fuse = setup_fuse(&args, &gateway_operations,
+			  sizeof(gateway_operations), *mountpoint, NULL);
+	if (*fuse == NULL) {
+		pr_crit("failed to setup fuse at %s\n", *mountpoint);
+
+		err = check_capabilities(1 << CAP_SYS_ADMIN, getpid());
+		if (err == 0)
+			pr_info("CAP_SYS_ADMIN is not set.\n");
+
+		if (access("/sys/module/fuse", F_OK)) {
+			pr_perror("failed to access /sys/module/fuse");
+			pr_err("FUSE module not loaded?\n");
+		}
+		return -1;
+	}
+
+	return 0;
+}
+
 int main(int argc, char *argv[])
 {
 	char *proxy_dir = NULL;
@@ -252,18 +303,10 @@ int main(int argc, char *argv[])
 	int mnt_ns_pid;
 	spfs_mode_t mode = SPFS_STUB_MODE;
 	struct fuse *fuse;
-	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 
 	if (parse_options(&argc, &argv, &proxy_dir, &mode, &log_file,
 			  &socket_path, &verbosity, &root, &ready_fd,
 			  &single_user, &mnt_ns_pid))
-		return -1;
-
-	args.argc = argc;
-	args.argv = argv;
-	args.allocated = 0;
-
-	if (fuse_parse_cmdline(&args, &mountpoint, &multithreaded, &foreground) == -1)
 		return -1;
 
 	if (access("/dev/fuse", R_OK | W_OK)) {
@@ -271,7 +314,8 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	if (context_init(proxy_dir, mode, log_file, socket_path, verbosity, mountpoint, single_user)) {
+	if (context_init(proxy_dir, mode, log_file, socket_path, verbosity,
+			 single_user)) {
 		pr_crit("failed to create gateway ctx\n");
 		return -1;
 	}
@@ -282,24 +326,15 @@ int main(int argc, char *argv[])
 		pr_debug("%s: proxy_dir   : %s\n", __func__, proxy_dir);
 	pr_debug("%s: log         : %s\n", __func__, log_file);
 	pr_debug("%s: socket path : %s\n", __func__, socket_path);
-	pr_debug("%s: mountpoint  : %s\n", __func__, mountpoint);
 	pr_debug("%s: root        : %s\n", __func__, root);
 	pr_debug("%s: verbosity   : +%d\n", __func__, verbosity);
 
-	fuse = setup_fuse(&args, &gateway_operations,
-			  sizeof(gateway_operations), mountpoint, NULL);
-	if (fuse == NULL) {
-		pr_crit("failed to setup fuse\n");
-
-		err = check_capabilities(1 << CAP_SYS_ADMIN, getpid());
-		if (err == 0)
-			pr_info("CAP_SYS_ADMIN is not set.\n");
-
-		if (access("/sys/module/fuse", F_OK)) {
-			pr_perror("failed to access /sys/module/fuse");
-			pr_err("FUSE module not loaded?\n");
-		}
-		return -1;
+	err = mount_fuse(argc, argv, &mountpoint,
+			 &multithreaded, &foreground,
+			 &fuse);
+	if (err) {
+		pr_err("failed to mount fuse\n");
+		return err;
 	}
 
 	err = -1;
