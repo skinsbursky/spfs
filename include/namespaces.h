@@ -20,6 +20,8 @@ typedef enum {
 			NS_PID_MASK | NS_USER_MASK
 
 int open_ns(pid_t pid, nstype_t ns_type);
+int set_ns(int ns_fd);
+
 int set_namespaces(const int *ns_fds, unsigned ns_mask);
 int close_namespaces(int *ns_fds);
 int open_namespaces(pid_t pid, int *ns_fds);
