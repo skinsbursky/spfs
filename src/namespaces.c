@@ -17,12 +17,12 @@ char *ns_names[NS_MAX] = {
 	[NS_USER] = "user"
 };
 
-int open_ns(pid_t pid, const char *ns_type)
+int open_ns(pid_t pid, nstype_t ns_type)
 {
 	int fd;
 	char path[PATH_MAX];
 
-	snprintf(path, PATH_MAX, "/proc/%d/ns/%s", pid, ns_type);
+	snprintf(path, PATH_MAX, "/proc/%d/ns/%s", pid, ns_names[ns_type]);
 	fd = open(path, O_RDONLY | O_CLOEXEC);
 	if (fd < 0) {
 		pr_perror("failed to open %s", path);
@@ -80,10 +80,11 @@ int close_namespaces(int *ns_fds)
 
 int open_namespaces(pid_t pid, int *ns_fds)
 {
-	int err, ns_type;
+	int err;
+	nstype_t ns_type;
 
 	for (ns_type = NS_UTS; ns_type < NS_MAX; ns_type++) {
-		err = open_ns(pid, ns_names[ns_type]);
+		err = open_ns(pid, ns_type);
 		if (err < 0)
 			goto close_saved_fd;
 		ns_fds[ns_type] = err;
