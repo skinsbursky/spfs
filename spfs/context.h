@@ -39,6 +39,8 @@ struct spfs_context_s {
 	struct sockaddr_un	sock_addr;
 	pthread_t		sock_pthread;
 	bool			single_user;
+
+	int			mnt_ns_fd;
 };
 
 int context_init(const char *proxy_dir, spfs_mode_t mode, const char *log_file,

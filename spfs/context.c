@@ -10,6 +10,7 @@
 #include "include/log.h"
 #include "include/socket.h"
 #include "include/futex.h"
+#include "include/namespaces.h"
 
 #include "interface.h"
 #include "context.h"
@@ -318,6 +319,10 @@ int context_init(const char *proxy_dir, spfs_mode_t mode, const char *log_file,
 		pr_crit("failed to open log: %d\n", err);
 		return err;
 	}
+
+	ctx->mnt_ns_fd = open_ns(getpid(), NS_MNT);
+	if (ctx->mnt_ns_fd < 0)
+		return ctx->mnt_ns_fd;
 
 	err = setup_context(ctx, proxy_dir, mode, single_user);
 	if (err) {

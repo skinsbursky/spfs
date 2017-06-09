@@ -24,11 +24,13 @@ bin_spfs_SOURCES =		spfs/main.c			\
 				src/log.c			\
 				src/socket.c			\
 				src/futex.c			\
+				src/namespaces.c		\
 								\
 				include/log.h			\
 				include/socket.h		\
 				include/list.h			\
 				include/util.h			\
+				include/namespaces.h		\
 				include/futex.h
 
 
