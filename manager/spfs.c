@@ -304,7 +304,7 @@ int spfs_send_mode(const struct spfs_info_s *info,
 		pr_err("failed to allocate package\n");
 		return -ENOMEM;
 	}
-	fill_mode_packet(package, mode, proxy_dir);
+	fill_mode_packet(package, mode, proxy_dir, 0);
 
 	err = seqpacket_sock_send(info->sock, package, psize);
 	if (err)

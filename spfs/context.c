@@ -256,16 +256,17 @@ int set_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode,
 	return 0;
 }
 
-int change_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode, const char *path)
+int change_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode,
+		     const char *path, int ns_pid)
 {
-	pr_info("%s: changing work mode from %d to %d (path: %s)\n", __func__, ctx->wm->mode, mode, path);
+	pr_info("%s: changing work mode from %d to %d (path: %s, ns_pid: %d)\n",
+			__func__, ctx->wm->mode, mode, path, ns_pid);
 	if (!stale_work_mode(mode, path)) {
 		pr_info("%s: the mode is already %d\n", __func__, ctx->wm->mode);
 		return 0;
 	}
-	return set_work_mode(ctx, mode, path, 0);
+	return set_work_mode(ctx, mode, path, ns_pid);
 }
-
 
 static int setup_context(struct spfs_context_s *ctx,
 			 const char *proxy_dir, int proxy_mnt_ns_pid,

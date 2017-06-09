@@ -17,7 +17,7 @@ int spfs_execute_cmd(int sock, void *data, void *package, size_t psize)
 	switch (order->cmd) {
 		case SPFS_CMD_SET_MODE:
 			mp = (struct cmd_package_s *)order->ctx;
-			return change_work_mode(ctx, mp->mode, mp->path);
+			return change_work_mode(ctx, mp->mode, mp->path, mp->ns_pid);
 		default:
 			pr_err("%s: unknown cmd: %d\n", __func__, order->cmd);
 			return -1;

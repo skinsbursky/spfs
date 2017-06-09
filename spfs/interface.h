@@ -19,6 +19,7 @@ struct external_cmd {
 
 struct cmd_package_s {
 	spfs_mode_t	mode;
+	int		ns_pid;
 	char		path[0];
 };
 
@@ -30,13 +31,14 @@ static inline size_t mode_packet_size(const char *path)
 }
 
 static inline void fill_mode_packet(struct external_cmd *package, spfs_mode_t mode,
-			const char *path)
+				    const char *path, int ns_pid)
 {
 	struct cmd_package_s *cp = (struct cmd_package_s *)&package->ctx;
 
 	package->cmd = SPFS_CMD_SET_MODE;
 
 	cp->mode = mode;
+	cp->ns_pid = ns_pid;
 	if (path)
 		strcpy(cp->path, path);
 }
