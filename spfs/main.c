@@ -9,6 +9,7 @@
 #include "include/log.h"
 #include "include/util.h"
 #include "include/ipc.h"
+#include "include/namespaces.h"
 
 #include "context.h"
 
@@ -292,6 +293,40 @@ static int mount_fuse(int argc, char **argv,
 	return 0;
 }
 
+static int mount_fuse_ns(int argc, char **argv,
+		         char **mountpoint, int mnt_ns_pid,
+		         int *multithreaded, int *foreground,
+		         struct fuse **fuse)
+{
+	int err, mnt_ns_fd;
+	struct spfs_context_s *ctx = get_context();
+
+	mnt_ns_fd = open_ns(mnt_ns_pid, NS_MNT);
+	if (mnt_ns_fd < 0)
+		return mnt_ns_fd;
+
+	err = set_ns(mnt_ns_fd);
+	if (err)
+		goto close_fd;
+
+	err = mount_fuse(argc, argv, mountpoint,
+			 multithreaded, foreground,
+			 fuse);
+
+	err = set_ns(ctx->mnt_ns_fd);
+	if (err)
+		goto teardown;
+
+close_fd:
+	close(mnt_ns_fd);
+	return err;
+
+teardown:
+	fuse_teardown(*fuse, *mountpoint);
+	goto close_fd;
+
+}
+
 int main(int argc, char *argv[])
 {
 	char *proxy_dir = NULL;
@@ -302,7 +337,7 @@ int main(int argc, char *argv[])
 	bool single_user = false;
 	int mnt_ns_pid;
 	spfs_mode_t mode = SPFS_STUB_MODE;
-	struct fuse *fuse;
+	struct fuse *fuse = NULL;
 
 	if (parse_options(&argc, &argv, &proxy_dir, &mode, &log_file,
 			  &socket_path, &verbosity, &root, &ready_fd,
@@ -329,12 +364,13 @@ int main(int argc, char *argv[])
 	pr_debug("%s: root        : %s\n", __func__, root);
 	pr_debug("%s: verbosity   : +%d\n", __func__, verbosity);
 
-	err = mount_fuse(argc, argv, &mountpoint,
-			 &multithreaded, &foreground,
-			 &fuse);
+	err = mount_fuse_ns(argc, argv,
+			    &mountpoint, mnt_ns_pid,
+			    &multithreaded, &foreground,
+			    &fuse);
 	if (err) {
 		pr_err("failed to mount fuse\n");
-		return err;
+		goto destroy_context;
 	}
 
 	err = -1;
@@ -370,6 +406,7 @@ int main(int argc, char *argv[])
 
 teardown:
 	fuse_teardown(fuse, mountpoint);
+destroy_context:
 	context_fini();
 	return (err == -1) ? 1 : 0;
 }
