@@ -485,7 +485,8 @@ static int __do_replace_spfs_mounts(struct spfs_info_s *info, const char *source
 		}
 	}
 
-	err = spfs_send_mode(info, SPFS_PROXY_MODE, mnt->mountpoint, info->ns_pid);
+	err = spfs_send_mode(info, SPFS_PROXY_MODE,
+			     mnt->ns_mountpoint, info->ns_pid);
 	if (!err)
 		(void) umount_target(source);
 
@@ -515,7 +516,7 @@ static int do_replace_spfs_resources(struct spfs_info_s *info)
 
 	return __replace_resources(info->fg, info->ns_fds, NULL,
 				   mnt->st.st_dev, info->mnt_ref,
-				   mnt->mountpoint);
+				   mnt->ns_mountpoint);
 }
 
 static int do_replace_spfs(struct spfs_info_s *info, const char *source)
