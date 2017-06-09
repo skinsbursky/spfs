@@ -31,6 +31,18 @@ int open_ns(pid_t pid, nstype_t ns_type)
 	return fd;
 }
 
+int set_ns(int ns_fd)
+{
+	int err;
+
+	err = setns(ns_fd, 0);
+	if (err) {
+		pr_perror("failed to set ns by fd %d", ns_fd);
+		return -errno;
+	}
+	return 0;
+}
+
 int set_namespaces(const int *ns_fds, unsigned ns_mask)
 {
 	int ns_type, err = 0;
@@ -53,11 +65,9 @@ int set_namespaces(const int *ns_fds, unsigned ns_mask)
 			continue;
 		}
 
-		err = setns(ns_fds[ns_type], 0);
-		if (err) {
-			pr_perror("failed to set ns by fd %d", ns_fds[ns_type]);
+		err = set_ns(ns_fds[ns_type]);
+		if (err)
 			break;
-		}
 	}
 	return err;
 }
