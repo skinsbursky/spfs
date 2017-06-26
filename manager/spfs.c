@@ -403,9 +403,9 @@ int spfs_prepare_env(struct spfs_info_s *info, const char *proxy_dir)
 	return err ? err : res;
 }
 
-static int __spfs_cleanup_env(struct spfs_info_s *info)
+static int __spfs_cleanup_env(struct spfs_info_s *info, bool killed)
 {
-	if (umount(info->work_dir)) {
+	if (killed && umount(info->work_dir)) {
 		pr_perror("failed to umount %s", info->work_dir);
 		return -errno;
 	}
@@ -417,7 +417,7 @@ static int __spfs_cleanup_env(struct spfs_info_s *info)
 	return 0;
 }
 
-int spfs_cleanup_env(struct spfs_info_s *info)
+int spfs_cleanup_env(struct spfs_info_s *info, bool killed)
 {
 	int err, res;
 
@@ -425,7 +425,7 @@ int spfs_cleanup_env(struct spfs_info_s *info)
 	if (res)
 		return res;
 
-	err = __spfs_cleanup_env(info);
+	err = __spfs_cleanup_env(info, killed);
 
 	res = leave_spfs_context(info, NS_MNT_MASK);
 
@@ -815,7 +815,7 @@ int umount_spfs(struct spfs_info_s *info)
 		err = -errno;
 	}
 	if (!err)
-		err = __spfs_cleanup_env(info);
+		err = __spfs_cleanup_env(info, true);
 
 	res = leave_spfs_context(info, NS_MNT_MASK);
 
