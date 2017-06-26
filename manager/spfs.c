@@ -454,13 +454,18 @@ static int do_replace_one_spfs(const char *source, const char *target)
 	return 0;
 }
 
-static int umount_target(const char *mnt)
+static int cleanup_mountpoint(const char *mnt)
 {
 	pr_info("unmounting %s\n", mnt);
 
 	if (umount2(mnt, MNT_DETACH)) {
 		pr_perror("failed to umount %s", mnt);
-		return -1;
+		return -errno;
+	}
+
+	if (rmdir(mnt)) {
+		pr_perror("failed to remove directory %s", mnt);
+		return -errno;
 	}
 	return 0;
 }
@@ -488,7 +493,7 @@ static int __do_replace_spfs_mounts(struct spfs_info_s *info, const char *source
 	err = spfs_send_mode(info, SPFS_PROXY_MODE,
 			     mnt->ns_mountpoint, info->ns_pid);
 	if (!err)
-		(void) umount_target(source);
+		(void) cleanup_mountpoint(source);
 
 unlock_shared_list:
 	(void) unlock_shared_list(&info->mountpaths);
