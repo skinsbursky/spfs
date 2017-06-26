@@ -67,7 +67,7 @@ int replace_spfs(int sock, struct spfs_info_s *info,
 		  const char *mountflags, const void *options);
 
 int spfs_prepare_env(struct spfs_info_s *info, const char *proxy_dir);
-int spfs_cleanup_env(struct spfs_info_s *info);
+int spfs_cleanup_env(struct spfs_info_s *info, bool killed);
 
 int spfs_apply_replace_mode(struct spfs_info_s *info, spfs_replace_mode_t mode);
 
