@@ -321,27 +321,32 @@ static int mount_fuse_ns(int argc, char **argv,
 		         int *multithreaded, int *foreground,
 		         struct fuse **fuse)
 {
-	int err, mnt_ns_fd;
+	int err, mnt_ns_fd = -1;
 	struct spfs_context_s *ctx = get_context();
 
-	mnt_ns_fd = open_ns(mnt_ns_pid, NS_MNT);
-	if (mnt_ns_fd < 0)
-		return mnt_ns_fd;
+	if (mnt_ns_pid) {
+		mnt_ns_fd = open_ns(mnt_ns_pid, NS_MNT);
+		if (mnt_ns_fd < 0)
+			return mnt_ns_fd;
 
-	err = set_ns(mnt_ns_fd);
-	if (err)
-		goto close_fd;
+		err = set_ns(mnt_ns_fd);
+		if (err)
+			goto close_fd;
+	}
 
 	err = mount_fuse(argc, argv, mountpoint,
 			 multithreaded, foreground,
 			 fuse);
 
-	err = set_ns(ctx->mnt_ns_fd);
-	if (err)
-		goto teardown;
+	if (mnt_ns_fd >= 0) {
+		err = set_ns(ctx->mnt_ns_fd);
+		if (err)
+			goto teardown;
+	}
 
 close_fd:
-	close(mnt_ns_fd);
+	if (mnt_ns_fd >= 0)
+		close(mnt_ns_fd);
 	return err;
 
 teardown:
