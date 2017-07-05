@@ -484,14 +484,16 @@ void context_fini(void)
 
 	pr_info("shutting down context\n");
 
-	err = pthread_cancel(ctx->sock_pthread);
-	if (!err) {
-		err = pthread_join(ctx->sock_pthread, &res);
-		if (err)
-			pr_err("failed to join socket thread: %d\n", err);
-	} else
-		pr_err("failed to kill socket thread: %d\n", err);
+	if (ctx->sock_pthread) {
+		err = pthread_cancel(ctx->sock_pthread);
+		if (!err) {
+			err = pthread_join(ctx->sock_pthread, &res);
+			if (err)
+				pr_err("failed to join socket thread: %d\n", err);
+		} else
+			pr_err("failed to kill socket thread: %d\n", err);
+	}
 
-	if (close(ctx->packet_socket))
+	if (ctx->packet_socket && close(ctx->packet_socket))
 		pr_perror("failed to close pthread socket");
 }
