@@ -220,7 +220,7 @@ static int configure(struct spfs_manager_context_s *ctx)
 
 static void help(const char *program)
 {
-	printf("usage: %s [options] mountpoint\n", program);
+	printf("usage: %s [options]\n", program);
 	printf("\n");
 	printf("general options:\n");
 	printf("\t-w   --work-dir        working directory\n");
