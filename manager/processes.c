@@ -1114,6 +1114,21 @@ destroy_process_fds:
 	return err;
 }
 
+static int cmp_pid(struct process_info *p, int dir,
+		   const char *dentry, const void *data)
+{
+	return p->pid == atoi(dentry);
+}
+
+static bool task_is_thread(struct process_info *p)
+{
+	/* Here is checked whether process pid can be found in /proc.
+	 * Note: this works only when readdir is used. Any real access to
+	 * thread proc dentry will succeed.
+	 */
+	return iterate_dir_name("/proc", p, cmp_pid, NULL) > 0 ? false : true;
+}
+
 int examine_processes(struct list_head *collection,
 		      const struct replace_info_s *ri)
 {
@@ -1121,6 +1136,9 @@ int examine_processes(struct list_head *collection,
 	int err;
 
 	list_for_each_entry_safe(p, tmp, collection, list) {
+		if (task_is_thread(p))
+			continue;
+
 		err = examine_one_process(p, ri);
 		if (err)
 			return err;
