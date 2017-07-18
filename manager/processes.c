@@ -668,8 +668,7 @@ static int examine_process_fd(struct process_info *p, int dir,
 static int iterate_dir_name(const char *dpath, struct process_info *p,
 		    int (*actor)(struct process_info *p, int dir,
 				 const char *fd, const void *data),
-		    const void *data,
-		    const char *actor_name)
+		    const void *data)
 {
 	struct dirent *dt;
 	DIR *fdir;
@@ -696,11 +695,8 @@ static int iterate_dir_name(const char *dpath, struct process_info *p,
 			continue;
 
 		err = actor(p, dir, fd, data);
-		if (err) {
-			pr_err("actor '%s' for %s/%s failed\n",
-					actor_name, dpath, fd);
+		if (err)
 			break;
-		}
 	}
 
 close_dir:
@@ -714,7 +710,7 @@ static int collect_process_open_fds(struct process_info *p,
 	char dpath[PATH_MAX];
 
 	snprintf(dpath, PATH_MAX, "/proc/%d/fd", p->pid);
-	return iterate_dir_name(dpath, p, examine_process_fd, ri, "examine_process_fd");
+	return iterate_dir_name(dpath, p, examine_process_fd, ri);
 }
 
 struct open_path_collect_s {
