@@ -106,6 +106,7 @@ static int do_mount(const char *source, const char *mnt,
 		case EPROTONOSUPPORT:
 		case EPERM:
 		case ETIMEDOUT:
+		case ECONNREFUSED:
 			pr_warn("failed to mount %s to %s: %s\n", fstype, mnt,
 					strerror(errno));
 			return -EAGAIN;
