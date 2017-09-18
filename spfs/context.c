@@ -68,11 +68,23 @@ const struct work_mode_s *ctx_work_mode(void)
 int wait_mode_change(int current_mode)
 {
 	int err;
+	const struct timespec timeout = {
+		.tv_sec = 0,
+		.tv_nsec = 100000000, // 100ms
+	};
 
-	err = futex_wait(&get_context()->wm->mode, current_mode, NULL);
-	if (err)
-		return err;
-	return -ERESTARTSYS;
+	while (!fuse_interrupted()) {
+		err = futex_wait(&get_context()->wm->mode, current_mode, &timeout);
+		/* Work mode wait changed */
+		if (!err)
+			return -ERESTARTSYS;
+		/* Handle error */
+		if (err != -ETIMEDOUT)
+			return err;
+		/* Timeout reached */
+	}
+	/* System call was interrupted */
+	return -EINTR;
 }
 
 static int wake_mode_waiters(struct work_mode_s *wm)
