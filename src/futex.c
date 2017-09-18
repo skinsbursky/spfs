@@ -15,7 +15,8 @@ int futex_op(int *uaddr, int op, int val, const struct timespec *timeout,
 			                 int *uaddr2, int val3)
 {
 	if (syscall(SYS_futex, uaddr, op, val, timeout, uaddr2, val3) < 0) {
-		pr_perror("SyS_futex failed");
+		if (errno != ETIMEDOUT)
+			pr_perror("SyS_futex failed");
 		return -errno;
 	}
 	return 0;
