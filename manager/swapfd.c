@@ -1,3 +1,5 @@
+#include "spfs_config.h"
+
 #include <sys/sendfile.h>
 #include <sys/socket.h>
 #include <sys/un.h>
