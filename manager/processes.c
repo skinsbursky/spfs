@@ -57,6 +57,9 @@ int seize_processes(struct list_head *processes)
 
 static int detach_from_process(const struct process_info *p)
 {
+	if (p->orig_st == TASK_UNDEF)
+		return 0;
+
 	if (detach_from_task(p->pid, p->orig_st)) {
 		pr_err("failed to detach from process %d\n", p->pid);
 		return -EPERM;
