@@ -1152,7 +1152,7 @@ static int parse_pid_status(pid_t pid, struct proc_status_creds *cr)
 
 	fp = fopen(path, "r");
 	if (!fp) {
-		pr_perror("Can't open proc status");
+		pr_perror("Can't open %s", path);
 		return -1;
 	}
 
