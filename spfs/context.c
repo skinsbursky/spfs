@@ -259,6 +259,7 @@ static int create_work_mode(spfs_mode_t mode,
 		new->proxy_dir_fd = open_proxy_directory(new->proxy_dir, mnt_ns_pid);
 		if (new->proxy_dir_fd < 0) {
 			err = new->proxy_dir_fd;
+			pr_perror("%s: failed to open proxy_dir %s", __func__);
 			goto free_proxy_dir;
 		}
 	}
@@ -344,8 +345,10 @@ int set_work_mode(struct spfs_context_s *ctx, spfs_mode_t mode,
 		case SPFS_PROXY_MODE:
 		case SPFS_STUB_MODE:
 			err = create_work_mode(mode, path, mnt_ns_pid, &new_wm);
-			if (err)
+			if (err) {
+				pr_err("%s: failed to create wm\n", __func__);
 				return err;
+			}
 
 			err = pthread_mutex_lock(&ctx->wm_lock);
 			if (err) {
