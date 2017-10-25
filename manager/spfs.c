@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <sys/xattr.h>
 #include <limits.h>
+#include <stdbool.h>
 
 #include "include/log.h"
 #include "include/util.h"
@@ -667,6 +668,7 @@ int spfs_apply_replace_mode(struct spfs_info_s *info, spfs_replace_mode_t mode)
 
 static int exec_spfs(int pipe, const struct spfs_info_s *info, const char *mode,
 		     const char *proxy_dir, const char *socket_path, const char *log_path,
+		     bool no_readahead,
 		     const char *mountpoint)
 {
 	const char *spfs = FS_NAME;
@@ -689,6 +691,8 @@ static int exec_spfs(int pipe, const struct spfs_info_s *info, const char *mode,
 		options = add_exec_options(options, "--root", info->root, NULL);
 	if (options && proxy_dir)
 		options = add_exec_options(options, "--proxy-dir", proxy_dir, NULL);
+	if (options && no_readahead)
+		options = add_exec_options(options, "-o", "max_readahead=0", NULL);
 	if (options && info->ns_pid) {
 		char pid[32];
 
@@ -714,6 +718,7 @@ int do_mount_spfs(struct spfs_info_s *info, const char *log_dir,
 {
 	char *cwd, *socket_path, *log_path, *mountpoint, *dir;
 	int err = -ENOMEM;
+	bool no_readahead = false;
 
 	cwd = get_current_dir_name();
 	if (!cwd) {
@@ -738,6 +743,7 @@ int do_mount_spfs(struct spfs_info_s *info, const char *log_dir,
 	else {
 		mode = "proxy";
 		dir = xsprintf("%s/restore", info->work_dir);
+		no_readahead = true;
 	}
 	if (!dir) {
 		pr_perror("failed to allocate\n");
@@ -748,8 +754,8 @@ int do_mount_spfs(struct spfs_info_s *info, const char *log_dir,
 	if (err)
 		goto free_proxy_dir;
 
-	err = exec_spfs(pipe_fd, info, mode,
-			dir, socket_path, log_path, mountpoint);
+	err = exec_spfs(pipe_fd, info, mode, dir, socket_path, log_path,
+			no_readahead, mountpoint);
 
 free_proxy_dir:
 	free(dir);
