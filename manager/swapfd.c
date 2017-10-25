@@ -121,7 +121,9 @@ static bool pages_equal(int fd1, unsigned long addr1, int fd2, unsigned long add
 		unsigned long *ptr2 = (unsigned long *)(buf2 + count);
 
 		if (*ptr1 != *ptr2)
-			pr_err("Values with offset %x do not match: %016lx != %016lx\n", count, *ptr1, *ptr2);
+			pr_err("Values with offset %x do not match: "
+				"%016lx (%#lx) != %016lx (%#lx)\n", count,
+				*ptr1, addr1 + count, *ptr2, addr2 + count);
 
 		count += sizeof(unsigned long);
 	}
@@ -238,8 +240,9 @@ static int copy_private_content(struct parasite_ctl *ctl, unsigned long to,
 		count = PAGE_SIZE;
 
 		if (map[copied/PAGE_SIZE] & (PME_PRESENT|PME_SWAP)) {
-			pr_debug("            copy %lx-%lx (%s)\n", from + copied,
-					from + copied + count,
+			pr_debug("            copy %#lx-%#lx to %#lx-%#lx (%s)\n",
+					from + copied, from + copied + count,
+					to + copied, to + copied + count,
 					(map[copied/PAGE_SIZE] & PME_PRESENT) ?
 					"PME_PRESENT" : "PME_SWAP");
 
@@ -251,6 +254,14 @@ static int copy_private_content(struct parasite_ctl *ctl, unsigned long to,
 			if (count != pwrite(dst, buf, count, to + copied)) {
 				pr_perror("Can't write to tracee's memory");
 				goto out;
+			}
+			if (!equal_mappings(ctl->pid, from + copied,
+						to + copied, count)) {
+				pr_err(" (!) Mappings %#lx-%#lx and %#lx-%#lx "
+					"are different\n",
+					from + copied, from + copied + count,
+					to + copied, to + copied + count);
+		//		return -1;
 			}
 		}
 		copied += count;
@@ -287,8 +298,8 @@ static int move_map(struct parasite_ctl *ctl,
 		return -1;
 	}
 
-	pr_debug("        mmap to replace %lx: len=%lx, prot=%x, flags=%x, off=%lx\n",
-		 start, length, prot, flags, pgoff);
+	pr_debug("        mmap to replace %lx-%lx, prot=%x, flags=%x, off=%lx\n",
+		 start, start + length, prot, flags, pgoff);
 
 	addr = (unsigned long)mmap_seized(ctl, 0, length, prot, flags, dst_fd, pgoff);
 	if (!addr) {
@@ -300,12 +311,6 @@ static int move_map(struct parasite_ctl *ctl,
 		ret = copy_private_content(ctl, addr, start, length);
 		if (ret)
 			return -1;
-	}
-
-	if (!equal_mappings(ctl->pid, addr, start, length)) {
-		pr_err("Mappings %#lx-%#lx and %#lx-%#lx are different\n",
-				addr, addr + length, start, start + length);
-//		return -1;
 	}
 
 	flags = MREMAP_FIXED | MREMAP_MAYMOVE;
