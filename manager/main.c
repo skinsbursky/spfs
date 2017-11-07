@@ -23,6 +23,9 @@ int main(int argc, char *argv[])
 		pr_info("Move itself to VE#%s\n", mgr_ovz_id());
 		if (move_to_cgroup("ve/", mgr_ovz_id()))
 			return -1;
+		pr_info("Move itself to freezer root cgroup\n");
+		if (move_to_cgroup("freezer", "/"))
+			return -1;
 	}
 
 	if (ctx->daemonize) {
