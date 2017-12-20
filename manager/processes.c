@@ -509,7 +509,7 @@ static int get_fd_info(struct process_info *p, int dir,
 	}
 
 	if (fstat(fdi->local_fd, &fdi->st)) {
-		pr_perror("failed to stat fd %d", fdi->local_fd);
+		pr_perror("failed to stat /proc/self/fd/%d", fdi->local_fd);
 		err = -errno;
 		goto close_local_fd;
 	}
@@ -546,8 +546,11 @@ static int get_fd_info(struct process_info *p, int dir,
 					ri->source_mnt, ri->target_mnt);
 
 close_local_fd:
-	if (err)
+	if (err) {
 		close(fdi->local_fd);
+		pr_err("failed to get /proc/%d/fd/%d ---> %s\n",
+					p->pid, fdi->process_fd, fdi->path);
+	}
 	return err;
 }
 
@@ -659,12 +662,23 @@ static int examine_process_fd(struct process_info *p, int dir,
 
 	err = get_fd_info(p, dir, process_fd, ri, &fdi);
 	if (err)
-		return err;
+		goto error;
 
 	if (is_mnt_fd(&fdi, ri))
 		err = collect_process_fd(p, ri, &fdi);
 
 	put_fd_info(&fdi);
+
+	if (err) {
+		pr_err("failed to collect process %d fd %d\n",
+				p->pid, fdi.process_fd);
+		goto error;
+	}
+
+	return 0;
+
+error:
+	pr_err("failed to examine process %d\n", p->pid);
 	return err;
 }
 
