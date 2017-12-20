@@ -191,7 +191,7 @@ static int attach_to_process(const struct process_info *p)
 }
 
 static bool is_mnt_file(int dir, const char *dentry,
-			const char *source_mnt, dev_t device)
+			const struct replace_info_s *ri)
 {
 	struct stat st;
 	ssize_t bytes;
@@ -200,7 +200,7 @@ static bool is_mnt_file(int dir, const char *dentry,
 	 * This is required to be able to switch between 2 different mounts
 	 * with the same superblock.
 	 */
-	if (source_mnt) {
+	if (ri->source_mnt) {
 		char link[PATH_MAX];
 
 		bytes = readlinkat(dir, dentry, link, PATH_MAX - 1);
@@ -209,10 +209,10 @@ static bool is_mnt_file(int dir, const char *dentry,
 			return -errno;
 		}
 
-		if (strncmp(link, source_mnt, strlen(source_mnt)))
+		if (strncmp(link, ri->source_mnt, strlen(ri->source_mnt)))
 			return false;
 
-		if (link[strlen(source_mnt)] != '/')
+		if (link[strlen(ri->source_mnt)] != '/')
 			return false;
 	}
 
@@ -226,7 +226,7 @@ static bool is_mnt_file(int dir, const char *dentry,
 		}
 		return false;
 	}
-	return st.st_dev == device;
+	return st.st_dev == ri->src_dev;
 }
 
 static int pid_is_kthread(pid_t pid)
@@ -830,7 +830,7 @@ static bool is_mnt_map(int dir,
 	char path[PATH_MAX];
 
 	snprintf(path, PATH_MAX, "%lx-%lx", start, end);
-	return is_mnt_file(dir, path, ri->source_mnt, ri->src_dev);
+	return is_mnt_file(dir, path, ri);
 }
 
 static int map_prot(char r, char w, char x)
@@ -979,7 +979,7 @@ static int collect_process_exe(struct process_info *p,
 		return -errno;
 	}
 
-	mnt_exe = is_mnt_file(dir, "exe", ri->source_mnt, ri->src_dev);
+	mnt_exe = is_mnt_file(dir, "exe", ri);
 
 	close(dir);
 
@@ -1037,8 +1037,8 @@ static int collect_process_cwd_root(struct process_info *p,
 		return -errno;
 	}
 
-	mnt_cwd = is_mnt_file(dir, "cwd", ri->source_mnt, ri->src_dev);
-	mnt_root = is_mnt_file(dir, "root", ri->source_mnt, ri->src_dev);
+	mnt_cwd = is_mnt_file(dir, "cwd", ri);
+	mnt_root = is_mnt_file(dir, "root", ri);
 
 	close(dir);
 
