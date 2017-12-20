@@ -22,13 +22,14 @@
 #include "link_remap.h"
 
 struct fd_info_s {
-	int             process_fd;
+	int		process_fd;
 	int		local_fd;
-	struct stat     st;
-	unsigned        flags;
+	struct stat	st;
+	unsigned	flags;
+	int		mnt_id;
 	long long	pos;
-	char            path[PATH_MAX];
-	char            cwd[PATH_MAX];
+	char		path[PATH_MAX];
+	char		cwd[PATH_MAX];
 };
 
 static int seize_one_process(struct process_info *p)
@@ -449,14 +450,14 @@ static int copy_process_fd(struct process_info *p, int fd)
 	return recv_fd(p->pctl, false);
 }
 
-static int parse_fdinfo(pid_t pid, int fd, unsigned *flags, long long *pos)
+static int parse_fdinfo(pid_t pid, struct fd_info_s *fdi)
 {
 	char path[PATH_MAX];
 	FILE *fdinfo;
 	char buf[64];
 	int err = 0;
 
-	snprintf(path, PATH_MAX, "/proc/%d/fdinfo/%d", pid, fd);
+	snprintf(path, PATH_MAX, "/proc/%d/fdinfo/%d", pid, fdi->process_fd);
 
 	fdinfo = fopen(path, "r");
 	if (!fdinfo) {
@@ -466,12 +467,17 @@ static int parse_fdinfo(pid_t pid, int fd, unsigned *flags, long long *pos)
 
 	while (fgets(buf, 64, fdinfo) != NULL) {
 		if (!strncmp(buf, "flags:\t", strlen("flags:\t"))) {
-			if (sscanf(buf + strlen("flags:\t"), "%o", flags) != 1) {
+			if (sscanf(buf + strlen("flags:\t"), "%o", &fdi->flags) != 1) {
 				pr_err("failed to sscanf '%s'\n", buf);
 				err = -EINVAL;
 			}
 		} else if (!strncmp(buf, "pos:\t", strlen("pos:\t"))) {
-			if (sscanf(buf + strlen("pos:\t"), "%lli", pos) != 1) {
+			if (sscanf(buf + strlen("pos:\t"), "%lli", &fdi->pos) != 1) {
+				pr_err("failed to sscanf '%s'\n", buf);
+				err = -EINVAL;
+			}
+		} else if (!strncmp(buf, "mnt_id:\t", strlen("mnt_id:\t"))) {
+			if (sscanf(buf + strlen("mnt_id:\t"), "%i", &fdi->mnt_id) != 1) {
 				pr_err("failed to sscanf '%s'\n", buf);
 				err = -EINVAL;
 			}
@@ -523,7 +529,7 @@ static int get_fd_info(struct process_info *p, int dir,
 		goto close_local_fd;
 	}
 
-	err = parse_fdinfo(p->pid, fdi->process_fd, &fdi->flags, &fdi->pos);
+	err = parse_fdinfo(p->pid, fdi);
 	if (err) {
 		pr_err("failed to get fd flags for /proc/%d/fd/%d", p->pid,
 				fdi->process_fd);
