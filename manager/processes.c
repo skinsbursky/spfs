@@ -190,31 +190,30 @@ static int attach_to_process(const struct process_info *p)
 	return 0;
 }
 
-static bool is_mnt_file(int dir, const char *dentry,
-			const struct replace_info_s *ri)
+static bool is_mnt_file_by_id(int dir, const char *dentry,
+			      int mnt_id)
+{
+	int fd, fd_mnt_id;
+
+	fd = openat(dir, dentry, O_RDONLY);
+	if (fd < 0) {
+		pr_perror("failed to open dentry %d", dentry);
+		return false;
+	}
+
+	fd_mnt_id = pid_fd_mnt_id(getpid(), fd);
+	close(fd);
+	if (fd_mnt_id < 0) {
+		pr_err("failed to fd %d mount id: %d\n", fd, fd_mnt_id);
+		return false;
+	}
+	return fd_mnt_id == mnt_id;
+}
+
+static bool is_mnt_file_by_dev(int dir, const char *dentry,
+			       dev_t device)
 {
 	struct stat st;
-	ssize_t bytes;
-
-	/* First check, that link points to the desired mount (if any).
-	 * This is required to be able to switch between 2 different mounts
-	 * with the same superblock.
-	 */
-	if (ri->source_mnt) {
-		char link[PATH_MAX];
-
-		bytes = readlinkat(dir, dentry, link, PATH_MAX - 1);
-		if (bytes < 0) {
-			pr_perror("failed to read link %s", dentry);
-			return -errno;
-		}
-
-		if (strncmp(link, ri->source_mnt, strlen(ri->source_mnt)))
-			return false;
-
-		if (link[strlen(ri->source_mnt)] != '/')
-			return false;
-	}
 
 	if (fstatat(dir, dentry, &st, 0)) {
 		switch (errno) {
@@ -226,7 +225,15 @@ static bool is_mnt_file(int dir, const char *dentry,
 		}
 		return false;
 	}
-	return st.st_dev == ri->src_dev;
+	return st.st_dev == device;
+}
+
+static bool is_mnt_file(int dir, const char *dentry,
+			const struct replace_info_s *ri)
+{
+	if (ri->src_mnt_id != -1)
+		return is_mnt_file_by_id(dir, dentry, ri->src_mnt_id);
+	return is_mnt_file_by_dev(dir, dentry, ri->src_dev);
 }
 
 static int pid_is_kthread(pid_t pid)
@@ -585,18 +592,8 @@ static int is_mnt_fd(const struct fd_info_s *fdi, const struct replace_info_s *r
 		return false;
 	}
 
-	/* First check, that link points to the desired mount (if any).
-	 * This is required to be able to switch between 2 different mounts
-	 * with the same superblock.
-	 */
-	if (ri->source_mnt) {
-		if (strncmp(fdi->path, ri->source_mnt, strlen(ri->source_mnt)))
-			return false;
-
-		if (fdi->path[strlen(ri->source_mnt)] != '/')
-			return false;
-	}
-
+	if (ri->src_mnt_id != -1 )
+		return fdi->mnt_id == ri->src_mnt_id;
 	return fdi->st.st_dev == ri->src_dev;
 }
 
