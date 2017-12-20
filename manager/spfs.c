@@ -522,7 +522,8 @@ static int do_replace_spfs_resources(struct spfs_info_s *info)
 	struct mount_info_s *mnt = &info->mnt;
 
 	return __replace_resources(info->fg, info->ns_fds, NULL,
-				   mnt->st.st_dev, info->mnt_ref,
+				   mnt->st.st_dev,
+				   info->mnt_ref, info->mnt_id,
 				   mnt->ns_mountpoint);
 }
 

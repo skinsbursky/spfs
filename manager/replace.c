@@ -79,13 +79,15 @@ free_pids:
 }
 
 int __replace_resources(struct freeze_cgroup_s *fg, int *ns_fds,
-		      const char *source_mnt, dev_t src_dev, int src_mnt_ref,
+		      const char *source_mnt, dev_t src_dev,
+		      int src_mnt_ref, int src_mnt_id,
 		      const char *target_mnt)
 {
 	int err, status = 0, pid;
 	struct replace_info_s ri = {
 		.src_dev = src_dev,
 		.src_mnt_ref = src_mnt_ref,
+		.src_mnt_id = src_mnt_id,
 		.source_mnt = source_mnt,
 		.target_mnt = target_mnt,
 	};
@@ -120,7 +122,7 @@ int replace_resources(struct freeze_cgroup_s *fg,
 		      const char *target_mnt,
 		      pid_t ns_pid)
 {
-	int res = 0, err, src_mnt_ref = -1;
+	int res = 0, err, src_mnt_ref = -1, src_mnt_id = -1;
 	int ct_ns_fds[NS_MAX], *ns_fds = NULL;
 
 	if (ns_pid) {
@@ -139,6 +141,14 @@ int replace_resources(struct freeze_cgroup_s *fg,
 			pr_perror("failed to open %s", source_mnt);
 			goto close_ns_fds;
 		}
+
+		src_mnt_id = pid_fd_mnt_id(getpid(), src_mnt_ref);
+		if (src_mnt_id < 0) {
+			pr_err("failed to %s mount ID: %d\n",
+					source_mnt, src_mnt_id);
+			err = src_mnt_id;
+			goto close_ns_fds;
+		}
 	}
 
 	err = lock_cgroup(fg);
@@ -149,7 +159,8 @@ int replace_resources(struct freeze_cgroup_s *fg,
 	if (err)
 		goto unlock_cgroup;
 
-	err = __replace_resources(fg, ns_fds, source_mnt, src_dev, src_mnt_ref,
+	err = __replace_resources(fg, ns_fds, source_mnt, src_dev,
+				  src_mnt_ref, src_mnt_id,
 				  target_mnt);
 
 	res = thaw_cgroup(fg);

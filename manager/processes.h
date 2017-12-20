@@ -8,6 +8,7 @@
 struct replace_info_s {
 	dev_t			src_dev;
 	int			src_mnt_ref;
+	int			src_mnt_id;
 	const char		*source_mnt;
 	const char		*target_mnt;
 };
