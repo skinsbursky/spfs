@@ -489,6 +489,20 @@ static int parse_fdinfo(pid_t pid, struct fd_info_s *fdi)
 	return err;
 }
 
+int pid_fd_mnt_id(pid_t pid, int fd)
+{
+	int err;
+	struct fd_info_s fdi = {
+		.process_fd = fd,
+	};
+
+	err = parse_fdinfo(pid, &fdi);
+	if (err)
+		return err;
+
+	return fdi.mnt_id;
+}
+
 static void put_fd_info(struct fd_info_s *fdi)
 {
 	close(fdi->local_fd);

@@ -88,4 +88,6 @@ struct process_info {
 int fixup_source_path(char *source_path, size_t source_size,
 		      const char *source_mnt, const char *target_mnt);
 
+int pid_fd_mnt_id(pid_t pid, int fd);
+
 #endif

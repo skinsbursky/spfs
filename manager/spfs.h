@@ -42,6 +42,7 @@ struct spfs_info_s {
 	spfs_replace_mode_t	mode __attribute__((aligned(sizeof(int))));
 	int			replacer;
 	int			mnt_ref;
+	int			mnt_id;
 };
 
 int create_spfs_info(const char *id,

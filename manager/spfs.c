@@ -22,6 +22,7 @@
 #include "replace.h"
 #include "cgroup.h"
 #include "context.h"
+#include "processes.h"
 
 int create_spfs_info(const char *id,
 		     const char *mountpoint, const char *ns_mountpoint,
@@ -797,6 +798,12 @@ int update_spfs_info(struct spfs_info_s *info)
 	if (info->mnt_ref < 0) {
 		pr_perror("failed to open %s", mnt->mountpoint);
 		err = -errno;
+	}
+
+	info->mnt_id = pid_fd_mnt_id(getpid(), info->mnt_ref);
+	if (info->mnt_id < 0) {
+		pr_perror("failed to get spfs %s mount ID %s", mnt->id);
+		err = info->mnt_id;
 	}
 
 set_orig_ns:
