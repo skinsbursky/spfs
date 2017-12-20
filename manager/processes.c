@@ -501,6 +501,15 @@ static int get_fd_info(struct process_info *p, int dir,
 		return err;
 	}
 
+	snprintf(fdi->path, PATH_MAX, "/proc/%d/fd/%d", p->pid, fdi->process_fd);
+	bytes = readlink(fdi->path, fdi->path, PATH_MAX - 1);
+	if (bytes < 0) {
+		pr_perror("failed to read link %s\n", fdi->path);
+		err = -errno;
+		goto close_local_fd;
+	}
+	fdi->path[bytes] = '\0';
+
 	fdi->local_fd = copy_process_fd(p, fdi->process_fd);
 	if (fdi->local_fd < 0) {
 		pr_err("failed to copy /proc/%d/fd/%d ---> %s\n",
@@ -520,15 +529,6 @@ static int get_fd_info(struct process_info *p, int dir,
 				fdi->process_fd);
 		goto close_local_fd;
 	}
-
-	snprintf(fdi->path, PATH_MAX, "/proc/%d/fd/%d", p->pid, fdi->process_fd);
-	bytes = readlink(fdi->path, fdi->path, PATH_MAX - 1);
-	if (bytes < 0) {
-		pr_perror("failed to read link %s\n", fdi->path);
-		err = -errno;
-		goto close_local_fd;
-	}
-	fdi->path[bytes] = '\0';
 
 	if (S_ISSOCK(fdi->st.st_mode)) {
 		snprintf(fdi->cwd, PATH_MAX, "/proc/%d/cwd", p->pid);
