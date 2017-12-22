@@ -200,7 +200,7 @@ static int leave_spfs_context(const struct spfs_info_s *info, int ns_mask)
 {
 	int err;
 
-	err = set_namespaces(mgr_ns_fds(), NS_MNT_MASK);
+	err = set_namespaces(mgr_ns_fds(), ns_mask);
 	if (err)
 		return err;
 
@@ -213,12 +213,15 @@ static int leave_spfs_context(const struct spfs_info_s *info, int ns_mask)
 	return 0;
 }
 
-static int join_spfs_context(const struct spfs_info_s *info, int ns_mask)
+static int join_spfs_context(const struct spfs_info_s *info,
+			     unsigned ns_mask, unsigned *orig_ns_mask)
 {
 	int err;
 
+	*orig_ns_mask = 0;
+
 	if (info->ns_pid) {
-		err = set_namespaces(info->ns_fds, ns_mask);
+		err = join_namespaces(info->ns_fds, ns_mask, orig_ns_mask);
 		if (err)
 			return err;
 	}
@@ -226,7 +229,7 @@ static int join_spfs_context(const struct spfs_info_s *info, int ns_mask)
 	err = spfs_chroot(info);
 
 	if (err && info->ns_pid)
-		(void) leave_spfs_context(info, ns_mask);
+		(void) leave_spfs_context(info, *orig_ns_mask);
 	return err;
 }
 
@@ -393,14 +396,15 @@ rm_info_dir:
 int spfs_prepare_env(struct spfs_info_s *info, const char *proxy_dir)
 {
 	int err, res;
+	unsigned orig_ns_mask;
 
-	res = join_spfs_context(info, NS_MNT_MASK);
+	res = join_spfs_context(info, NS_MNT_MASK, &orig_ns_mask);
 	if (res)
 		return res;
 
 	err = __spfs_prepare_env(info, proxy_dir);
 
-	res = leave_spfs_context(info, NS_MNT_MASK);
+	res = leave_spfs_context(info, orig_ns_mask);
 
 	return err ? err : res;
 }
@@ -422,14 +426,15 @@ static int __spfs_cleanup_env(struct spfs_info_s *info, bool killed)
 int spfs_cleanup_env(struct spfs_info_s *info, bool killed)
 {
 	int err, res;
+	unsigned orig_ns_mask;
 
-	res = join_spfs_context(info, NS_MNT_MASK);
+	res = join_spfs_context(info, NS_MNT_MASK, &orig_ns_mask);
 	if (res)
 		return res;
 
 	err = __spfs_cleanup_env(info, killed);
 
-	res = leave_spfs_context(info, NS_MNT_MASK);
+	res = leave_spfs_context(info, orig_ns_mask);
 
 	return err ? err : res;
 }
@@ -505,14 +510,15 @@ unlock_shared_list:
 static int do_replace_spfs_mounts(struct spfs_info_s *info, const char *source)
 {
 	int err, res;
+	unsigned orig_ns_mask;
 
-	res = join_spfs_context(info, NS_MNT_MASK);
+	res = join_spfs_context(info, NS_MNT_MASK, &orig_ns_mask);
 	if (res)
 		return res;
 
 	err = __do_replace_spfs_mounts(info, source);
 
-	res = leave_spfs_context(info, NS_MNT_MASK);
+	res = leave_spfs_context(info, orig_ns_mask);
 
 	return err ? err : res;
 }
@@ -565,9 +571,11 @@ static int __do_mount_target(struct spfs_info_s *info,
 		long mflags, const void *options)
 {
 	int err, res;
+	unsigned orig_ns_mask;
 
 	res = join_spfs_context(info, NS_MNT_MASK | NS_NET_MASK |
-				      NS_USER_MASK | NS_UTS_MASK);
+				      NS_USER_MASK | NS_UTS_MASK,
+				      &orig_ns_mask);
 	if (res)
 		return res;
 
@@ -776,6 +784,7 @@ int update_spfs_info(struct spfs_info_s *info)
 {
 	struct mount_info_s *mnt = &info->mnt;
 	int err, res;
+	unsigned orig_ns_mask;
 
 	info->sock = seqpacket_sock(info->socket_path, true, false, NULL);
 	if (info->sock < 0) {
@@ -783,7 +792,7 @@ int update_spfs_info(struct spfs_info_s *info)
 		return info->sock;
 	}
 
-	res = join_spfs_context(info, NS_MNT_MASK);
+	res = join_spfs_context(info, NS_MNT_MASK, &orig_ns_mask);
 	if (res)
 		return res;
 
@@ -808,7 +817,7 @@ int update_spfs_info(struct spfs_info_s *info)
 	}
 
 set_orig_ns:
-	res = leave_spfs_context(info, NS_MNT_MASK);
+	res = leave_spfs_context(info, orig_ns_mask);
 
 	return err ? err : res;
 }
@@ -823,8 +832,9 @@ int umount_spfs(struct spfs_info_s *info)
 {
 	struct mount_info_s *mnt = &info->mnt;
 	int err, res;
+	unsigned orig_ns_mask;
 
-	res = join_spfs_context(info, NS_MNT_MASK);
+	res = join_spfs_context(info, NS_MNT_MASK, &orig_ns_mask);
 	if (res)
 		return res;
 
@@ -837,7 +847,7 @@ int umount_spfs(struct spfs_info_s *info)
 	if (!err)
 		err = __spfs_cleanup_env(info, true);
 
-	res = leave_spfs_context(info, NS_MNT_MASK);
+	res = leave_spfs_context(info, orig_ns_mask);
 
 	return err ? err : res;
 }

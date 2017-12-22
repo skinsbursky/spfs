@@ -23,6 +23,7 @@ static int do_replace_resources(struct freeze_cgroup_s *fg,
 	char *pids;
 	int err;
 	LIST_HEAD(processes);
+	unsigned orig_ns_mask;
 
 	err = cgroup_pids(fg, &pids);
 	if (err)
@@ -31,7 +32,7 @@ static int do_replace_resources(struct freeze_cgroup_s *fg,
 	/* We need to set target mount namespace, because we need /proc, where
 	 * we can check, whether process being collected is kthread or not.
 	 */
-	err = set_namespaces(ns_fds, NS_MNT_MASK);
+	err = join_namespaces(ns_fds, NS_MNT_MASK, &orig_ns_mask);
 	if (err)
 		goto free_pids;
 
@@ -39,9 +40,9 @@ static int do_replace_resources(struct freeze_cgroup_s *fg,
 	if (err)
 		goto release_processes;
 
-	/* And we also want to revert mount namespace bask, so we can find the
+	/* And we also want to revert mount namespace back, so we can find the
 	 * freezer cgroup to thaw before seize. */
-	err = set_namespaces(mgr_ns_fds(), NS_MNT_MASK);
+	err = set_namespaces(mgr_ns_fds(), orig_ns_mask);
 	if (err)
 		goto release_processes;
 
@@ -53,7 +54,7 @@ static int do_replace_resources(struct freeze_cgroup_s *fg,
 	 * We do it before seize, becuase of parasite injection, which accesses
 	 * process /proc information.
 	 */
-	err = set_namespaces(ns_fds, NS_MNT_MASK | NS_NET_MASK);
+	err = join_namespaces(ns_fds, NS_MNT_MASK | NS_NET_MASK, &orig_ns_mask);
 	if (err)
 		goto release_processes;
 
@@ -98,7 +99,7 @@ int __replace_resources(struct freeze_cgroup_s *fg, int *ns_fds,
 	 * and opened file modifications).
 	 * Also, ptrace needs to use pids, located in its pid namespace.
 	 */
-	err = set_namespaces(ns_fds, NS_PID_MASK);
+	err = join_namespaces(ns_fds, NS_PID_MASK, NULL);
 	if (err)
 		return err;
 
