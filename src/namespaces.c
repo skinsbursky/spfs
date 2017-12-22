@@ -6,6 +6,9 @@
 #include <unistd.h>
 #include <limits.h>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+
 #include "include/log.h"
 #include "include/namespaces.h"
 
@@ -50,11 +53,6 @@ int set_namespaces(const int *ns_fds, unsigned ns_mask)
 	if (!ns_fds)
 		return 0;
 
-	if (!ns_mask) {
-		pr_err("ns_mask is empty\n");
-		return -EINVAL;
-	}
-
 	for (ns_type = NS_UTS; ns_type < NS_MAX; ns_type++) {
 		if ((ns_mask & (1 << ns_type)) == 0)
 			continue;
@@ -69,6 +67,59 @@ int set_namespaces(const int *ns_fds, unsigned ns_mask)
 		if (err)
 			break;
 	}
+	return err;
+}
+
+static bool skip_ns(int ns_fd, int ns_type)
+{
+	struct stat fd_ns_st, self_ns_st;
+	char ns_path[] = "/proc/self/ns/XXXXX";
+
+	if (fstat(ns_fd, &fd_ns_st) == -1) {
+		pr_perror("failed to stat /proc/self/fd/%d", ns_fd);
+		return true;
+	}
+
+	snprintf(ns_path, strlen(ns_path), "/proc/self/ns/%s", ns_names[ns_type]);
+	if (stat(ns_path, &self_ns_st) == -1) {
+		pr_perror("failed to stat %s", ns_path);
+		sleep(1000);
+		return true;
+	}
+
+	return !memcmp(&fd_ns_st, &self_ns_st, sizeof(struct stat));
+}
+
+int join_namespaces(const int *ns_fds, unsigned ns_mask, unsigned *rst_mask)
+{
+	int err = 0;
+	unsigned real_mask = 0;
+
+	if (ns_fds) {
+		int ns_type;
+
+		if (!ns_mask) {
+			pr_err("ns_mask is empty\n");
+			return -EINVAL;
+		}
+
+		for (ns_type = NS_UTS; ns_type < NS_MAX; ns_type++) {
+			if ((ns_mask & (1 << ns_type)) == 0)
+				continue;
+
+			if (skip_ns(ns_fds[ns_type], ns_type)) {
+				pr_debug("Skipping %s namespace\n", ns_names[ns_type]);
+				continue;
+			}
+
+			real_mask |= 1 << ns_type;
+		}
+
+		err = set_namespaces(ns_fds, real_mask);
+	}
+
+	if (rst_mask)
+		*rst_mask = real_mask;
 	return err;
 }
 
