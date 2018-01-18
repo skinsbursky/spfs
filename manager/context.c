@@ -47,11 +47,15 @@ static void cleanup_spfs_mount(struct spfs_manager_context_s *ctx,
 {
 	bool failed = WIFSIGNALED(status) || !!WEXITSTATUS(status);
 
-	pr_debug("removing info %s from the list\n", info->mnt.id);
+	pr_debug("removing info %s from the list (replacer pid %d)\n",
+		  info->mnt.id, info->replacer);
 
-	if (failed)
+	if (failed) {
 		/* SPFS master was failed. We need to release the reference */
 		spfs_release_mnt(info);
+		if (info->replacer > 0 && kill(info->replacer, SIGKILL))
+			pr_perror("Failed to kill replacer");
+	}
 
 	info->dead = true;
 	del_spfs_info(ctx->spfs_mounts, info);
@@ -88,6 +92,7 @@ static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)
 				 * corresponding fd.
 				 */
 				spfs_release_mnt(info);
+			info->replacer = -1;
 		} else {
 			info = find_spfs_by_pid(ctx->spfs_mounts, pid);
 			if (info) {

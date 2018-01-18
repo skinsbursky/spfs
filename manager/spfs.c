@@ -107,6 +107,7 @@ int create_spfs_info(const char *id,
 	INIT_LIST_HEAD(&info->processes);
 
 	info->mode = SPFS_REPLACE_MODE_HOLD;
+	info->replacer = -1;
 
 	*i = info;
 
