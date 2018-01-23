@@ -45,12 +45,12 @@ const char *mgr_ovz_id(void)
 static void cleanup_spfs_mount(struct spfs_manager_context_s *ctx,
 			       struct spfs_info_s *info, int status)
 {
-	bool killed = WIFSIGNALED(status);
+	bool failed = WIFSIGNALED(status) || !!WEXITSTATUS(status);
 
 	pr_debug("removing info %s from the list\n", info->mnt.id);
 
-	if (killed)
-		/* SPFS master was killed. We need to release the reference */
+	if (failed)
+		/* SPFS master was failed. We need to release the reference */
 		spfs_release_mnt(info);
 
 	info->dead = true;
@@ -59,7 +59,7 @@ static void cleanup_spfs_mount(struct spfs_manager_context_s *ctx,
 	if (unlink(info->socket_path))
 		pr_perror("failed to unlink %s", info->socket_path);
 
-	spfs_cleanup_env(info, killed);
+	spfs_cleanup_env(info, failed);
 
 	close_namespaces(info->ns_fds);
 }
