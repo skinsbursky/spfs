@@ -72,8 +72,8 @@ int parse_options(int *orig_argc, char ***orig_argv,
 		{"proxy-mntns-pid",	required_argument,	0, 1003},
 		{0,		0,			0,  0 }
 	};
-	int oind = 0, nind = 1;
-	int argc = *orig_argc, new_argc = 0, prev_optind = 0, help_level = 0;
+	int oind = 0, nind = optind;
+	int argc = *orig_argc, new_argc = 0, help_level = 0;
 	char **argv = *orig_argv, **new_argv;
 	char *mode_str = "stub";
 	char *ready_fd_str = NULL;
@@ -101,15 +101,6 @@ int parse_options(int *orig_argc, char ***orig_argv,
 		if (c == -1)
 			break;
 
-		if (!prev_optind) {
-			/* First option */
-			prev_optind++;
-			if (optind != 1)
-				/* Some non-option paramete was skipped.
-				 * Need to copy it. */
-				copy_args(argv, &nind, new_argv, &new_argc);
-		}
-
 		switch (c) {
 			case 'p':
 				*proxy_dir = optarg;
@@ -132,7 +123,7 @@ int parse_options(int *orig_argc, char ***orig_argv,
 				nind += 2;
 				break;
 			case 'v':
-				if (optind > prev_optind)
+				if (!*verbosity)
 					nind += 1;
 				*verbosity += 1;
 				break;
@@ -163,7 +154,6 @@ int parse_options(int *orig_argc, char ***orig_argv,
 				pr_warn("getopt returned character code: 0%o\n");
 				break;
 		}
-		prev_optind = optind;
 	}
 
 	if (help_level) {
