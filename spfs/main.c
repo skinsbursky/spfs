@@ -375,7 +375,8 @@ int main(int argc, char *argv[])
 	}
 
 	pr_debug("%s: daemon      : %s\n", __func__, foreground ? "no" : "yes");
-	pr_debug("%s: mode        : %d\n", __func__, mode);
+	pr_debug("%s: mode        : %s\n", __func__, (mode == SPFS_STUB_MODE)
+						     ? "Stub" : "Proxy");
 	if (proxy_dir)
 		pr_debug("%s: proxy_dir   : %s\n", __func__, proxy_dir);
 	pr_debug("%s: log         : %s\n", __func__, log_file);
