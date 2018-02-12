@@ -397,18 +397,16 @@ int main(int argc, char *argv[])
 	}
 
 	err = -1;
+	if (!foreground && daemon(0, 0)) {
+		pr_perror("failed to daemonize");
+		goto teardown;
+	}
+
 	if (start_socket_thread())
 		goto teardown;
 
 	if (secure_chroot(root))
 		goto teardown;
-
-	if (!foreground) {
-		if (daemon(0, 0)) {
-			pr_perror("failed to daemonize");
-			goto teardown;
-		}
-	}
 
 	pr_info("SPFS master started successfully\n");
 
