@@ -276,9 +276,11 @@ static int mount_fuse(int argc, char **argv,
 		return -EINVAL;
 	}
 
-	pr_debug("%s: mountpoint  : %s\n", __func__, *mountpoint);
+	pr_debug("%s: FUSE: mountpoint   : %s\n", __func__, *mountpoint);
+	pr_debug("%s: FUSE: foreground   : %s\n", __func__, *foreground ? "yes" : "no");
+	pr_debug("%s: FUSE: multithreaded: %s\n", __func__, *multithreaded ? "yes" : "no");
 
-	/* Needed to return something, when stat for root in Sbut mode is
+	/* Needed to return something, when stat for root in Stub mode is
 	 * called */
 	err = stat(*mountpoint, &ctx->stub_root_stat);
 	if (err < 0) {
@@ -382,6 +384,7 @@ int main(int argc, char *argv[])
 	pr_debug("%s: log         : %s\n", __func__, log_file);
 	pr_debug("%s: socket path : %s\n", __func__, socket_path);
 	pr_debug("%s: root        : %s\n", __func__, root);
+	pr_debug("%s: mnt ns pid  : %d\n", __func__, mnt_ns_pid);
 	pr_debug("%s: verbosity   : +%d\n", __func__, verbosity);
 
 	err = mount_fuse_ns(argc, argv,
