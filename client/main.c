@@ -71,8 +71,8 @@ static void help(char *program)
 	fprintf(stdout, "\t-h   --help            print help (for double option will print fuse help)\n");
 	fprintf(stdout, "\n");
 	fprintf(stdout, "Mode options:\n");
-	fprintf(stdout, "\t--mode                 mode string (\"proxy\", \"stub\", or \"golem\")\n");
-	fprintf(stdout, "\t--path_to_send         proxy directory path to send to spfs\n");
+	fprintf(stdout, "\t--mode                 mode string (\"proxy\" or \"stub\")\n");
+	fprintf(stdout, "\t--proxy-dir            proxy directory path to send to spfs\n");
 	fprintf(stdout, "\n");
 	fprintf(stdout, "Mount options:\n");
 	fprintf(stdout, "\t--source               file system fype source (default: \"none\")\n");
@@ -204,7 +204,7 @@ static int execude_mode_cmd(int argc, char **argv)
 	char *path_to_send = NULL;
 	static struct option opts[] = {
 		{"mode",		required_argument,	0,	1001 },
-		{"path_to_send",	required_argument,	0,	1002 },
+		{"proxy-dir",		required_argument,	0,	1002 },
 		{"socket-path",		required_argument,	0,	1003 },
 		{"help",		no_argument,		0,	'h'},
 		{0,			0,			0,	0 }
