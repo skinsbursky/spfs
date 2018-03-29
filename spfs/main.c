@@ -363,7 +363,7 @@ int main(int argc, char *argv[])
 	int ready_fd = -1, multithreaded, foreground, err, verbosity = 0;
 	char *root = "", *mountpoint;
 	bool single_user = false;
-	int mnt_ns_pid;
+	int mnt_ns_pid = 0;
 	int proxy_mnt_ns_pid = 0;
 	spfs_mode_t mode = SPFS_STUB_MODE;
 	struct fuse *fuse = NULL;
