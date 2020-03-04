@@ -68,6 +68,14 @@ static void cleanup_spfs_mount(struct spfs_manager_context_s *ctx,
 	close_namespaces(info->ns_fds);
 }
 
+static inline void pr_term_mnt_service_info(pid_t pid, int status, const char *mnt, const char* tag)
+{
+	if (WIFEXITED(status))
+		pr_debug("spfs (mnt_id %s) %s (pid %d) exited, status=%d\n", mnt, tag, pid, WEXITSTATUS(status));
+	else
+		pr_err("spfs (mnt_id %s) %s (pid %d) killed by signal %d (%s)\n", mnt, tag, pid, WTERMSIG(status), strsignal(WTERMSIG(status)));
+}
+
 static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)
 {
 	struct spfs_manager_context_s *ctx = &spfs_manager_context;
@@ -79,30 +87,26 @@ static void sigchld_handler(int signal, siginfo_t *siginfo, void *data)
 	while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
 		struct spfs_info_s *info;
 
-		if (WIFEXITED(status))
-			pr_debug("%d exited, status=%d\n", pid, WEXITSTATUS(status));
-		else
-			pr_err("%d killed by signal %d (%s)\n", pid, WTERMSIG(status), strsignal(WTERMSIG(status)));
-
-		info = find_spfs_by_replacer(ctx->spfs_mounts, pid);
-		if (info) {
+		if ((info = find_spfs_by_replacer(ctx->spfs_mounts, pid))) {
 			if (WEXITSTATUS(status) == 0)
 				/* SPFS has been successfully replaced.
 				 * Now we can release spfs mount by closing
 				 * corresponding fd.
 				 */
 				spfs_release_mnt(info);
+
+			pr_term_mnt_service_info(pid, status, info->mnt.id, "replacer");
 			info->replacer = -1;
-		} else {
-			info = find_spfs_by_pid(ctx->spfs_mounts, pid);
-			if (info) {
-				pr_info("spfs %s master has exited\n", info->mnt.id);
-				cleanup_spfs_mount(ctx, info, status);
-				if (list_empty(&ctx->spfs_mounts->list) && ctx->exit_with_spfs) {
-					pr_info("spfs list is empty. Exiting.\n");
-					exit(0);
-				}
+		} else if ((info = find_spfs_by_pid(ctx->spfs_mounts, pid))) {
+			pr_term_mnt_service_info(pid, status, info->mnt.id, "master");
+
+			cleanup_spfs_mount(ctx, info, status);
+			if (list_empty(&ctx->spfs_mounts->list) && ctx->exit_with_spfs) {
+				pr_info("spfs list is empty. Exiting.\n");
+				exit(0);
 			}
+		} else {
+			pr_term_mnt_service_info(pid, status, "unknown", "unknown");
 		}
 	}
 
