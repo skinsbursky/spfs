@@ -76,7 +76,7 @@ int unreliable_conn_handler(int sock, void *data,
 		return -errno;
 	}
 	if (bytes == 0) {
-		pr_debug("%s: peer was closed\n", __func__);
+		pr_debug("%s: peer was closed for fd %d\n", __func__, sock);
 		return -ECONNABORTED;
 	}
 
@@ -105,7 +105,7 @@ int unreliable_socket_loop(int psock, void *data, bool async,
 			break;
 		}
 
-		pr_debug("%s: accepted new socket\n", __func__);
+		pr_debug("%s: accepted new socket fd %d\n", __func__, sock);
 
 		do {
 			err = unreliable_conn_handler(sock, data, packet_handler);
