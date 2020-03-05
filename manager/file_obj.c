@@ -198,6 +198,10 @@ fobj_ops_t fobj_ops[] = {
 		.early_open = unix_sk_early_open,
 		.close = reg_file_close,
 	},
+	[FTYPE_LINK] = {
+		.open = reg_file_open,
+		.close = reg_file_close,
+	},
 };
 
 static file_type_t convert_mode_to_type(mode_t mode)
@@ -233,9 +237,9 @@ static int get_file_ops(mode_t mode, fobj_ops_t **ops)
 		case FTYPE_DIR:
 		case FTYPE_FIFO:
 		case FTYPE_SOCK:
+		case FTYPE_LINK:
 			*ops = &fobj_ops[type];
 			return 0;
-		case FTYPE_LINK:
 		case FTYPE_CHR:
 		case FTYPE_BLK:
 			break;

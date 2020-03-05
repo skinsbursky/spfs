@@ -107,6 +107,7 @@ int create_spfs_info(const char *id,
 	INIT_LIST_HEAD(&info->processes);
 
 	info->mode = SPFS_REPLACE_MODE_HOLD;
+	info->replacer = -1;
 
 	*i = info;
 
@@ -409,9 +410,9 @@ int spfs_prepare_env(struct spfs_info_s *info, const char *proxy_dir)
 	return err ? err : res;
 }
 
-static int __spfs_cleanup_env(struct spfs_info_s *info, bool killed)
+static int __spfs_cleanup_env(struct spfs_info_s *info, bool failed)
 {
-	if (killed && umount(info->work_dir)) {
+	if (failed && umount(info->work_dir)) {
 		pr_perror("failed to umount %s", info->work_dir);
 		return -errno;
 	}
@@ -423,7 +424,7 @@ static int __spfs_cleanup_env(struct spfs_info_s *info, bool killed)
 	return 0;
 }
 
-int spfs_cleanup_env(struct spfs_info_s *info, bool killed)
+int spfs_cleanup_env(struct spfs_info_s *info, bool failed)
 {
 	int err, res;
 	unsigned orig_ns_mask;
@@ -432,7 +433,7 @@ int spfs_cleanup_env(struct spfs_info_s *info, bool killed)
 	if (res)
 		return res;
 
-	err = __spfs_cleanup_env(info, killed);
+	err = __spfs_cleanup_env(info, failed);
 
 	res = leave_spfs_context(info, orig_ns_mask);
 
